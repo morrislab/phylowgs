@@ -286,11 +286,8 @@ def print_tree_latex(tssb,fout,score):
 	fout.close()	
 		
 if __name__ == "__main__":
-
-
-	dir = './best/' # the folder name with best trees	
-
-	fin1='ssm_data.txt'
-	fin2='cnv_data.txt'
+	dir = sys.argv[1] # the folder name with best trees
+	fin1=sys.argv[2]
+	fin2=sys.argv[3]
 	
 	compute_lineages(dir,fin1,fin2,'postk')	
