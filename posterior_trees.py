@@ -83,7 +83,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 		
 
 		# system call pdflatex?
-		call(['pdflatex', './latex/'+str(fidx)+'.tex','-output-directory=./latex/'])
+		#call(['pdflatex', './latex/'+str(fidx)+'.tex','-output-directory=./latex/'])
 
 		fidx+=1
 
