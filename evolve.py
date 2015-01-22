@@ -191,5 +191,5 @@ def test():
 
 if __name__ == "__main__":
 	#run(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4],sys.argv[5],int(sys.argv[6]),int(sys.argv[7]),int(sys.argv[8]))
-	run(sys.argv[1], sys.argv[2])
+	run(sys.argv[1], sys.argv[2], rand_seed=None)
 	#test()
