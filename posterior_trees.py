@@ -215,18 +215,8 @@ def print_index(root, tree_file):
 	global count
 	count+=1
 	tree_file+='{0} & '.format(count)
-	ssms=''
-	for datum in root.get_data():
-		ssms+='{0}, '.format(datum.name)
-	tree_file+=ssms.strip().strip(',')
-	if root.get_data()==[]:
-		tree_file+='-- '
-	#else:
-	#	tree_file=tree_file[:-1]
-		#tree_file+=' & '
-	#for i in range(len(root.params)):
-	#	tree_file+='{0} & '.format(str(around(root.params[i],3)))
-	#tree_file=tree_file[:-2]
+	ssms = root.get_data()
+	tree_file += '%s ' % len(ssms)
 	tree_file+='\\\\\n'
 	for child in root.children():
 		tree_file=print_index(child, tree_file)
