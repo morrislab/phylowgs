@@ -18,7 +18,7 @@ def print_top_trees(fdir,fout,k=5):
 	fout = open(fout,'w')
 	for fname in flist:
 			ctr=0
-			print_best_tree('./'+fdir+'/'+str(fname),fout)
+			print_best_tree(fdir+'/'+str(fname),fout)
 	fout.close()	
 
 def print_best_tree(fin,fout):

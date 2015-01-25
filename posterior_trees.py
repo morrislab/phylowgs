@@ -23,7 +23,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	
 	for idx,fname in enumerate(flist):
 		#if idx>100:continue
-		f=open('./'+fdir+'/'+str(fname))
+		f=open(fdir+'/'+str(fname))
 		tssb = cPickle.load(f)
 		f.close()
 	
@@ -69,7 +69,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fout = open(fout,'w')
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		print_best_tree('./'+fdir+'/'+str(flist[idx]),fout,-1.*score)
+		print_best_tree(fdir+'/'+str(flist[idx]),fout,-1.*score)
 	fout.flush()
 	fout.close()
 	'''
@@ -79,11 +79,11 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fidx=0
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		print_best_tree('./'+fdir+'/'+str(flist[idx]),'./latex/'+str(fidx)+'.tex',-1.*score)
+		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
 		
 
 		# system call pdflatex?
-		call(['pdflatex', './latex/'+str(fidx)+'.tex','-output-directory=./latex/'])
+		call(['pdflatex', 'latex/'+str(fidx)+'.tex','-output-directory=latex/'])
 
 		fidx+=1
 
@@ -288,7 +288,7 @@ def print_tree_latex(tssb,fout,score):
 if __name__ == "__main__":
 
 
-	dir = './best/' # the folder name with best trees	
+	dir = 'best/' # the folder name with best trees
 
 	fin1='ssm_data.txt'
 	fin2='cnv_data.txt'
