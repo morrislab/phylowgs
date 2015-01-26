@@ -81,6 +81,13 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fidx=0
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
+		try:
+			os.mkdir('latex')
+		except OSError, e:
+			if e.errno == 17: # Directory exists
+				pass
+			else:
+				raise e
 		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
 		
 
