@@ -10,6 +10,8 @@ import heapq
 
 from subprocess import call
 
+import argparse
+
 def compute_lineages(fdir,fin1,fin2,fout):
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)	
 	m = len(codes) # number of SSMs+CNVs
@@ -286,11 +288,16 @@ def print_tree_latex(tssb,fout,score):
 	fout.close()	
 		
 if __name__ == "__main__":
+	parser = argparse.ArgumentParser(
+		description='Plot posterior trees resulting from PhyloWGS run',
+		formatter_class=argparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add_argument('-t', '--trees', dest='trees', default='trees',
+		help='Folder name where the MCMC trees/samples are saved')
+	parser.add_argument('ssm_file',
+		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
+	parser.add_argument('cnv_file',
+		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
+	args = parser.parse_args()
 
-
-	dir = 'best/' # the folder name with best trees
-
-	fin1='ssm_data.txt'
-	fin2='cnv_data.txt'
-	
-	compute_lineages(dir,fin1,fin2,'postk')	
+	compute_lineages(args.trees, args.ssm_file, args.cnv_file, 'postk')
