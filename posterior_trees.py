@@ -91,8 +91,14 @@ def compute_lineages(fdir,fin1,fin2,fout):
 		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
 		
 
-		# system call pdflatex?
-		call(['pdflatex', 'latex/'+str(fidx)+'.tex','-output-directory=latex/'])
+		# Call pdflatex. To permit it to find standalone.* files,
+		# change into PhyloWGS directory to run the command, then
+		# change back to previous directory.
+		script_dir = os.path.dirname(os.path.realpath(__file__))
+		old_wd = os.getcwd()
+		os.chdir(script_dir)
+		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
+		os.chdir(old_wd)
 
 		fidx+=1
 
