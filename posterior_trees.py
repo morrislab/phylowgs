@@ -310,7 +310,7 @@ if __name__ == "__main__":
 	parser.add_argument('cnv_file',
 		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
 	parser.add_argument('trees_dir',
-		help='Folder name where the MCMC trees/samples are saved')
+		help='Directory where the MCMC trees/samples are saved')
 	args = parser.parse_args()
 
 	compute_lineages(args.trees_dir, args.ssm_file, args.cnv_file, 'postk')

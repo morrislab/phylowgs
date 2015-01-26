@@ -59,17 +59,17 @@ USAGE:
         optional arguments:
           -h, --help            show this help message and exit
           -t TREES, --trees TREES
-                                Output folder name where the MCMC trees/samples are
+                                Output directory where the MCMC trees/samples are
                                 saved (default: trees)
           -k TOP_K_TREES, --top-k-trees TOP_K_TREES
-                                Output file name to save top-k trees in text format
+                                Output file to save top-k trees in text format
                                 (default: top_k_trees)
           -f CLONAL_FREQS, --clonal-freqs CLONAL_FREQS
                                 Output file to save clonal frequencies (default:
                                 clonalFrequencies)
           -l LLH_TRACE, --llh-trace LLH_TRACE
-                                Output file name to save log likelihood trace
-                                (default: llh_trace)
+                                Output file to save log likelihood trace (default:
+                                llh_trace)
           -s MCMC_SAMPLES, --mcmc-samples MCMC_SAMPLES
                                 Number of MCMC samples (default: 2500)
           -i MH_ITERATIONS, --mh-iterations MH_ITERATIONS
@@ -80,14 +80,11 @@ USAGE:
                                 unspecified, choose random seed automatically.
                                 (default: None)
 
+  4. Generate the posterior trees in PDF/latex format. The LaTeX files and
+     resulting PDFs are saved in the directory 'latex'.
 
-  4. Generate the posterior trees in PDF/latex format. The LaTeX files are
-     saved in folder 'latex'.
+       python posterior_trees.py ssm_data.txt cnv_data.txt trees
 
-       python posterior_trees.py 'trees' 'ssm_data.txt' 'cnv_data.txt'
-       rm *.aux
-       rm *.log
-       mv *.pdf ./latex/
 #######################################################################
 
 

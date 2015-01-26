@@ -199,13 +199,13 @@ if __name__ == "__main__":
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
 	parser.add_argument('-t', '--trees', dest='trees', default='trees',
-		help='Output folder name where the MCMC trees/samples are saved')
+		help='Output directory where the MCMC trees/samples are saved')
 	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
-		help='Output file name to save top-k trees in text format')
+		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
 		help='Output file to save clonal frequencies')
 	parser.add_argument('-l', '--llh-trace', dest='llh_trace', default='llh_trace',
-		help='Output file name to save log likelihood trace')
+		help='Output file to save log likelihood trace')
 	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
 		help='Number of MCMC samples')
 	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
