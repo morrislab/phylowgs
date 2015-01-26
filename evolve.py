@@ -16,6 +16,8 @@ from util2 import *
 from params import *
 from printo import *
 
+import argparse
+
 # MCMC settings
 burnin		= 1000
 num_samples   = 5000
@@ -190,5 +192,41 @@ def test():
 		print [dat.id, dat.__log_likelihood__(0.5)]
 
 if __name__ == "__main__":
-	run(sys.argv[1], sys.argv[2], sys.argv[3], sys.argv[4],sys.argv[5],int(sys.argv[6]),int(sys.argv[7]),int(sys.argv[8]))
 	#test()
+
+	parser = argparse.ArgumentParser(
+		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
+		formatter_class=argparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add_argument('-t', '--trees', dest='trees', default='trees',
+		help='Output folder name where the MCMC trees/samples are saved')
+	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
+		help='Output file name to save top-k trees in text format')
+	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
+		help='Output file to save clonal frequencies')
+	parser.add_argument('-l', '--llh-trace', dest='llh_trace', default='llh_trace',
+		help='Output file name to save log likelihood trace')
+	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
+		help='Number of MCMC samples')
+	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
+		help='Number of Metropolis-Hastings iterations')
+	parser.add_argument('-r', '--random-seed', dest='random_seed', default=None, type=int,
+		help='Random seed for initializing MCMC sampler. If unspecified, choose random seed automatically.')
+	parser.add_argument('ssm_file',
+		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
+	parser.add_argument('cnv_file',
+		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
+	args = parser.parse_args()
+
+	run(
+		args.ssm_file,
+		args.cnv_file,
+		fout=args.trees,
+		out2=args.top_k_trees,
+		out3=args.clonal_freqs,
+		out4=args.llh_trace,
+		num_samples=args.mcmc_samples,
+		mh_itr=args.mh_iterations,
+		mh_std=100,
+		rand_seed=args.random_seed
+	)
