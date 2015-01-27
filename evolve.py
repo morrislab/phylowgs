@@ -210,8 +210,8 @@ if __name__ == "__main__":
 		help='Number of MCMC samples')
 	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
 		help='Number of Metropolis-Hastings iterations')
-	parser.add_argument('-r', '--random-seed', dest='random_seed', default=None, type=int,
-		help='Random seed for initializing MCMC sampler. If unspecified, choose random seed automatically.')
+	parser.add_argument('-r', '--random-seed', dest='random_seed', default=1, type=int,
+		help='Random seed for initializing MCMC sampler')
 	parser.add_argument('ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
 	parser.add_argument('cnv_file',
