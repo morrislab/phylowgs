@@ -97,7 +97,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 		script_dir = os.path.dirname(os.path.realpath(__file__))
 		old_wd = os.getcwd()
 		os.chdir(script_dir)
-		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
+		#call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
 		os.chdir(old_wd)
 
 		fidx+=1
