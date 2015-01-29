@@ -5,12 +5,6 @@ Reconstructing subclonal composition and evolution from whole genome sequencing 
 
 ######################################################################
 
-DEPENDENCIES:
-SciPy - http://www.scipy.org/
-ETE2 - http://ete.cgenomics.org/
-GSL- http://www.gnu.org/software/gsl/
-
-#######################################################################
 
 PREPARING THE INPUT FILE:
 Input file format:
@@ -32,31 +26,82 @@ CNV DATA
 
 
 #######################################################################
-COMPILING THE C++ FILES:
-To compile the C++ file, execute the following command:
-g++ -o mh.o  mh.cpp  util.cpp `gsl-config --cflags --libs`
+USAGE:
 
-RUNNING THE SOFTWARE:
-1. To run the code on the sample data set "ssm_data.txt" and "cnv_data.txt" execute the following command:
+  1. Install dependencies.
 
-python evolve.py 'ssm_data.txt' 'cnv_data.txt' 'trees' 'top_k_trees' 'clonal_frequencies' 'llh_trace' 100 5000 1
+    # Install Python 2 versions of NumPy (www.numpy.org) and SciPy (www.scipy.org).
+    # Install Python 2 version of ETE2 (e.g.: pip2 install --user ete2).
+    # Install GSL (http://www.gnu.org/software/gsl/).
 
-# 'ssm_data.txt': file name of the input ssm data
-# 'cnv_data.txt': file name of the input cnv data
-# 'trees': output folder name where the MCMC trees/samples are saved 
-# 'top_k_trees': output file name to save top-k trees in text format. 
-# 'clonalFrequencies': output file to save clonal frequencies
-# 'llh_trace': output file name to save log likelihood trace
-The last three arguments are the number of MCMC samples, number of Metropolis-Hastings iterations, and a random seed number for initializing the MCMC sampler.
+  2. Compile the C++ file.
 
-2. To generate the posterior trees in PDF/latex format, execute the following commands. The latex files are saved in folder 'latex'
+    g++ -o mh.o  mh.cpp  util.cpp `gsl-config --cflags --libs`
 
- python posterior_trees.py 'trees' 'ssm_data.txt' 'cnv_data.txt'
- rm *.aux
- rm *.log
- mv *.pdf ./latex/
-  
-# 'trees': the folder name where the MCMC trees/samples are located (saved from the above command)
-# 'ssm_data.txt': file name of the input ssm data
-# 'cnv_data.txt': file name of the input cnv data
+  3. Run PhyloWGS.
+
+    # Minimum invocation on sample data set: python2 evolve.py ssm_data.txt cnv_data.txt
+
+    # All options:
+
+        usage: evolve.py [-h] [-t TREES] [-k TOP_K_TREES] [-f CLONAL_FREQS]
+                         [-l LLH_TRACE] [-s MCMC_SAMPLES] [-i MH_ITERATIONS]
+                         [-r RANDOM_SEED]
+                         ssm_file cnv_file
+
+        positional arguments:
+          ssm_file              File listing SSMs (simple somatic mutations, i.e.,
+                                single nucleotide variants. For proper format, see
+                                README.txt.
+          cnv_file              File listing CNVs (copy number variations). For proper
+                                format, see README.txt.
+
+        optional arguments:
+          -h, --help            show this help message and exit
+          -t TREES, --trees TREES
+                                Output directory where the MCMC trees/samples are
+                                saved (default: trees)
+          -k TOP_K_TREES, --top-k-trees TOP_K_TREES
+                                Output file to save top-k trees in text format
+                                (default: top_k_trees)
+          -f CLONAL_FREQS, --clonal-freqs CLONAL_FREQS
+                                Output file to save clonal frequencies (default:
+                                clonalFrequencies)
+          -l LLH_TRACE, --llh-trace LLH_TRACE
+                                Output file to save log likelihood trace (default:
+                                llh_trace)
+          -s MCMC_SAMPLES, --mcmc-samples MCMC_SAMPLES
+                                Number of MCMC samples (default: 2500)
+          -i MH_ITERATIONS, --mh-iterations MH_ITERATIONS
+                                Number of Metropolis-Hastings iterations (default:
+                                5000)
+          -r RANDOM_SEED, --random-seed RANDOM_SEED
+                                Random seed for initializing MCMC sampler. If
+                                unspecified, choose random seed automatically.
+                                (default: None)
+
+  4. Generate the posterior trees in PDF/latex format. The LaTeX files and
+     resulting PDFs are saved in the directory 'latex'.
+
+       python posterior_trees.py ssm_data.txt cnv_data.txt trees
+
 #######################################################################
+
+
+#######################################################################
+LICENSE:
+
+Copyright (C) 2015 Quaid Morris
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <http://www.gnu.org/licenses/>.

@@ -12,6 +12,7 @@ from numpy.random import dirichlet
 import subprocess as sp
 
 import util2 as u2
+import os
 
 # done for multi-sample
 def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2='',rseed=1, ntps=5):
@@ -48,7 +49,8 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	NNODES = str(len(nodes))
 	TREE_HEIGHT = str(max([node.ht for node in nodes])+1)
 	
-	sp.call(['./mh.o', MH_ITR, MH_STD, N_SSM_DATA, N_CNV_DATA, NNODES, TREE_HEIGHT, FNAME_SSM_DATA, FNAME_CNV_DATA, FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS,FNAME_C_MH_ARATIO, NTPS])
+	script_dir = os.path.dirname(os.path.realpath(__file__))
+	sp.call(['%s/mh.o' % script_dir, MH_ITR, MH_STD, N_SSM_DATA, N_CNV_DATA, NNODES, TREE_HEIGHT, FNAME_SSM_DATA, FNAME_CNV_DATA, FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS,FNAME_C_MH_ARATIO, NTPS])
 	ar = str(loadtxt(FNAME_C_MH_ARATIO,dtype='string'))
 	update_tree_params(tssb,FNAME_C_PARAMS) # update the tree with the new parameters sampled using the c++ code
 	

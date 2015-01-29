@@ -10,6 +10,8 @@ import heapq
 
 from subprocess import call
 
+import argparse
+
 def compute_lineages(fdir,fin1,fin2,fout):
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)	
 	m = len(codes) # number of SSMs+CNVs
@@ -23,7 +25,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	
 	for idx,fname in enumerate(flist):
 		#if idx>100:continue
-		f=open('./'+fdir+'/'+str(fname))
+		f=open(fdir+'/'+str(fname))
 		tssb = cPickle.load(f)
 		f.close()
 	
@@ -69,7 +71,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fout = open(fout,'w')
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		print_best_tree('./'+fdir+'/'+str(flist[idx]),fout,-1.*score)
+		print_best_tree(fdir+'/'+str(flist[idx]),fout,-1.*score)
 	fout.flush()
 	fout.close()
 	'''
@@ -79,11 +81,24 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fidx=0
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		print_best_tree('./'+fdir+'/'+str(flist[idx]),'./latex/'+str(fidx)+'.tex',-1.*score)
+		try:
+			os.mkdir('latex')
+		except OSError, e:
+			if e.errno == 17: # Directory exists
+				pass
+			else:
+				raise e
+		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
 		
 
-		# system call pdflatex?
-		#call(['pdflatex', './latex/'+str(fidx)+'.tex','-output-directory=./latex/'])
+		# Call pdflatex. To permit it to find standalone.* files,
+		# change into PhyloWGS directory to run the command, then
+		# change back to previous directory.
+		script_dir = os.path.dirname(os.path.realpath(__file__))
+		old_wd = os.getcwd()
+		os.chdir(script_dir)
+		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
+		os.chdir(old_wd)
 
 		fidx+=1
 
@@ -276,8 +291,16 @@ def print_tree_latex(tssb,fout,score):
 	fout.close()	
 		
 if __name__ == "__main__":
-	dir = sys.argv[1] # the folder name with best trees
-	fin1=sys.argv[2]
-	fin2=sys.argv[3]
-	
-	compute_lineages(dir,fin1,fin2,'postk')	
+	parser = argparse.ArgumentParser(
+		description='Plot posterior trees resulting from PhyloWGS run',
+		formatter_class=argparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add_argument('ssm_file',
+		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
+	parser.add_argument('cnv_file',
+		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
+	parser.add_argument('trees_dir',
+		help='Directory where the MCMC trees/samples are saved')
+	args = parser.parse_args()
+
+	compute_lineages(args.trees_dir, args.ssm_file, args.cnv_file, 'postk')

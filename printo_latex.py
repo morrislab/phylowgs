@@ -23,7 +23,7 @@ def print_trees(fdir,fout,k):
 	i=0
 	for fname in flist:
 		i=i+1
-		fin = './'+fdir+'/'+str(fname)
+		fin = fdir+'/'+str(fname)
 		fh = open(fin)
 		tssb = cPickle.load(fh)
 		fh.close()

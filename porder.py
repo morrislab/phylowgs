@@ -34,7 +34,7 @@ def print_porder(fdir,dname,fout):
 	ns = len(flist) #number of MCMC samples
 	
 	for idx,fname in enumerate(flist):
-		f=open('./'+fdir+'/'+str(fname))
+		f=open(fdir+'/'+str(fname))
 		tssb = cPickle.load(f)
 		f.close()
 		
