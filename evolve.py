@@ -218,6 +218,16 @@ if __name__ == "__main__":
 		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
 	args = parser.parse_args()
 
+	# Ensure input files exist and can be read.
+	try:
+		ssm_file = open(args.ssm_file)
+		cnv_file = open(args.cnv_file)
+		ssm_file.close()
+		cnv_file.close()
+	except IOError as e:
+		print(e)
+		sys.exit(1)
+
 	run(
 		args.ssm_file,
 		args.cnv_file,
