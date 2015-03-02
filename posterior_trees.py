@@ -258,8 +258,19 @@ def print_index(root, tree_file,freqs):
 	global count
 	count+=1
 	tree_file+='{0} & '.format(count)
-	ssms = root.get_data()
-	tree_file += '%s & ' % len(ssms)
+
+	num_ssms = 0
+	num_cnvs = 0
+	mutations = root.get_data()
+	for mut in mutations:
+		if mut.id.startswith('s'):
+			num_ssms += 1
+		elif mut.id.startswith('c'):
+			num_cnvs += 1
+		else:
+			raise Exception('Unknown mutation ID type: %s' % mut.id)
+
+	tree_file += '%s & %s &' % (num_ssms, num_cnvs)
 
 	# print params
 	names=''
@@ -310,12 +321,12 @@ def print_tree_latex(tssb,fout,score,freqs):
 	tree_file+='\\node (b) at (a.south)[anchor=north,yshift=-.5cm]{\n'
 	tree_file+='\\begin{tikzpicture}\n'	
 	tree_file+='\\node (table){\n'
-	tree_file+='\\begin{tabular}{|c|p{5cm}|'
+	tree_file+='\\begin{tabular}{|c|l|l|'
 	for i in range(len(tssb.root['node'].params)):
 		tree_file+='l|'
 	tree_file+='}\n'
 	tree_file+='\\hline\n'
-	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{Mutations}} & \multicolumn{{{0}}}{{|c|}}{{Clonal frequencies}}\\\\\n'.format(len(tssb.root['node'].params))
+	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{SSMs}} & \multicolumn{{1}}{{|c|}}{{CNVs}} & \multicolumn{{{0}}}{{|c|}}{{Clonal frequencies}}\\\\\n'.format(len(tssb.root['node'].params))
 	tree_file+='\\hline\n'
 	tree_file=print_index(tssb.root['node'], tree_file,freqs)
 	tree_file+='\\hline\n'
