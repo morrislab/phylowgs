@@ -64,7 +64,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 		prob =round(len(tssb_list)*1./ns,4)
 		#print 'posterior probability: ' + repr(prob)
 		idx = tssb_list[0]
-		heapq.heappush(post_trees,(-1.*prob,idx))
+		heapq.heappush(post_trees,(-1.*prob,tssb_list))
 
 
 	# print the trees in ascii format
@@ -80,16 +80,43 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	# print the trees in latext format
 	fout = open(fout,'w')
 	fidx=0
+	try:
+		os.mkdir('latex')
+	except OSError, e:
+		if e.errno == 17: # Directory exists
+			pass
+		else:
+			raise e
+
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		try:
-			os.mkdir('latex')
-		except OSError, e:
-			if e.errno == 17: # Directory exists
-				pass
-			else:
-				raise e
-		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
+
+		# aggregate frequencies
+		freqs = dict()
+		for id1 in idx:
+			fh = open(fdir+'/'+str(flist[id1]))
+			tssb = cPickle.load(fh)
+			fh.close()
+
+			remove_empty_nodes(tssb.root, None)
+
+			def descend(root):
+				for child in root.children():
+					descend(child)
+
+				names=''
+				for dat in root.get_data():names+=dat.name+';'
+				names=names.strip(';')
+
+				if names in freqs:
+					freqs[names].append(root.params)
+				else:
+					if len(names)>0 or root.parent() is None:
+						freqs[names]=[]
+						freqs[names].append(root.params)
+			descend(tssb.root['node'])
+
+		print_best_tree(fdir+'/'+str(flist[idx[0]]),'latex/'+str(fidx)+'.tex',-1.*score,freqs)
 		
 
 		# Call pdflatex. To permit it to find standalone.* files,
@@ -124,7 +151,7 @@ def sort_and_merge(gtypelist):
 
 ### printing stuff #################
 
-def print_best_tree(fin,fout,score):
+def print_best_tree(fin,fout,score,freqs):
 	fh = open(fin)
 	tssb = cPickle.load(fh)
 	fh.close()
@@ -134,7 +161,7 @@ def print_best_tree(fin,fout,score):
 	#wts, nodes = tssb.get_mixture()
 	#w = dict([(n[1], n[0]) for n in zip(wts,nodes)])
 	
-	print_tree_latex(tssb,fout,score)
+	print_tree_latex(tssb,fout,score,freqs)
 
 ctr=0
 def print_best_tree1(fin,fout,score):
@@ -227,21 +254,32 @@ def write_tree(root, tree_file):
 # writes code for index
 # root: root of the tree
 # tree_file: string with latex code
-def print_index(root, tree_file):
+def print_index(root, tree_file,freqs):
 	global count
 	count+=1
 	tree_file+='{0} & '.format(count)
 	ssms = root.get_data()
-	tree_file += '%s ' % len(ssms)
+	tree_file += '%s & ' % len(ssms)
+
+	# print params
+	names=''
+	for dat in root.get_data():names+=dat.name+';'
+	names=names.strip(';')
+	freq = array(freqs[names])
+	for i in range(len(root.params)):
+		#tree_file+='{0} & '.format(str(around(root.params[i],3)))
+		tree_file+='{0} & '.format( str(around(mean(freq[:,i]),3)) + ' $\pm$ ' + str(around(std(freq[:,i]),3)) )
+	tree_file=tree_file[:-2]
 	tree_file+='\\\\\n'
+
 	for child in root.children():
-		tree_file=print_index(child, tree_file)
+		tree_file=print_index(child, tree_file,freqs)
 	return tree_file
 
 # writes the latex code
 # tssb: tssb structure of the tree
 # fout: output file for latex
-def print_tree_latex(tssb,fout,score):
+def print_tree_latex(tssb,fout,score,freqs):
 	global count
 	#remove_empty_nodes(tssb.root, None)
 
@@ -277,9 +315,9 @@ def print_tree_latex(tssb,fout,score):
 		tree_file+='l|'
 	tree_file+='}\n'
 	tree_file+='\\hline\n'
-	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{Mutations}}\\\\\n'.format(len(tssb.root['node'].params))
+	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{Mutations}} & \multicolumn{{{0}}}{{|c|}}{{Clonal frequencies}}\\\\\n'.format(len(tssb.root['node'].params))
 	tree_file+='\\hline\n'
-	tree_file=print_index(tssb.root['node'], tree_file)
+	tree_file=print_index(tssb.root['node'], tree_file,freqs)
 	tree_file+='\\hline\n'
 	tree_file+='\\end{tabular}\n'
 	tree_file+='};\n'
