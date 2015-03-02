@@ -22,10 +22,11 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	# file names
 	FNAME_SSM_DATA = fin1
 	FNAME_CNV_DATA = fin2
-	FNAME_C_TREE = 'c_tree_' + fin1.split('.')[0] + '_' + str(rseed) + '.txt'
-	FNAME_C_DATA_STATES = 'c_data_states_' + fin1.split('.')[0] + '_' + str(rseed) + '.txt'
-	FNAME_C_PARAMS = 'c_params_' + fin1.split('.')[0] + '_' + str(rseed) + '.txt' ;
-	FNAME_C_MH_ARATIO = 'c_mh_ar_' + fin1.split('.')[0] + '_' + str(rseed) + '.txt' ;
+	basename = os.path.basename(fin1).split('.')[0]
+	FNAME_C_TREE = 'c_tree_' + basename + '_' + str(rseed) + '.txt'
+	FNAME_C_DATA_STATES = 'c_data_states_' + basename + '_' + str(rseed) + '.txt'
+	FNAME_C_PARAMS = 'c_params_' + basename + '_' + str(rseed) + '.txt' ;
+	FNAME_C_MH_ARATIO = 'c_mh_ar_' + basename + '_' + str(rseed) + '.txt' ;
 	NTPS = str(ntps)
 
 	## initialize the MH sampler###########
