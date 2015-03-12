@@ -4,7 +4,6 @@ import cPickle
 import numpy
 import scipy.special
 import scipy.stats
-import scipy.io
 
 def bucket(edges, value):
     return numpy.sum(value > edges)
