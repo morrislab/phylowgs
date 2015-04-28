@@ -148,7 +148,7 @@ def write_data_state(tssb,fname):
 						dat.state2 += str(node.id) + ',' + str(mr_cnv[2]) + ',' + str(mr_cnv[1]) + ';' # paternal
 					
 				else:
-					dat.state1 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(1) + ';'
+					dat.state1 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(min(1,mr_cnv[1]+mr_cnv[2])) + ';'
 					dat.state2 = dat.state1 
 			else:
 				print "PANIC"

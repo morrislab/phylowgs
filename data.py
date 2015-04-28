@@ -88,10 +88,10 @@ class Datum(object):
 					self.nr2 = self.nr2 + pi * mr_cnv[2]
 					self.nv2 = self.nv2 + pi * mr_cnv[1]
 				else:
-					self.nr1 = self.nr1 + pi * (mr_cnv[1]+mr_cnv[2] - 1)
-					self.nv1 = self.nv1 + pi
-					self.nr2 = self.nr2 + pi * (mr_cnv[1] + mr_cnv[2] - 1)
-					self.nv2 = self.nv2 + pi
+					self.nr1 = self.nr1 + pi * max(0,(mr_cnv[1]+mr_cnv[2] - 1))
+					self.nv1 = self.nv1 + pi * min(1,mr_cnv[1]+mr_cnv[2])
+					self.nr2 = self.nr2 + pi * max(0,(mr_cnv[1] + mr_cnv[2] - 1))
+					self.nv2 = self.nv2 + pi * min(1,mr_cnv[1]+mr_cnv[2])
 			else:
 				print "PANIC"
 		
