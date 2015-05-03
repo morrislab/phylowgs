@@ -12,23 +12,16 @@ from subprocess import call
 
 import argparse
 
-def compute_lineages(fdir,fin1,fin2,fout):
+def compute_lineages(archive_fn,fin1,fin2,fout):
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)	
 	m = len(codes) # number of SSMs+CNVs
-	
-	flist = os.listdir(fdir)
-	if sum([flist[i]=='.DS_Store' for i in arange(len(flist))]): flist.remove('.DS_Store')
-	ns = len(flist) #number of MCMC samples
+	tree_reader = TreeReader(archive_fn)
+	ns = tree_reader.num_trees() #number of MCMC samples
 	
 	G = dict()
 	datalist = dict([(datum.name,str(i)) for i,datum in enumerate(codes)])
 	
-	for idx,fname in enumerate(flist):
-		#if idx>100:continue
-		f=open(fdir+'/'+str(fname))
-		tssb = cPickle.load(f)
-		f.close()
-	
+	for idx, llh, tssb in tree_reader.load_trees_and_metadata():
 		wts,nodes = tssb.get_mixture()
 		genotype = dict([(id(node),'') for i,node in enumerate(nodes)])
 		gtypelist = []
@@ -56,8 +49,6 @@ def compute_lineages(fdir,fin1,fin2,fout):
 
 
 	post_trees = []
-	flist = os.listdir(fdir)
-	if sum([flist[i]=='.DS_Store' for i in arange(len(flist))]): flist.remove('.DS_Store')
 	for ptree in G.keys():
 		tssb_list = G[ptree]
 		prob =round(len(tssb_list)*1./ns,4)
@@ -76,20 +67,21 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	fout.close()
 	'''
 
-	# print the trees in latext format
+	# print the trees in latex format
+	try:
+		os.mkdir('posterior_trees')
+	except OSError, e:
+		if e.errno == 17: # Directory exists
+			pass
+		else:
+			raise e
 	fout = open(fout,'w')
 	fidx=0
 	while(len(post_trees)):
 		score,idx = heapq.heappop(post_trees)
-		try:
-			os.mkdir('latex')
-		except OSError, e:
-			if e.errno == 17: # Directory exists
-				pass
-			else:
-				raise e
-		print_best_tree(fdir+'/'+str(flist[idx]),'latex/'+str(fidx)+'.tex',-1.*score)
-		
+		score = -score
+		tex_fn = 'posterior_trees/tree_%s_%s.tex' % (fidx, score)
+		print_best_tree(tree_reader.load_tree(idx), tex_fn, score)
 
 		# Call pdflatex. To permit it to find standalone.* files,
 		# change into PhyloWGS directory to run the command, then
@@ -97,7 +89,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 		script_dir = os.path.dirname(os.path.realpath(__file__))
 		old_wd = os.getcwd()
 		os.chdir(script_dir)
-		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
+		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/posterior_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
 		os.chdir(old_wd)
 
 		fidx+=1
@@ -105,9 +97,7 @@ def compute_lineages(fdir,fin1,fin2,fout):
 	
 	fout.flush()
 	fout.close()
-
-
-
+	tree_reader.close()
 
 def _sort(str):
 	str = sort(str.split('_'))
@@ -123,11 +113,7 @@ def sort_and_merge(gtypelist):
 
 ### printing stuff #################
 
-def print_best_tree(fin,fout,score):
-	fh = open(fin)
-	tssb = cPickle.load(fh)
-	fh.close()
-	
+def print_best_tree(tssb,fout,score):
 	remove_empty_nodes(tssb.root, None) # removes empty leaves
 	
 	#wts, nodes = tssb.get_mixture()
@@ -136,13 +122,9 @@ def print_best_tree(fin,fout,score):
 	print_tree_latex(tssb,fout,score)
 
 ctr=0
-def print_best_tree1(fin,fout,score):
+def print_best_tree1(tssb,fout,score):
 	global ctr
 	ctr=0
-	fh = open(fin)
-	tssb = cPickle.load(fh)
-	fh.close()
-	
 	remove_empty_nodes(tssb.root, None) # removes empty leaves
 	
 	#wts, nodes = tssb.get_mixture()
@@ -305,12 +287,12 @@ if __name__ == "__main__":
 		description='Plot posterior trees resulting from PhyloWGS run',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
+	parser.add_argument('-t', '--trees', dest='trees', default='trees.zip',
+		help='Output file where the MCMC trees/samples are saved')
 	parser.add_argument('ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
 	parser.add_argument('cnv_file',
 		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
-	parser.add_argument('trees_dir',
-		help='Directory where the MCMC trees/samples are saved')
 	args = parser.parse_args()
 
-	compute_lineages(args.trees_dir, args.ssm_file, args.cnv_file, 'postk')
+	compute_lineages(args.trees, args.ssm_file, args.cnv_file, 'postk')

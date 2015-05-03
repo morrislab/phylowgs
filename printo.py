@@ -1,5 +1,3 @@
-import cPickle
-
 from numpy	  import *
 from numpy.random import *
 from tssb		import *
@@ -11,29 +9,29 @@ from ete2 import *
 from subprocess import call
 
 ctr=0
-def print_top_trees(fdir,fout,k=5):
+def print_top_trees(tree_archive,fout,k=5):
 	global ctr;
-	flist = os.listdir(fdir); 
-	if sum([flist[i]=='.DS_Store' for i in arange(len(flist))]): flist.remove('.DS_Store')
-	if len(flist)<k:k=len(flist)
-	flist = sort(array(flist,float))[::-1][:k]
 	fout = open(fout,'w')
-	for fidx,fname in enumerate(flist):
+	tree_reader = TreeReader(tree_archive)
+
+	try:
+		os.mkdir('top_trees')
+	except OSError, e:
+		if e.errno == 17: # Directory exists
+			pass
+		else:
+			raise e
+
+	for idx, (tidx, llh, tree) in enumerate(tree_reader.load_trees_and_metadata(k)):
 			ctr=0
 			
 			# print top K trees in ascii
-			print_best_tree(fdir+'/'+str(fname),fout)
+			print_best_tree(tree,fout)
 			
 			# print top K trees in pdf format
-			try:
-				os.mkdir('latex')
-			except OSError, e:
-				if e.errno == 17: # Directory exists
-					pass
-				else:
-					raise e
 					
-			print_best_tree_pdf(fdir+'/'+str(fname),'./latex/'+str(fidx)+'.tex')			
+			tex_fn = 'top_trees/tree_%s_%s.tex' % (idx, llh)
+			print_best_tree_pdf(tree, tex_fn)
 			
 			# Call pdflatex. To permit it to find standalone.* files,
 			# change into PhyloWGS directory to run the command, then
@@ -41,17 +39,13 @@ def print_top_trees(fdir,fout,k=5):
 			script_dir = os.path.dirname(os.path.realpath(__file__))
 			old_wd = os.getcwd()
 			os.chdir(script_dir)
-			call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/latex/' % old_wd, old_wd+'/latex/'+str(fidx)+'.tex'])
+			call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
 			os.chdir(old_wd)
 			
-			
+	tree_reader.close()
 	fout.close()	
 
-def print_best_tree(fin,fout):
-	fh = open(fin)
-	tssb = cPickle.load(fh)
-	fh.close()
-	
+def print_best_tree(tssb,fout):
 	wts, nodes = tssb.get_mixture()
 	w = dict([(n[1], n[0]) for n in zip(wts,nodes)])
 	nnodes = sum( [ 1 for node in nodes if len(node.get_data()) ] )
@@ -115,11 +109,7 @@ def remove_empty_nodes(root, parent):
 
 		
 ### printing stuff #################
-def print_best_tree_pdf(fin,fout,score=0):
-	fh = open(fin)
-	tssb = cPickle.load(fh)
-	fh.close()
-	
+def print_best_tree_pdf(tssb,fout,score=0):
 	remove_empty_nodes(tssb.root, None) # removes empty leaves
 	
 	#wts, nodes = tssb.get_mixture()

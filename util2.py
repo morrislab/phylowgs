@@ -1,5 +1,7 @@
 import numpy
 from numpy import *
+import cPickle as pickle
+import zipfile
 
 import scipy.stats as stat
 from scipy.stats import beta, binom
@@ -103,3 +105,62 @@ def check_bounds(p,l=0.0001,u=.9999):
 	if p < l: p=l
 	if p > u: p=u
 	return p
+
+class TreeWriter(object):
+    def __init__(self, archive_fn):
+	self._archive = zipfile.ZipFile(archive_fn, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+	self._counter = 0
+
+    def write_tree(self, tree, llh):
+	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
+	self._archive.writestr('tree_%s_%s' % (self._counter, llh), serialized)
+	self._counter += 1
+
+    def close(self):
+	self._archive.close()
+
+class TreeReader(object):
+    def __init__(self, archive_fn):
+	self._archive = zipfile.ZipFile(archive_fn)
+	infolist = self._archive.infolist()
+	infolist.sort(key = lambda zinfo: self._extract_metadata(zinfo)[0])
+	self._trees = []
+	for info in infolist:
+	    idx, llh = self._extract_metadata(info)
+	    assert idx == len(self._trees)
+	    self._trees.append((idx, llh, info))
+
+    def num_trees(self):
+	return len(self._trees)
+
+    def close(self):
+	self._archive.close()
+
+    def _extract_metadata(self, zinfo):
+	tokens = zinfo.filename.split('_')
+	idx = int(tokens[1])
+	llh = float(tokens[2])
+	return (idx, llh)
+
+    def load_tree(self, idx):
+	tidx, llh, zinfo = self._trees[idx]
+	assert tidx == idx
+	pickled = self._archive.read(zinfo)
+	return pickle.loads(pickled)
+
+    def load_trees(self, num_trees=None):
+	for idx, llh, tree in self.load_trees_and_llhs(archive_fn, num_trees):
+	    yield tree
+
+    def load_trees_and_metadata(self, num_trees=None):
+	# Sort by LLH
+	trees = sorted(self._trees, key = lambda (tidx, llh, zinfo): llh, reverse=True)
+
+	if num_trees is not None:
+	    num_trees = min(num_trees,len(trees))
+	    trees = trees[:num_trees]
+
+	for tidx, llh, zinfo in trees:
+	    pickled = self._archive.read(zinfo)
+	    tree = pickle.loads(pickled)
+	    yield (tidx, llh, tree)
