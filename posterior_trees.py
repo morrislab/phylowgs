@@ -93,7 +93,7 @@ def compute_lineages(archive_fn,fin1,fin2):
 			descend(tssb.root['node'])
 
 		tex_fn = 'posterior_trees/tree_%s_%s.tex' % (fidx, score)
-		print_best_tree(tree_reader.load_tree(idx), tex_fn, score, freqs)
+		print_best_tree(tree_reader.load_tree(idx[0]), tex_fn, score, freqs)
 
 		# Call pdflatex. To permit it to find standalone.* files,
 		# change into PhyloWGS directory to run the command, then
