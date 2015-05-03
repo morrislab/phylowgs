@@ -4,7 +4,6 @@ import sys
 import time
 import cPickle
 
-from subprocess import call
 from numpy		import *
 from numpy.random import *
 from tssb		 import *
@@ -46,13 +45,7 @@ NTPS = 5
 # mh_itr: number of metropolis-hasting iterations
 # dp_alpha: dp alpha
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def run(fin1,fin2,fout='best',out2='top_k_trees',out3='clonal_frequencies',out4='llh_trace',num_samples=2500,mh_itr=5000,mh_std=100,rand_seed=1):
-	if not os.path.exists(fout):
-		os.makedirs(fout)
-	else:
-		call(['rm','-r',fout])
-		os.makedirs(fout)
-
+def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',out4='llh_trace',num_samples=2500,mh_itr=5000,mh_std=100,rand_seed=1):
 	seed(rand_seed)
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)
 	NTPS = len(codes[0].a) # number of samples / time point
@@ -93,6 +86,7 @@ def run(fin1,fin2,fout='best',out2='top_k_trees',out3='clonal_frequencies',out4=
 	freq = dict([(g,[] )for g in glist])	
 	
 	print "Starting MCMC run..."
+	tree_writer = TreeWriter(fout)
 	
 	for iter in range(-burnin,num_samples):
 		if iter<0: print iter
@@ -159,9 +153,7 @@ def run(fin1,fin2,fout='best',out2='top_k_trees',out3='clonal_frequencies',out4=
 
 		# save all trees
 		if iter >= 0:
-			fh = open(fout+'/'+str((cd_llh_traces[iter])[0]), 'w')
-			cPickle.dump(tssb, fh)
-			fh.close()
+			tree_writer.write_tree(tssb, cd_llh_traces[iter][0])
 		
 		wts, nodes = tssb.get_mixture()
 		#Save log likelihood:savetxt('loglike',cd_llh_traces)
@@ -177,6 +169,8 @@ def run(fin1,fin2,fout='best',out2='top_k_trees',out3='clonal_frequencies',out4=
 					if datum.name in freq:
 						freq[datum.name].append(float(round(node.params,5)))
 		'''
+	tree_writer.close()
+
 	#save the best tree
 	print_top_trees(fout,out2,top_k)
 
@@ -199,8 +193,8 @@ if __name__ == "__main__":
 		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
-	parser.add_argument('-t', '--trees', dest='trees', default='trees',
-		help='Output directory where the MCMC trees/samples are saved')
+	parser.add_argument('-t', '--trees', dest='trees', default='trees.zip',
+		help='Output file where the MCMC trees/samples are saved')
 	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
 		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
