@@ -55,6 +55,8 @@ def compute_lineages(archive_fn,fin1,fin2):
 		prob =round(len(tssb_list)*1./ns,4)
 		#print 'posterior probability: ' + repr(prob)
 		idx = tssb_list[0]
+		# Note that trees aren't ordered by likelihood -- only posterior
+		# probabaility.
 		heapq.heappush(post_trees,(-1.*prob,tssb_list))
 
 
