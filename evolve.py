@@ -208,9 +208,9 @@ if __name__ == "__main__":
 	parser.add_argument('-r', '--random-seed', dest='random_seed', default=1, type=int,
 		help='Random seed for initializing MCMC sampler')
 	parser.add_argument('ssm_file',
-		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.txt.')
+		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
 	parser.add_argument('cnv_file',
-		help='File listing CNVs (copy number variations). For proper format, see README.txt.')
+		help='File listing CNVs (copy number variations). For proper format, see README.md.')
 	args = parser.parse_args()
 
 	# Ensure input files exist and can be read.
