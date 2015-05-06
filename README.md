@@ -17,7 +17,7 @@ included with PhyloWGS for examples.
 `ssm_data.txt`:
 
 * `id`: identifier for each SSM. Identifiers must start at `s0` and
-  increment, so the first row will have `s0`, the second row `s1`, and so
+  increment, so the first data row will have `s0`, the second row `s1`, and so
   forth.
 * `gene`: any string identifying the variant -- this need not be a gene name.
   `<chr>_<pos>` (e.g., `2_234577`) works well.
@@ -39,7 +39,7 @@ included with PhyloWGS for examples.
 `cnv_data.txt`:
 
 * `cnv`: identifier for each CNV. Identifiers must start at `c0` and
-  increment, so the first row will have `c0`, the second row `c1`, and so
+  increment, so the first data row will have `c0`, the second row `c1`, and so
   forth.
 * `a`: number of reference reads covering the CNV.
 * `d`: total number of reads covering the CNV. This will be affected by
