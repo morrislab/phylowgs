@@ -230,8 +230,14 @@ class BattenbergParser(object):
     return cn_regions
 
 class CnvFormatter(object):
-  def _max_total_reads(self, read_depth):
-    return 1e6 * read_depth
+  def __init__(self, cnv_confidence, cellularity, read_depth, read_length):
+    self._cnv_confidence = cnv_confidence
+    self._cellularity = cellularity
+    self._read_depth = read_depth
+    self._read_length = read_length
+
+  def _max_total_reads(self):
+    return 1e6 * self._read_depth
 
   def _find_overlapping_variants(self, chrom, cnv, variants):
     overlapping = []
@@ -244,15 +250,15 @@ class CnvFormatter(object):
           overlapping.append(variant['ssm_id'])
     return overlapping
 
-  def _calc_ref_reads(self, pop_frac, cellularity, total_reads):
-    tumor_cells_frac = cellularity * pop_frac
+  def _calc_ref_reads(self, pop_frac, total_reads):
+    tumor_cells_frac = self._cellularity * pop_frac
     vaf = tumor_cells_frac / 2
     ref_reads = int((1 - vaf) * total_reads)
     return ref_reads
 
-  def _calc_total_reads(self, pop_frac, cellularity, locus_start, locus_end, new_cn, read_depth, read_length):
+  def _calc_total_reads(self, pop_frac, locus_start, locus_end, new_cn):
     # Proportion of all cells carrying CNV.
-    p = cellularity * pop_frac
+    p = self._cellularity * pop_frac
     if new_cn == 2:
       # If no net change in copy number -- e.g., because (major, minor) went
       # from (1, 1) to (2, 0) -- force the delta_cn to be 1.
@@ -263,7 +269,7 @@ class CnvFormatter(object):
       no_net_change = False
 
     region_length = locus_end - locus_start + 1
-    fn = (read_depth * region_length) / read_length
+    fn = (self._read_depth * region_length) / self._read_length
 
     # This is a hack to prevent division by zero (when delta_cn = -2). Its
     # effect will be to make d large.
@@ -277,35 +283,30 @@ class CnvFormatter(object):
       # meaning we have lower confidence in it. Indicate this lack of
       # confidence via d by multiplying it by (read length / distance between
       # common SNPs), with the "distance between common SNPs" taken to be 1000 bp.
-      d *= (read_length / 1000.)
+      d *= (self._read_length / 1000.)
 
     # Cap at 1e6 * read_depth.
-    return int(round(min(d, self._max_total_reads(read_depth))))
+    return int(round(min(d, self._max_total_reads())))
 
   def _format_overlapping_variants(self, variants, maj_cn, min_cn):
       variants = [(ssm_id, str(min_cn), str(maj_cn)) for ssm_id in variants]
       return variants
 
-  def _format_cnvs(self, cnvs, variants, cellularity, read_depth):
-    # This is just a guess. Setting this properly (e.g., from the BAM files?) would be preferable.
-    read_length = 100
-    log('Estimated read depth: %s' % read_depth)
+  def _format_cnvs(self, cnvs, variants):
+    log('Estimated read depth: %s' % self._read_depth)
 
     for chrom, chrom_cnvs in cnvs.items():
       for cnv in chrom_cnvs:
         overlapping_variants = self._find_overlapping_variants(chrom, cnv, variants)
         total_reads = self._calc_total_reads(
           cnv['frac'],
-          cellularity,
           cnv['start'],
           cnv['end'],
           cnv['nmaj'] + cnv['nmin'],
-          read_depth,
-          read_length
         )
         yield {
           'frac': cnv['frac'],
-          'ref_reads': self._calc_ref_reads(cnv['frac'], cellularity, total_reads),
+          'ref_reads': self._calc_ref_reads(cnv['frac'], total_reads),
           'total_reads': total_reads,
           'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['nmaj'], cnv['nmin']),
         }
@@ -326,8 +327,8 @@ class CnvFormatter(object):
   # CNVs with similar a/d values should not be free to move around the
   # phylogeny independently, and so we merge them into a single entity. We may
   # do the same with SNVs bearing similar frequencies later on.
-  def format_and_merge_cnvs(self, cnvs, variants, cellularity, read_depth):
-    formatted = list(self._format_cnvs(cnvs, variants, cellularity, read_depth))
+  def format_and_merge_cnvs(self, cnvs, variants):
+    formatted = list(self._format_cnvs(cnvs, variants))
     formatted.sort(key = lambda f: f['ref_reads'])
     delta = 0.001
 
@@ -345,7 +346,7 @@ class CnvFormatter(object):
       if current['frac'] == last['frac'] == 1.0 and abs(last_frac - current_frac) <= delta:
         # Merge the CNVs.
         last['total_reads'] += current['total_reads']
-        last['total_reads'] = int(round(min(last['total_reads'], self._max_total_reads(read_depth))))
+        last['total_reads'] = int(round(min(last['total_reads'], self._max_total_reads())))
         mean_frac = (last_frac + current_frac) / 2
         last['ref_reads'] = int(round(mean_frac * last['total_reads']))
         self._merge_variants(last, current)
@@ -354,6 +355,10 @@ class CnvFormatter(object):
         current['cnv_id'] = 'c%s' % counter
         merged.append(current)
         counter += 1
+
+    for cnv in merged:
+      cnv['ref_reads'] = int(round(cnv['ref_reads'] * self._cnv_confidence))
+      cnv['total_reads'] = int(round(cnv['total_reads'] * self._cnv_confidence))
 
     return merged
 
@@ -584,7 +589,7 @@ class VariantAndCnvGroup(object):
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
 
-  def write_cnvs(self, cellularity, outfn):
+  def write_cnvs(self, outfn, cnv_confidence, cellularity, read_length):
     abnormal_regions = {}
     filtered_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     for chrom, regions in filtered_regions.items():
@@ -592,8 +597,8 @@ class VariantAndCnvGroup(object):
 
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
-      formatter = CnvFormatter()
-      for cnv in formatter.format_and_merge_cnvs(abnormal_regions, self._variants, cellularity, self._estimate_read_depth()):
+      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimate_read_depth(), read_length)
+      for cnv in formatter.format_and_merge_cnvs(abnormal_regions, self._variants):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
           cnv['cnv_id'],
@@ -631,6 +636,10 @@ def main():
     help='Fraction of sample that is cancerous rather than somatic')
   parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'oncoscan', 'mutect'),
       help='Type of VCF file')
+  parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
+      help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
+  parser.add_argument('--read-length', dest='read_length', type=int, default=100,
+      help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('vcf_file')
   args = parser.parse_args()
@@ -665,7 +674,7 @@ def main():
 
     grouper.write_variants(args.output_variants, args.error_rate)
     if not args.only_normal_cn and grouper.has_cnvs():
-      grouper.write_cnvs(args.cellularity, args.output_cnvs)
+      grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
 
   elif args.input_type == 'oncoscan':
     raise Exception('Various changes necessary before this works again')
