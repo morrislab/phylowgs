@@ -76,16 +76,20 @@ Examples
 --------
 * Create ssm_data.txt from Sanger's PCAWG variant-calling
   pipeline, subsampling to 5000 mutations:
+
         ./create_phylowgs_inputs.py -s 5000 -v sanger sample.vcf
+
     * Note that no cnv_data.txt is created in this scenario, as no Battenberg
       data was provided. In this case, please provide an empty cnv_data.txt for
       PhyloWGS (e.g., created via `touch cnv_data.txt`).
 
 * Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
   pipeline, including all mutations:
+
         ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt sample.vcf
 
 * Only use variants in copy-number-normal regions:
+
         ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt --only-normal-cn sample.vcf
 
 Notes
