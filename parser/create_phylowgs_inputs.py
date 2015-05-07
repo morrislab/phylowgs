@@ -323,6 +323,9 @@ class CnvFormatter(object):
         # its SSMs.
         log('%s already in %s' % (variant, cnv1['cnv_id']))
 
+  # CNVs with similar a/d values should not be free to move around the
+  # phylogeny independently, and so we merge them into a single entity. We may
+  # do the same with SNVs bearing similar frequencies later on.
   def format_and_merge_cnvs(self, cnvs, variants, cellularity, read_depth):
     formatted = list(self._format_cnvs(cnvs, variants, cellularity, read_depth))
     formatted.sort(key = lambda f: f['ref_reads'])

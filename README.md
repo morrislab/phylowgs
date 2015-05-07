@@ -14,6 +14,10 @@ The input to evolve.py is two tab-delimited text files -- one for SSM data and
 one for CNV data. Please see the files `ssm_data.txt` and `cnv_data.txt`
 included with PhyloWGS for examples.
 
+To see how to generate `ssm_data.txt` and `cnv_data.txt` from a VCF file and
+[Battenberg](https://github.com/cancerit/cgpBattenberg) CNV file, please see
+[the included parser](parser/).
+
 `ssm_data.txt`:
 
 * `id`: identifier for each SSM. Identifiers must start at `s0` and
@@ -48,7 +52,6 @@ included with PhyloWGS for examples.
 * `ssms`: SSMs that overlap with this CNV. Each entry is a comma-separated
   triplet consisting of SSM ID, maternal copy number, and paternal copy
   number. These triplets are separated by semicolons.
-
 
 Running PhyloWGS
 ----------------

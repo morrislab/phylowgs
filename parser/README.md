@@ -3,7 +3,27 @@ PhyloWGS input parser
 
 Description
 -----------
-This parser can be used to create the `ssm_data.txt` and `cnv_data.txt` inputs used by PhyloWGS.
+This parser can be used to create the `ssm_data.txt` and `cnv_data.txt` inputs
+used by PhyloWGS.
+
+The parser will create `ssm_data.txt` from a provided VCF file. Though VCF
+itself is standardized, different variant callers differ in how they represent
+read counts, and so minor adjustments must be made for each caller. Currently,
+Sanger and MuTect VCFs are supported. To add support for your own flavour, you
+may subclass `VariantParser` (see `SangerParser` and `MutectParser` for
+examples).
+
+For `cnv_data.txt`, the parser requires CNV calls. At the moment, only
+[Battenberg](https://github.com/cancerit/cgpBattenberg) is supported. In the
+future, we will likely support parsing
+[TITAN](http://compbio.bccrc.ca/software/titan/) calls as well. Adding support
+for a different CNV-caller is possible, but more difficult than supporting
+other variant callers. Regardless, seeing how to generate the `d` value in
+`cnv_data.txt`, which represents your confidence in the correctness of the
+observed fraction of cells bearing the CNV, will be informative, as
+establishing a proper value for this is difficult, given that it depends on the
+size of the CNV, the read depth, the total copy-number change, and other
+factors. For this code, please see the method `CnvFormatter._calc_total_reads`.
 
 Installation
 ------------
