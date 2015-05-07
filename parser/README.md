@@ -39,10 +39,12 @@ Usage
                                      [--output-cnvs OUTPUT_CNVS]
                                      [--output-variants OUTPUT_VARIANTS]
                                      [-c CELLULARITY] -v {sanger,oncoscan,mutect}
-                                     [--verbose]
+                                     [--cnv-confidence CNV_CONFIDENCE]
+                                     [--read-length READ_LENGTH] [--verbose]
                                      vcf_file
 
-    Create SSM input file for PhyloWGS from VCF and CNV data
+    Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV
+    data.
 
     positional arguments:
       vcf_file
@@ -70,6 +72,12 @@ Usage
                             somatic (default: 1.0)
       -v {sanger,oncoscan,mutect}, --variant-type {sanger,oncoscan,mutect}
                             Type of VCF file (default: None)
+      --cnv-confidence CNV_CONFIDENCE
+                            Confidence in CNVs. Set to < 1 to scale "d" values
+                            used in CNV output file (default: 1.0)
+      --read-length READ_LENGTH
+                            Approximate length of reads. Used to calculate
+                            confidence in CNV frequencies (default: 100)
       --verbose
 
 Examples
@@ -101,3 +109,11 @@ Notes
 * Any variants on mitochondrial or sex chromosomes are ignored. Mitochondrial
   variants are weird, and sex-chromosome variants require knowing the patient's
   gender to generate proper allele frequencies.
+
+* To permit CNVs to move more freely amongst populations in the sampled
+  phylogenies, you can pass `--cnv-confidence [0.0, 1.0]`. This will scale the
+  `d` column in `cnv_data.txt` by the given factor. A value of 1.0 leaves the
+  `d` values unchanged; lower values will reduce every `d` value's magnitude by
+  the specified factor, permitting CNVs to move more freely betwen populations,
+  and reducing the probability that a CNV will be assigned a population unto
+  itself because of excessively high confidence in its population frequency.
