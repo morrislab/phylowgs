@@ -610,7 +610,7 @@ log.verbose = False
 
 def main():
   parser = argparse.ArgumentParser(
-    description='Create SSM input file for PhyloWGS from VCF and CNV data',
+    description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   # TODO: re-enable --error-rate argument once we decide that values of mu_r
