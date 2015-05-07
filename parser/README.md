@@ -5,6 +5,13 @@ Description
 -----------
 This parser can be used to create the `ssm_data.txt` and `cnv_data.txt` inputs used by PhyloWGS.
 
+Installation
+------------
+The parser requires Python 2 and [PyVCF](https://pypi.python.org/pypi/PyVCF).
+The latter can be installed via pip:
+
+    pip2 install --user pyvcf
+
 Usage
 -----
     usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE] [-s SAMPLE_SIZE]
