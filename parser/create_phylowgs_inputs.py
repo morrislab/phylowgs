@@ -633,7 +633,7 @@ def main():
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
-    help='Fraction of sample that is cancerous rather than somatic')
+    help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
   parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'oncoscan', 'mutect'),
       help='Type of VCF file')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,

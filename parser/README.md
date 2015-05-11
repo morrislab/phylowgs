@@ -69,7 +69,8 @@ Usage
                             ssm_data.txt)
       -c CELLULARITY, --cellularity CELLULARITY
                             Fraction of sample that is cancerous rather than
-                            somatic (default: 1.0)
+                            somatic. Used only for estimating CNV confidence --
+                            if no CNVs, need not specify argument. (default: 1.0)
       -v {sanger,oncoscan,mutect}, --variant-type {sanger,oncoscan,mutect}
                             Type of VCF file (default: None)
       --cnv-confidence CNV_CONFIDENCE
@@ -92,13 +93,13 @@ Examples
       PhyloWGS (e.g., created via `touch cnv_data.txt`).
 
 * Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
-  pipeline, including all mutations:
+  pipeline, including all mutations, assuming 0.72 cellularity:
 
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt sample.vcf
+        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 sample.vcf
 
 * Only use variants in copy-number-normal regions:
 
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt --only-normal-cn sample.vcf
+        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 --only-normal-cn sample.vcf
 
 Notes
 -----
