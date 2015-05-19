@@ -18,20 +18,6 @@ from printo import *
 
 import argparse
 
-# MCMC settings
-burnin		= 1000
-num_samples   = 5000
-checkpoint	= 1000
-dp_alpha	  =25.0
-dp_gamma	  = 1.0
-init_conc	= 1.0
-alpha_decay   = 0.25
-top_k = 5
-
-#metropolis-hastings settings
-mh_itr = 5000 # no. of iterations in metropolis-hastings
-mh_burnin = 0
-
 # number of multiple samples
 NTPS = 5
 
@@ -45,102 +31,123 @@ NTPS = 5
 # dp_alpha: dp alpha
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
 def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',num_samples=2500,mh_itr=5000,mh_std=100,rand_seed=1):
-	seed(rand_seed)
-	codes, n_ssms, n_cnvs = load_data(fin1,fin2)
-	NTPS = len(codes[0].a) # number of samples / time point
-	glist = [datum.name for datum in codes if len(datum.name)>0]
+	state = {}
+	state['rand_seed'] = rand_seed
+	seed(state['rand_seed'])
+	codes, state['n_ssms'], state['n_cnvs'] = load_data(fin1,fin2)
 
-	root  = alleles(conc=0.1,ntps=NTPS)
-	tssb  = TSSB( dp_alpha=dp_alpha, dp_gamma=dp_gamma, alpha_decay=alpha_decay, root_node=root, data=codes )
+	# MCMC settings
+	state['burnin'] = 1000
+	state['num_samples'] = num_samples
+	state['dp_alpha'] = 25.0
+	state['dp_gamma'] = 1.0
+	state['alpha_decay'] = 0.25
+	state['top_k'] = 5
+
+	# Metropolis-Hastings settings
+	state['mh_burnin'] = 0
+	state['mh_itr'] = mh_itr # No. of iterations in metropolis-hastings
+	state['mh_std'] = mh_std
+
+	state['NTPS'] = len(codes[0].a) # number of samples / time point
+	state['cd_llh_traces'] = zeros((num_samples, 1))
+	state['fin1'] = fin1
+	state['fin2'] = fin2
+	state['working_directory'] = os.getcwd()
+
+	root = alleles(conc=0.1, ntps=state['NTPS'])
+	state['tssb'] = TSSB(dp_alpha=state['dp_alpha'], dp_gamma=state['dp_gamma'], alpha_decay=state['alpha_decay'], root_node=root, data=codes)
 	# hack...
 	if 1:
 		depth=0
-		tssb.root['sticks'] = vstack([ tssb.root['sticks'], boundbeta(1, tssb.dp_gamma) if depth!=0 else .999])
-		tssb.root['children'].append({ 'node': tssb.root['node'].spawn(),
-					'main':boundbeta(1.0, (tssb.alpha_decay**(depth+1))*tssb.dp_alpha) if tssb.min_depth <= (depth+1) else 0.0, 
+		state['tssb'].root['sticks'] = vstack([ state['tssb'].root['sticks'], boundbeta(1, state['tssb'].dp_gamma) if depth!=0 else .999])
+		state['tssb'].root['children'].append({ 'node': state['tssb'].root['node'].spawn(),
+					'main':boundbeta(1.0, (state['tssb'].alpha_decay**(depth+1))*state['tssb'].dp_alpha) if state['tssb'].min_depth <= (depth+1) else 0.0, 
 					'sticks' : empty((0,1)),	
 					'children' : [] })
-		new_node=tssb.root['children'][0]['node']	
-		for n in range(tssb.num_data):	
-			tssb.assignments[n].remove_datum(n)
+		new_node = state['tssb'].root['children'][0]['node']
+		for n in range(state['tssb'].num_data):
+			state['tssb'].assignments[n].remove_datum(n)
 			new_node.add_datum(n)
-			tssb.assignments[n] = new_node
-
-		
-	####
-
+			state['tssb'].assignments[n] = new_node
 	
-	for datum in codes: datum.tssb=tssb 
-
-	cd_llh_traces	  = zeros((num_samples, 1))
-
-	best_tssb = 0
-
-	# clonal frequencies
-	freq = dict([(g,[] )for g in glist])	
+	for datum in codes:
+		datum.tssb = state['tssb']
 	
 	print "Starting MCMC run..."
 	tree_writer = TreeWriter(fout)
 	
-	for iter in range(-burnin,num_samples):
-		if iter<0: print iter
-	
-			
-		tssb.resample_assignments()
+	for iter in range(-state['burnin'], state['num_samples']):
+		state['iter'] = iter
 
-		tssb.cull_tree()
+		if state['iter'] < 0:
+			print state['iter']
+
+		state['tssb'].resample_assignments()
+		state['tssb'].cull_tree()
 		
 		# assign node ids
-		wts,nodes=tssb.get_mixture()
-		for i,node in enumerate(nodes): node.id=i
+		wts, nodes = state['tssb'].get_mixture()
+		for i, node in enumerate(nodes):
+			node.id = i
 		
 		##################################################
 		## some useful info about the tree,
 		## used by CNV related computations,
 		## to be called only after resampling assignments
-		set_node_height(tssb)
-		set_path_from_root_to_node(tssb)
-		map_datum_to_node(tssb)
+		set_node_height(state['tssb'])
+		set_path_from_root_to_node(state['tssb'])
+		map_datum_to_node(state['tssb'])
 		##################################################
 
-		mh_acc = metropolis(tssb,mh_itr,mh_std,mh_burnin,n_ssms,n_cnvs,fin1,fin2,rand_seed,NTPS)
-		if float(mh_acc) < 0.08 and mh_std < 10000:
-			mh_std = mh_std*2.0
-			print "Shrinking MH proposals. Now %f" % mh_std
-		if float(mh_acc) > 0.5 and float(mh_acc) < 0.99:
-			mh_std = mh_std/2.0
-			print "Growing MH proposals. Now %f" % mh_std
+		state['mh_acc'] = metropolis(
+			state['tssb'],
+			state['mh_itr'],
+			state['mh_std'],
+			state['mh_burnin'],
+			state['n_ssms'],
+			state['n_cnvs'],
+			state['fin1'],
+			state['fin2'],
+			state['rand_seed'],
+			state['NTPS']
+		)
+		if float(state['mh_acc']) < 0.08 and state['mh_std'] < 10000:
+			state['mh_std'] = state['mh_std']*2.0
+			print "Shrinking MH proposals. Now %f" % state['mh_std']
+		if float(state['mh_acc']) > 0.5 and float(state['mh_acc']) < 0.99:
+			state['mh_std'] = state['mh_std']/2.0
+			print "Growing MH proposals. Now %f" % state['mh_std']
 	
 		#root.resample_hypers()
-	
-		tssb.resample_sticks()
-		
-		tssb.resample_stick_orders()
-	
-		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
+		state['tssb'].resample_sticks()
+		state['tssb'].resample_stick_orders()
+		state['tssb'].resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
  
-
-		if iter>=0:
-			cd_llh_traces[iter]	  = tssb.complete_data_log_likelihood()
+		if state['iter'] >= 0:
+			cd_llh_traces[state['iter']]	  = state['tssb'].complete_data_log_likelihood()
 	   
-		if iter>=0:
-			if True or mod(iter, 10) == 0:
-				(weights, nodes) = tssb.get_mixture()
-				print iter, len(nodes), cd_llh_traces[iter], mh_acc, tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay
+		if state['iter'] >= 0:
+			if True or mod(state['iter'], 10) == 0:
+				weights, nodes = state['tssb'].get_mixture()
+				print state['iter'], len(nodes), state['cd_llh_traces'][state['iter']], state['mh_acc'], state['tssb'].dp_alpha, state['tssb'].dp_gamma, state['tssb'].alpha_decay
   
-		if iter >= 0 and argmax(cd_llh_traces[:iter+1]) == iter:
-			print "\t%f is best per-data complete data likelihood so far." % (cd_llh_traces[iter])
+		if state['iter'] >= 0 and argmax(state['cd_llh_traces'][:state['iter']+1]) == state['iter']:
+			print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][state['iter']])
 
 		# save all trees
-		if iter >= 0:
-			tree_writer.write_tree(tssb, cd_llh_traces[iter][0])
+		if state['iter'] >= 0:
+			tree_writer.write_tree(state['tssb'], state['cd_llh_traces'][state['iter']][0])
+		state['rand_state'] = get_state()
 		
 	tree_writer.close()
 
 	#save the best tree
-	print_top_trees(fout,out2,top_k)
+	print_top_trees(fout, out2, state['top_k'])
 
 	#save clonal frequencies
+	glist = [datum.name for datum in codes if len(datum.name)>0]
+	freq = dict([(g,[] )for g in glist])
 	glist = array(freq.keys(),str);glist.shape=(1,len(glist)) 
 	savetxt(out3,vstack((glist, array([freq[g] for g in freq.keys()]).T)),fmt='%s',delimiter=', ')
 
