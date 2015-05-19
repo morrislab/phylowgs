@@ -13,7 +13,7 @@ from subprocess import call
 
 import argparse
 
-def compute_lineages(archive_fn,fin1,fin2):
+def compute_lineages(archive_fn, num_trees, fin1, fin2):
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)	
 	m = len(codes) # number of SSMs+CNVs
 	tree_reader = TreeReader(archive_fn)
@@ -70,7 +70,10 @@ def compute_lineages(archive_fn,fin1,fin2):
 			raise e
 	fidx=0
 
-	while(len(post_trees)):
+	if num_trees is None:
+		num_trees = len(post_trees)
+
+	while len(post_trees) > 0 and fidx < num_trees:
 		score,idx = heapq.heappop(post_trees)
 		score = -score
 
@@ -311,10 +314,12 @@ if __name__ == "__main__":
 	)
 	parser.add_argument('-t', '--trees', dest='trees', default='trees.zip',
 		help='Output file where the MCMC trees/samples are saved')
+	parser.add_argument('--num-trees', '-n', dest='num_trees', type=int,
+		help='Only output given number of trees')
 	parser.add_argument('ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
 	parser.add_argument('cnv_file',
 		help='File listing CNVs (copy number variations). For proper format, see README.md.')
 	args = parser.parse_args()
 
-	compute_lineages(args.trees, args.ssm_file, args.cnv_file)
+	compute_lineages(args.trees, args.num_trees, args.ssm_file, args.cnv_file)
