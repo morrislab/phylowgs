@@ -40,12 +40,11 @@ NTPS = 5
 # fout: output folder for tssb trees/samples
 # out2: output file to save top-k trees
 # out3: output file to save clonal frequencies
-# out4: output file to save log likelihood trace
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # dp_alpha: dp alpha
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',out4='llh_trace',num_samples=2500,mh_itr=5000,mh_std=100,rand_seed=1):
+def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',num_samples=2500,mh_itr=5000,mh_std=100,rand_seed=1):
 	seed(rand_seed)
 	codes, n_ssms, n_cnvs = load_data(fin1,fin2)
 	NTPS = len(codes[0].a) # number of samples / time point
@@ -73,13 +72,8 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 	
 	for datum in codes: datum.tssb=tssb 
 
-	dp_alpha_traces	= zeros((num_samples, 1))
-	dp_gamma_traces	= zeros((num_samples, 1))
-	alpha_decay_traces = zeros((num_samples, 1))
-	conc_traces	   = zeros((num_samples, 1))
 	cd_llh_traces	  = zeros((num_samples, 1))
 
-	intervals = zeros((7))
 	best_tssb = 0
 
 	# clonal frequencies
@@ -91,13 +85,10 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 	for iter in range(-burnin,num_samples):
 		if iter<0: print iter
 	
-		times = [ time.time() ]
 			
 		tssb.resample_assignments()
-		times.append(time.time())
 
 		tssb.cull_tree()
-		times.append(time.time())
 		
 		# assign node ids
 		wts,nodes=tssb.get_mixture()
@@ -119,34 +110,23 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 		if float(mh_acc) > 0.5 and float(mh_acc) < 0.99:
 			mh_std = mh_std/2.0
 			print "Growing MH proposals. Now %f" % mh_std
-		times.append(time.time())
 	
 		#root.resample_hypers()
-		times.append(time.time())
 	
 		tssb.resample_sticks()
-		times.append(time.time())
 		
 		tssb.resample_stick_orders()
-		times.append(time.time())
 	
 		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
-		times.append(time.time())
  
-		intervals = intervals + diff(array(times)) 
 
 		if iter>=0:
-			dp_alpha_traces[iter]	= tssb.dp_alpha
-			dp_gamma_traces[iter]	= tssb.dp_gamma
-			alpha_decay_traces[iter] = tssb.alpha_decay
-			conc_traces[iter]	   = root.conc()
 			cd_llh_traces[iter]	  = tssb.complete_data_log_likelihood()
 	   
 		if iter>=0:
 			if True or mod(iter, 10) == 0:
 				(weights, nodes) = tssb.get_mixture()
-				print iter, len(nodes), cd_llh_traces[iter], mh_acc, tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay#, " ".join(map(lambda x: "%0.2f" % x, intervals.tolist())) 
-				intervals = zeros((7))	  
+				print iter, len(nodes), cd_llh_traces[iter], mh_acc, tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay
   
 		if iter >= 0 and argmax(cd_llh_traces[:iter+1]) == iter:
 			print "\t%f is best per-data complete data likelihood so far." % (cd_llh_traces[iter])
@@ -155,20 +135,6 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 		if iter >= 0:
 			tree_writer.write_tree(tssb, cd_llh_traces[iter][0])
 		
-		wts, nodes = tssb.get_mixture()
-		#Save log likelihood:savetxt('loglike',cd_llh_traces)
-		savetxt(out4,cd_llh_traces)		
-
-		#log clonal frequencies		
-		'''
-		if iter >= 0:		
-			wts, nodes = tssb.get_mixture()
-			for node in nodes:
-				data = node.get_data()
-				for datum in data:
-					if datum.name in freq:
-						freq[datum.name].append(float(round(node.params,5)))
-		'''
 	tree_writer.close()
 
 	#save the best tree
@@ -199,8 +165,6 @@ if __name__ == "__main__":
 		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
 		help='Output file to save clonal frequencies')
-	parser.add_argument('-l', '--llh-trace', dest='llh_trace', default='llh_trace',
-		help='Output file to save log likelihood trace')
 	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
 		help='Number of MCMC samples')
 	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
@@ -229,7 +193,6 @@ if __name__ == "__main__":
 		fout=args.trees,
 		out2=args.top_k_trees,
 		out3=args.clonal_freqs,
-		out4=args.llh_trace,
 		num_samples=args.mcmc_samples,
 		mh_itr=args.mh_iterations,
 		mh_std=100,
