@@ -108,12 +108,28 @@ def check_bounds(p,l=0.0001,u=.9999):
 
 class TreeWriter(object):
     def __init__(self, archive_fn):
-	self._archive = zipfile.ZipFile(archive_fn, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
 	self._counter = 0
+	self._archive_fn = archive_fn
+
+	try:
+	    os.remove(self._archive_fn)
+	except OSError as e:
+	    if e.errno == 2: # Ignore "no such file" errors
+		pass
+	    else:
+		raise e
+
+    def _open_archive(self):
+	self._archive = zipfile.ZipFile(self._archive_fn, 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+
+    def _close_archive(self):
+	self._archive.close()
 
     def _write_tree(self, tree, tree_fn):
 	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
+	self._open_archive()
 	self._archive.writestr(tree_fn, serialized)
+	self._close_archive()
 
     def write_tree(self, tree, llh):
 	self._write_tree(tree, 'tree_%s_%s' % (self._counter, llh))
@@ -121,9 +137,6 @@ class TreeWriter(object):
 
     def write_burnin_tree(self, burnin_tree, idx):
 	self._write_tree(burnin_tree, 'burnin_%s' % idx)
-
-    def close(self):
-	self._archive.close()
 
 class TreeReader(object):
     def __init__(self, archive_fn):

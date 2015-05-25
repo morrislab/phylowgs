@@ -136,8 +136,6 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 			tree_writer.write_burnin_tree(state['tssb'], state['iter'])
 
 		state['rand_state'] = get_state()
-		
-	tree_writer.close()
 
 	#save the best tree
 	print_top_trees(fout, out2, state['top_k'])
