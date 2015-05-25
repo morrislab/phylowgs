@@ -132,6 +132,9 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 			if argmax(state['cd_llh_traces'][:state['iter']+1]) == state['iter']:
 				print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][state['iter']])
 			tree_writer.write_tree(state['tssb'], state['cd_llh_traces'][state['iter']][0])
+		else:
+			tree_writer.write_burnin_tree(state['tssb'], state['iter'])
+
 		state['rand_state'] = get_state()
 		
 	tree_writer.close()

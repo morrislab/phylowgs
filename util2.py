@@ -111,10 +111,16 @@ class TreeWriter(object):
 	self._archive = zipfile.ZipFile(archive_fn, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
 	self._counter = 0
 
-    def write_tree(self, tree, llh):
+    def _write_tree(self, tree, tree_fn):
 	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
-	self._archive.writestr('tree_%s_%s' % (self._counter, llh), serialized)
+	self._archive.writestr(tree_fn, serialized)
+
+    def write_tree(self, tree, llh):
+	self._write_tree(tree, 'tree_%s_%s' % (self._counter, llh))
 	self._counter += 1
+
+    def write_burnin_tree(self, burnin_tree, idx):
+	self._write_tree(burnin_tree, 'burnin_%s' % idx)
 
     def close(self):
 	self._archive.close()
@@ -123,9 +129,12 @@ class TreeReader(object):
     def __init__(self, archive_fn):
 	self._archive = zipfile.ZipFile(archive_fn)
 	infolist = self._archive.infolist()
-	infolist.sort(key = lambda zinfo: self._extract_metadata(zinfo)[0])
+	tree_info = [t for t in infolist if t.filename.startswith('tree_')]
+
+	# Sort by index
+	tree_info.sort(key = lambda tinfo: self._extract_metadata(tinfo)[0])
 	self._trees = []
-	for info in infolist:
+	for info in tree_info:
 	    idx, llh = self._extract_metadata(info)
 	    assert idx == len(self._trees)
 	    self._trees.append((idx, llh, info))
