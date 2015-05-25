@@ -125,18 +125,12 @@ def run(fin1,fin2,fout='trees.zip',out2='top_k_trees',out3='clonal_frequencies',
 		state['tssb'].resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
  
 		if state['iter'] >= 0:
-			cd_llh_traces[state['iter']]	  = state['tssb'].complete_data_log_likelihood()
-	   
-		if state['iter'] >= 0:
+			cd_llh_traces[state['iter']] = state['tssb'].complete_data_log_likelihood()
 			if True or mod(state['iter'], 10) == 0:
 				weights, nodes = state['tssb'].get_mixture()
 				print state['iter'], len(nodes), state['cd_llh_traces'][state['iter']], state['mh_acc'], state['tssb'].dp_alpha, state['tssb'].dp_gamma, state['tssb'].alpha_decay
-  
-		if state['iter'] >= 0 and argmax(state['cd_llh_traces'][:state['iter']+1]) == state['iter']:
-			print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][state['iter']])
-
-		# save all trees
-		if state['iter'] >= 0:
+			if argmax(state['cd_llh_traces'][:state['iter']+1]) == state['iter']:
+				print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][state['iter']])
 			tree_writer.write_tree(state['tssb'], state['cd_llh_traces'][state['iter']][0])
 		state['rand_state'] = get_state()
 		
