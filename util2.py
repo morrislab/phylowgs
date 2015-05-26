@@ -106,18 +106,49 @@ def check_bounds(p,l=0.0001,u=.9999):
 	if p > u: p=u
 	return p
 
-class TreeWriter(object):
-    def __init__(self, archive_fn):
-	self._counter = 0
-	self._archive_fn = archive_fn
-
+def rm_safely(filename):
 	try:
-	    os.remove(self._archive_fn)
+	    os.remove(filename)
 	except OSError as e:
 	    if e.errno == 2: # Ignore "no such file" errors
 		pass
 	    else:
 		raise e
+
+class StateManager(object):
+    def __init__(self):
+	self._initial_state_fn = 'state.initial.pickle'
+	self._last_state_fn = 'state.last.pickle'
+
+    def _write_state(self, state, state_fn):
+	with open(state_fn, 'w') as state_file:
+	    pickle.dump(state, state_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def write_state(self, state):
+	self._write_state(state, self._last_state_fn)
+
+    def load_state(self):
+	with open(self._last_state_fn) as state_file:
+	    return pickle.load(state_file)
+
+    def write_initial_state(self, state):
+	self._write_state(state, self._initial_state_fn)
+
+    def delete_state_file(self):
+	rm_safely(self._last_state_fn)
+
+    def state_exists(self):
+	return os.path.isfile(self._last_state_fn)
+
+class TreeWriter(object):
+    def __init__(self, archive_fn, resume_run=False):
+	self._archive_fn = archive_fn
+	if resume_run:
+	    pass
+	    #if not os.path.isfile(self._archive_fn):
+		#raise Exception('Attempting to resume run, but %s does not exist' % self._archive_fn)
+	else:
+	    rm_safely(self._archive_fn)
 
     def _open_archive(self):
 	self._archive = zipfile.ZipFile(self._archive_fn, 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
@@ -131,9 +162,8 @@ class TreeWriter(object):
 	self._archive.writestr(tree_fn, serialized)
 	self._close_archive()
 
-    def write_tree(self, tree, llh):
-	self._write_tree(tree, 'tree_%s_%s' % (self._counter, llh))
-	self._counter += 1
+    def write_tree(self, tree, llh, idx):
+	self._write_tree(tree, 'tree_%s_%s' % (idx, llh))
 
     def write_burnin_tree(self, burnin_tree, idx):
 	self._write_tree(burnin_tree, 'burnin_%s' % idx)
