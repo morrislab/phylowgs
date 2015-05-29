@@ -17,11 +17,13 @@ from params import *
 from printo import *
 
 import argparse
+import threading
+import signal
 
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, ssm_file, cnv_file, trees_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, rand_seed):
+def start_new_run(state_manager, safe_to_exit, ssm_file, cnv_file, trees_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, rand_seed):
 	state = {}
 	state['rand_seed'] = rand_seed
 	seed(state['rand_seed'])
@@ -75,9 +77,9 @@ def start_new_run(state_manager, ssm_file, cnv_file, trees_file, top_k_trees_fil
 	state_manager.write_initial_state(state)
 	print("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
-	do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
 
-def resume_existing_run(state_manager):
+def resume_existing_run(state_manager, safe_to_exit):
 	state = state_manager.load_state()
 	set_state(state['rand_state'])
 	os.chdir(state['working_directory'])
@@ -86,11 +88,12 @@ def resume_existing_run(state_manager):
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
 
-	do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
 
-def do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
+def do_mcmc(state_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 	start_iter = state['last_iteration'] + 1
 	for iteration in range(start_iter, state['num_samples']):
+		safe_to_exit.set()
 		if iteration < 0:
 			print iteration
 
@@ -130,7 +133,6 @@ def do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 			state['mh_std'] = state['mh_std']/2.0
 			print "Growing MH proposals. Now %f" % state['mh_std']
 	
-		#root.resample_hypers()
 		state['tssb'].resample_sticks()
 		state['tssb'].resample_stick_orders()
 		state['tssb'].resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
@@ -143,15 +145,19 @@ def do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
 				print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration])
 
+		# It's not safe to exit while performing file IO, as we don't want
+		# trees.zip or the computation state file to become corrupted from an
+		# interrupted write.
+		safe_to_exit.clear()
 		if iteration >= 0:
 			tree_writer.write_tree(state['tssb'], state['cd_llh_traces'][iteration][0], iteration)
 		else:
-			#tree_writer.write_burnin_tree(state['tssb'], iteration)
-			pass
+			tree_writer.write_burnin_tree(state['tssb'], iteration)
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
 		state_manager.write_state(state)
 
+	safe_to_exit.clear()
 	#save the best tree
 	print_top_trees(state['trees_file'], state['top_k_trees_file'], state['top_k'])
 
@@ -161,6 +167,7 @@ def do_mcmc(state_manager, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 	glist.shape=(1,len(glist))
 	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 	state_manager.delete_state_file()
+	safe_to_exit.set()
 
 def test():
 	tssb=cPickle.load(open('ptree'))
@@ -168,7 +175,7 @@ def test():
 	for dat in tssb.data:
 		print [dat.id, dat.__log_likelihood__(0.5)]
 
-if __name__ == "__main__":
+def run(safe_to_exit):
 	parser = argparse.ArgumentParser(
 		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -203,10 +210,11 @@ if __name__ == "__main__":
 
 	state_manager = StateManager()
 	if state_manager.state_exists():
-		resume_existing_run(state_manager)
+		resume_existing_run(state_manager, safe_to_exit)
 	else:
 		start_new_run(
 			state_manager,
+			safe_to_exit,
 			args.ssm_file,
 			args.cnv_file,
 			trees_file=args.trees,
@@ -217,3 +225,39 @@ if __name__ == "__main__":
 			mh_std=100,
 			rand_seed=args.random_seed
 		)
+
+
+def main():
+	safe_to_exit = threading.Event()
+
+	def sigterm_handler(_signo, _stack_frame):
+		safe_to_exit.wait()
+		# Exit with non-zero to indicate run didn't finish.
+		sys.exit(3)
+	# SciNet will supposedly send SIGTERM 30 s before hard-killing the process.
+	# This gives us time to clean up.
+	signal.signal(signal.SIGTERM, sigterm_handler)
+	# SIGINT is sent on CTRL-C. We don't want the user to interrupt a write
+	# operation by hitting CTRL-C, thereby potentially resulting in corrupted
+	# data being written. Permit these operations to finish before exiting.
+	signal.signal(signal.SIGINT, sigterm_handler)
+
+	run_thread = threading.Thread(target=run, args=(safe_to_exit,))
+	# Thread must be a daemon thread, or sys.exit() will wait until the thread
+	# finishes execution completely.
+	run_thread.daemon = True
+	run_thread.start()
+
+	while True:
+		if not run_thread.is_alive():
+			break
+		# I don't fully understand this. At least on the imacvm machine, calling
+		# join with no timeout argument doesn't work, as the signal handler does
+		# not seem to run until run_thread exits. If, however, I specify *any*
+		# timeout, no matter how short or long, the signal handler will run
+		# *immediately* when the signal is sent -- i.e., even before the timeout
+		# has expired.
+		run_thread.join(10)
+
+if __name__ == "__main__":
+	main()
