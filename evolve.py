@@ -245,6 +245,13 @@ def run(safe_to_exit):
 		)
 
 def main():
+	# Introducing threading is necessary to allow write operations to complete
+	# when interrupts are received. As the interrupt halts execution of the main
+	# thread and immediately jumps to the interrupt handler, we must run the
+	# PhyloWGS code in a different thread, which clears the safe_to_exit flag
+	# when in the midst of a write operation. This way, the main thread is left
+	# only to handle the signal, allowing the derived thread to finish its
+	# current write operation.
 	safe_to_exit = threading.Event()
 
 	def sigterm_handler(_signo, _stack_frame):
