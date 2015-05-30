@@ -2,6 +2,7 @@ import numpy
 from numpy import *
 import cPickle as pickle
 import zipfile
+import shutil
 
 import scipy.stats as stat
 from scipy.stats import beta, binom
@@ -115,10 +116,29 @@ def rm_safely(filename):
 	    else:
 		raise e
 
+class CorruptZipFileError(Exception):
+    pass
+
+class BackupManager(object):
+    def __init__(self, filenames):
+	self._filenames = filenames
+	self._backup_filenames = [os.path.realpath(fn) + '.backup' for fn in self._filenames]
+
+    def save_backup(self):
+	for fn, backup_fn in zip(self._filenames, self._backup_filenames):
+	    shutil.copy2(fn, backup_fn)
+
+    def restore_backup(self):
+	for fn, backup_fn in zip(self._filenames, self._backup_filenames):
+	    shutil.copy2(backup_fn, fn)
+
 class StateManager(object):
+    default_last_state_fn = 'state.last.pickle'
+    default_initial_state_fn = 'state.initial.pickle'
+
     def __init__(self):
-	self._initial_state_fn = 'state.initial.pickle'
-	self._last_state_fn = 'state.last.pickle'
+	self._initial_state_fn = StateManager.default_initial_state_fn
+	self._last_state_fn = StateManager.default_last_state_fn
 
     def _write_state(self, state, state_fn):
 	with open(state_fn, 'w') as state_file:
@@ -141,14 +161,25 @@ class StateManager(object):
 	return os.path.isfile(self._last_state_fn)
 
 class TreeWriter(object):
-    def __init__(self, archive_fn, resume_run=False):
-	self._archive_fn = archive_fn
+    default_archive_fn = 'trees.zip'
+
+    def __init__(self, resume_run = False):
+	self._archive_fn = TreeWriter.default_archive_fn
 	if resume_run:
-	    pass
-	    #if not os.path.isfile(self._archive_fn):
-		#raise Exception('Attempting to resume run, but %s does not exist' % self._archive_fn)
+	    self._ensure_archive_is_valid()
 	else:
+	    # Remove file to avoid unwanted behaviour. By the zipfile module's
+	    # behaviour, given that we open the file with the "a" flag, if a
+	    # non-zip file exists at this path, a zip file will be appended to
+	    # the file; otherwise, if the file is already a zip, additional
+	    # files will be written into the zip. On a new run, neither case is
+	    # something we want.
 	    rm_safely(self._archive_fn)
+
+    def _ensure_archive_is_valid(self):
+	with zipfile.ZipFile(self._archive_fn) as zipf:
+	    if zipf.testzip() is not None:
+		raise CorruptZipFileError('Corrupt zip file: %s' % self._archive_fn)
 
     def _open_archive(self):
 	self._archive = zipfile.ZipFile(self._archive_fn, 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
