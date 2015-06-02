@@ -236,7 +236,7 @@ class CnvFormatter(object):
     self._read_depth = read_depth
     self._read_length = read_length
 
-  def _max_total_reads(self):
+  def _max_reads(self):
     return 1e6 * self._read_depth
 
   def _find_overlapping_variants(self, chrom, cnv, variants):
@@ -286,7 +286,7 @@ class CnvFormatter(object):
       d *= (self._read_length / 1000.)
 
     # Cap at 1e6 * read_depth.
-    return int(round(min(d, self._max_total_reads())))
+    return int(round(min(d, self._max_reads())))
 
   def _format_overlapping_variants(self, variants, maj_cn, min_cn):
       variants = [(ssm_id, str(min_cn), str(maj_cn)) for ssm_id in variants]
@@ -347,7 +347,7 @@ class CnvFormatter(object):
       # free to move around the tree.
       if current['frac'] == last['frac'] == 1.0:
         # Merge the CNVs.
-        last['total_reads'] = int(round(min(current['total_reads'] + last['total_reads'], self._max_total_reads())))
+        last['total_reads'] = current['total_reads'] + last['total_reads']
         last['ref_reads'] = self._calc_ref_reads(last['frac'], last['total_reads'])
         self._merge_variants(last, current)
       else:
