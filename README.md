@@ -40,7 +40,8 @@ To see how to generate `ssm_data.txt` and `cnv_data.txt` from a VCF file and
   allele with frequency `0.5 - (sequencing error rate)`. Given the 0.001
   error rate in Illumina sequencing, setting this column to 0.499 works well.
 
-`cnv_data.txt`:
+`cnv_data.txt`: Note that if you are running without any CNVs, this file should
+be empty. You can create the empty file via the command `touch cnv_data.txt`.
 
 * `cnv`: identifier for each CNV. Identifiers must start at `c0` and
   increment, so the first data row will have `c0`, the second row `c1`, and so
@@ -66,53 +67,63 @@ Running PhyloWGS
 
         g++ -o mh.o  mh.cpp  util.cpp `gsl-config --cflags --libs`
 
-3. Run PhyloWGS.
+3. Run PhyloWGS. Minimum invocation on sample data set:
+        python2 evolve.py ssm_data.txt cnv_data.txt
 
-        # Minimum invocation on sample data set: python2 evolve.py ssm_data.txt cnv_data.txt
+  All options:
 
-        # All options:
+        usage: evolve.py [-h] [-b WRITE_BACKUPS_EVERY] [-k TOP_K_TREES]
+                         [-f CLONAL_FREQS] [-s MCMC_SAMPLES] [-i MH_ITERATIONS]
+                         [-r RANDOM_SEED]
+                         ssm_file cnv_file
 
-            usage: evolve.py [-h] [-t TREES] [-k TOP_K_TREES] [-f CLONAL_FREQS]
-                             [-l LLH_TRACE] [-s MCMC_SAMPLES] [-i MH_ITERATIONS]
-                             [-r RANDOM_SEED]
-                             ssm_file cnv_file
+        Run PhyloWGS to infer subclonal composition from SSMs and CNVs
 
-            positional arguments:
-              ssm_file              File listing SSMs (simple somatic mutations, i.e.,
-                                    single nucleotide variants. For proper format, see
-                                    README.txt.
-              cnv_file              File listing CNVs (copy number variations). For proper
-                                    format, see README.txt.
+        positional arguments:
+          ssm_file              File listing SSMs (simple somatic mutations, i.e.,
+                                single nucleotide variants. For proper format, see
+                                README.md.
+          cnv_file              File listing CNVs (copy number variations). For proper
+                                format, see README.md.
 
-            optional arguments:
-              -h, --help            show this help message and exit
-              -t TREES, --trees TREES
-                                    Output file where the MCMC trees/samples are saved
-                                    (default: trees.zip)
-              -k TOP_K_TREES, --top-k-trees TOP_K_TREES
-                                    Output file to save top-k trees in text format
-                                    (default: top_k_trees)
-              -f CLONAL_FREQS, --clonal-freqs CLONAL_FREQS
-                                    Output file to save clonal frequencies (default:
-                                    clonalFrequencies)
-              -l LLH_TRACE, --llh-trace LLH_TRACE
-                                    Output file to save log likelihood trace (default:
-                                    llh_trace)
-              -s MCMC_SAMPLES, --mcmc-samples MCMC_SAMPLES
-                                    Number of MCMC samples (default: 2500)
-              -i MH_ITERATIONS, --mh-iterations MH_ITERATIONS
-                                    Number of Metropolis-Hastings iterations (default:
-                                    5000)
-              -r RANDOM_SEED, --random-seed RANDOM_SEED
-                                    Random seed for initializing MCMC sampler. If
-                                    unspecified, choose random seed automatically.
-                                    (default: None)
+        optional arguments:
+          -h, --help            show this help message and exit
+          -b WRITE_BACKUPS_EVERY, --write-backups-every WRITE_BACKUPS_EVERY
+                                Number of iterations to go between writing backups of
+                                program state (default: 100)
+          -k TOP_K_TREES, --top-k-trees TOP_K_TREES
+                                Output file to save top-k trees in text format
+                                (default: top_k_trees)
+          -f CLONAL_FREQS, --clonal-freqs CLONAL_FREQS
+                                Output file to save clonal frequencies (default:
+                                clonalFrequencies)
+          -s MCMC_SAMPLES, --mcmc-samples MCMC_SAMPLES
+                                Number of MCMC samples (default: 2500)
+          -i MH_ITERATIONS, --mh-iterations MH_ITERATIONS
+                                Number of Metropolis-Hastings iterations (default:
+                                5000)
+          -r RANDOM_SEED, --random-seed RANDOM_SEED
+                                Random seed for initializing MCMC sampler (default: 1)
 
 4. Generate the posterior trees in PDF & LaTeX formats. The LaTeX files and
    resulting PDFs are saved in the directory `posterior_trees`.
 
         python2 posterior_trees.py ssm_data.txt cnv_data.txt
 
+Resuming a previous PhyloWGS run
+--------------------------------
+
+If PhyloWGS is interrupted for whatever reason, you can resume your existing
+run by simply running `evolve.py` from the same directory as the previous run,
+without any command-line params:
+
+    # Start initial run.
+    python2 evolve.py ssm_data.txt cnv_data.txt
+
+    # Hit CTRL+C to send SIGINT, halting run partway through.
+
+    # Resume run:
+    python2 evolve.py
 
 Interpreting output
 -------------------
