@@ -40,13 +40,13 @@ int main(int argc, char* argv[]){
 
 	conf.NTPS = atoi(argv[13]); // no. of samples 
 	
-	struct datum data[conf.N_SSM_DATA+conf.N_CNV_DATA];
+	struct datum *data = new datum[conf.N_SSM_DATA+conf.N_CNV_DATA];
 	load_ssm_data(FNAME_SSM_DATA, data,conf);
 	if (conf.N_CNV_DATA>0)
 		load_cnv_data(FNAME_CNV_DATA,data,conf);
 	
 	
-	struct node nodes[conf.NNODES];
+	struct node *nodes = new node[conf.NNODES];
 	load_tree(FNAME_C_TREE,nodes,conf);		
 	
 	load_data_states(FNAME_C_DATA_STATES,data, nodes, conf);
