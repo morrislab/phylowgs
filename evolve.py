@@ -24,7 +24,7 @@ import traceback
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, rand_seed):
+def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
 	state = {}
 	state['rand_seed'] = rand_seed
 	seed(state['rand_seed'])
@@ -33,6 +33,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_fil
 	state['cnv_file'] = cnv_file
 	state['top_k_trees_file'] = top_k_trees_file
 	state['clonal_freqs_file'] = clonal_freqs_file
+	state['write_backups_every'] = write_backups_every
 
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
@@ -171,8 +172,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 		state['last_iteration'] = iteration
 		state_manager.write_state(state)
 
-		write_backups_every = 100
-		if iteration % write_backups_every == 0 and iteration != start_iter:
+		if iteration % state['write_backups_every'] == 0 and iteration != start_iter:
 			backup_manager.save_backup()
 
 	safe_to_exit.clear()
@@ -198,6 +198,8 @@ def run(safe_to_exit):
 		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
+	parser.add_argument('-b', '--write-backups-every', dest='write_backups_every', default=100, type=int,
+		help='Number of iterations to go between writing backups of program state')
 	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
 		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
@@ -241,6 +243,7 @@ def run(safe_to_exit):
 			num_samples=args.mcmc_samples,
 			mh_itr=args.mh_iterations,
 			mh_std=100,
+			write_backups_every=args.write_backups_every,
 			rand_seed=args.random_seed
 		)
 
