@@ -236,7 +236,7 @@ class CnvFormatter(object):
     self._read_depth = read_depth
     self._read_length = read_length
 
-  def _max_total_reads(self):
+  def _max_reads(self):
     return 1e6 * self._read_depth
 
   def _find_overlapping_variants(self, chrom, cnv, variants):
@@ -286,7 +286,7 @@ class CnvFormatter(object):
       d *= (self._read_length / 1000.)
 
     # Cap at 1e6 * read_depth.
-    return int(round(min(d, self._max_total_reads())))
+    return int(round(min(d, self._max_reads())))
 
   def _format_overlapping_variants(self, variants, maj_cn, min_cn):
       variants = [(ssm_id, str(min_cn), str(maj_cn)) for ssm_id in variants]
@@ -305,6 +305,11 @@ class CnvFormatter(object):
           cnv['nmaj'] + cnv['nmin'],
         )
         yield {
+          'chrom': chrom,
+          'start': cnv['start'],
+          'end': cnv['end'],
+          'nmaj': cnv['nmaj'],
+          'nmin': cnv['nmin'],
           'frac': cnv['frac'],
           'ref_reads': self._calc_ref_reads(cnv['frac'], total_reads),
           'total_reads': total_reads,
@@ -329,8 +334,7 @@ class CnvFormatter(object):
   # do the same with SNVs bearing similar frequencies later on.
   def format_and_merge_cnvs(self, cnvs, variants):
     formatted = list(self._format_cnvs(cnvs, variants))
-    formatted.sort(key = lambda f: f['ref_reads'])
-    delta = 0.001
+    formatted.sort(key = lambda f: f['frac'])
 
     merged, formatted = formatted[:1], formatted[1:]
     merged[0]['cnv_id'] = 'c0'
@@ -338,17 +342,13 @@ class CnvFormatter(object):
 
     for current in formatted:
       last = merged[-1]
-      last_frac = float(last['ref_reads']) / last['total_reads']
-      current_frac = float(current['ref_reads']) / current['total_reads']
 
       # Only merge CNVs if they're clonal. If they're subclonal, leave them
       # free to move around the tree.
-      if current['frac'] == last['frac'] == 1.0 and abs(last_frac - current_frac) <= delta:
+      if current['frac'] == last['frac'] == 1.0:
         # Merge the CNVs.
-        last['total_reads'] += current['total_reads']
-        last['total_reads'] = int(round(min(last['total_reads'], self._max_total_reads())))
-        mean_frac = (last_frac + current_frac) / 2
-        last['ref_reads'] = int(round(mean_frac * last['total_reads']))
+        last['total_reads'] = current['total_reads'] + last['total_reads']
+        last['ref_reads'] = self._calc_ref_reads(last['frac'], last['total_reads'])
         self._merge_variants(last, current)
       else:
         # Do not merge the CNVs.
@@ -618,8 +618,6 @@ def main():
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  # TODO: re-enable --error-rate argument once we decide that values of mu_r
-  # and mu_v shouldn't always be fixed.
   parser.add_argument('-e', '--error-rate', dest='error_rate', type=restricted_float, default=0.001,
     help='Expected error rate of sequencing platform')
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,

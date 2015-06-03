@@ -25,6 +25,7 @@ def print_top_trees(tree_archive,fout,k=5):
 	for idx, (tidx, llh, tree) in enumerate(tree_reader.load_trees_and_metadata(k)):
 			ctr=0
 			
+			remove_empty_nodes(tree.root, None)
 			# print top K trees in ascii
 			print_best_tree(tree,fout)
 			
@@ -110,8 +111,6 @@ def remove_empty_nodes(root, parent):
 		
 ### printing stuff #################
 def print_best_tree_pdf(tssb,fout,score=0):
-	remove_empty_nodes(tssb.root, None) # removes empty leaves
-	
 	#wts, nodes = tssb.get_mixture()
 	#w = dict([(n[1], n[0]) for n in zip(wts,nodes)])
 	
@@ -163,7 +162,6 @@ def print_index(root, tree_file):
 # fout: output file for latex
 def print_tree_latex(tssb,fout,score):
 	global count
-	#remove_empty_nodes(tssb.root, None)
 
 	fout = open(fout,'w')
 	count=-1
