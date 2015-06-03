@@ -312,8 +312,6 @@ if __name__ == "__main__":
 		description='Plot posterior trees resulting from PhyloWGS run',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
-	parser.add_argument('-t', '--trees', dest='trees', default='trees.zip',
-		help='Output file where the MCMC trees/samples are saved')
 	parser.add_argument('--num-trees', '-n', dest='num_trees', type=int,
 		help='Only output given number of trees')
 	parser.add_argument('ssm_file',
@@ -322,4 +320,4 @@ if __name__ == "__main__":
 		help='File listing CNVs (copy number variations). For proper format, see README.md.')
 	args = parser.parse_args()
 
-	compute_lineages(args.trees, args.num_trees, args.ssm_file, args.cnv_file)
+	compute_lineages(TreeWriter.default_archive_fn, args.num_trees, args.ssm_file, args.cnv_file)
