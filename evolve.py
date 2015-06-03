@@ -198,7 +198,7 @@ def test():
 	for dat in tssb.data:
 		print [dat.id, dat.__log_likelihood__(0.5)]
 
-def run(safe_to_exit):
+def parse_args():
 	parser = argparse.ArgumentParser(
 		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
@@ -220,23 +220,27 @@ def run(safe_to_exit):
 	parser.add_argument('cnv_file',
 		help='File listing CNVs (copy number variations). For proper format, see README.md.')
 	args = parser.parse_args()
+	return args
 
-	# Ensure input files exist and can be read.
-	try:
-		ssm_file = open(args.ssm_file)
-		cnv_file = open(args.cnv_file)
-		ssm_file.close()
-		cnv_file.close()
-	except IOError as e:
-		print(e)
-		sys.exit(1)
-
+def run(safe_to_exit):
 	state_manager = StateManager()
 	backup_manager = BackupManager([StateManager.default_last_state_fn, TreeWriter.default_archive_fn])
 
 	if state_manager.state_exists():
+		print 'Resuming existing run. Ignoring command-line parameters.'
 		resume_existing_run(state_manager, backup_manager, safe_to_exit)
 	else:
+		args = parse_args()
+		# Ensure input files exist and can be read.
+		try:
+			ssm_file = open(args.ssm_file)
+			cnv_file = open(args.cnv_file)
+			ssm_file.close()
+			cnv_file.close()
+		except IOError as e:
+			sys.stderr.write(str(e) + '\n')
+			sys.exit(1)
+
 		start_new_run(
 			state_manager,
 			backup_manager,
