@@ -182,7 +182,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 
 	safe_to_exit.clear()
 	#save the best tree
-	print_top_trees(tree_writer.archive_fn, state['top_k_trees_file'], state['top_k'])
+	print_top_trees(TreeWriter.default_archive_fn, state['top_k_trees_file'], state['top_k'])
 
 	#save clonal frequencies
 	freq = dict([(g,[] )for g in state['glist']])
