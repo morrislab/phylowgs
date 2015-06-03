@@ -112,11 +112,14 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 		if iteration < 0:
 			print iteration
 
-		state['tssb'].resample_assignments()
-		state['tssb'].cull_tree()
+		# Referring to tssb as local variable instead of dictionary element is much
+		# faster.
+		tssb = state['tssb']
+		tssb.resample_assignments()
+		tssb.cull_tree()
 		
 		# assign node ids
-		wts, nodes = state['tssb'].get_mixture()
+		wts, nodes = tssb.get_mixture()
 		for i, node in enumerate(nodes):
 			node.id = i
 		
@@ -124,13 +127,13 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 		## some useful info about the tree,
 		## used by CNV related computations,
 		## to be called only after resampling assignments
-		set_node_height(state['tssb'])
-		set_path_from_root_to_node(state['tssb'])
-		map_datum_to_node(state['tssb'])
+		set_node_height(tssb)
+		set_path_from_root_to_node(tssb)
+		map_datum_to_node(tssb)
 		##################################################
 
 		state['mh_acc'] = metropolis(
-			state['tssb'],
+			tssb,
 			state['mh_itr'],
 			state['mh_std'],
 			state['mh_burnin'],
@@ -148,15 +151,15 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 			state['mh_std'] = state['mh_std']/2.0
 			print "Growing MH proposals. Now %f" % state['mh_std']
 	
-		state['tssb'].resample_sticks()
-		state['tssb'].resample_stick_orders()
-		state['tssb'].resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
+		tssb.resample_sticks()
+		tssb.resample_stick_orders()
+		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
  
 		if iteration >= 0:
-			state['cd_llh_traces'][iteration] = state['tssb'].complete_data_log_likelihood()
+			state['cd_llh_traces'][iteration] = tssb.complete_data_log_likelihood()
 			if True or mod(iteration, 10) == 0:
-				weights, nodes = state['tssb'].get_mixture()
-				print iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], state['tssb'].dp_alpha, state['tssb'].dp_gamma, state['tssb'].alpha_decay
+				weights, nodes = tssb.get_mixture()
+				print iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay
 			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
 				print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration])
 
@@ -165,9 +168,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 		# interrupted write.
 		safe_to_exit.clear()
 		if iteration >= 0:
-			tree_writer.write_tree(state['tssb'], state['cd_llh_traces'][iteration][0], iteration)
+			tree_writer.write_tree(tssb, state['cd_llh_traces'][iteration][0], iteration)
 		else:
-			tree_writer.write_burnin_tree(state['tssb'], iteration)
+			tree_writer.write_burnin_tree(tssb, iteration)
+
+		state['tssb'] = tssb
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
 		state_manager.write_state(state)
