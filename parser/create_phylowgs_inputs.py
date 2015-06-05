@@ -335,6 +335,8 @@ class CnvFormatter(object):
   def format_and_merge_cnvs(self, cnvs, variants):
     formatted = list(self._format_cnvs(cnvs, variants))
     formatted.sort(key = lambda f: f['frac'])
+    if len(formatted) == 0:
+      return []
 
     merged, formatted = formatted[:1], formatted[1:]
     merged[0]['cnv_id'] = 'c0'
