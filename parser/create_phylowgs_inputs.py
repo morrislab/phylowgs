@@ -431,6 +431,9 @@ class VariantAndCnvGroup(object):
 
   def add_variants(self, variants_and_reads):
     self._variants_and_reads = variants_and_reads
+    # Estimate read depth before any filtering of variants is performed, in
+    # case no SSMs remain afterward.
+    self._estimated_read_depth = self._estimate_read_depth()
 
   def add_cnvs(self, cn_regions):
     self._cn_regions = cn_regions
@@ -599,7 +602,7 @@ class VariantAndCnvGroup(object):
 
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
-      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimate_read_depth(), read_length)
+      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimated_read_depth, read_length)
       for cnv in formatter.format_and_merge_cnvs(abnormal_regions, self._variants):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
