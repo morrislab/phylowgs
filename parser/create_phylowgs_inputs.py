@@ -43,6 +43,9 @@ class VariantParser(object):
       # ('_random'), so ignore.
       return False
 
+    if chrom.startswith('hs37d5') or chrom.startswith('gl'):
+      return False
+
     if '_' in chrom:
       # Reject weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
       return False
@@ -139,15 +142,14 @@ class SangerParser(VariantParser):
     return (ref_reads, total_reads)
 
 class MutectParser(VariantParser):
-
   def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
 
   def _calc_read_counts(self, variant):
     # Currently hardcodes tumour sample as the second column.
     # Might not always be true
-    ref_reads = variant.samples[-1]['AD'][0]
-    variant_reads = variant.samples[-1]['AD'][1]
+    ref_reads = int(variant.samples[-1].data.ref_count)
+    variant_reads = int(variant.samples[-1].data.alt_count)
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
