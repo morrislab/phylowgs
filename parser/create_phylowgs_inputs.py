@@ -586,7 +586,7 @@ class VariantAndCnvGroup(object):
   def _estimate_read_depth(self):
     read_sum = 0
     if len(self._variants_and_reads) == 0:
-      return 1
+      return 50
     for variant, ref_reads, total_reads in self._variants_and_reads:
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
