@@ -347,6 +347,7 @@ class CnvFormatter(object):
       # free to move around the tree.
       if current['frac'] == last['frac'] == 1.0:
         # Merge the CNVs.
+        log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
         last['total_reads'] = current['total_reads'] + last['total_reads']
         last['ref_reads'] = self._calc_ref_reads(last['frac'], last['total_reads'])
         self._merge_variants(last, current)
@@ -478,7 +479,8 @@ class VariantAndCnvGroup(object):
       var_name = '%s_%s' % (var.CHROM, var.POS)
       for region in self._cn_regions[chrom]:
         if region['start'] <= var.POS <= region['end']:
-          log('%s\t[in region chr%s(%s, %s)]' % (var_name, var.CHROM, region['start'], region['end']))
+          region_type = (self._is_region_normal_cn(region) and 'normal') or 'abnormal'
+          log('%s\t[in %s-CN region chr%s(%s, %s)]' % (var_name, region_type, var.CHROM, region['start'], region['end']))
           break
       else:
         log('%s\t[outside all regions]' % var_name)
