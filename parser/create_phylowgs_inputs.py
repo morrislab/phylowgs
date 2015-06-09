@@ -349,6 +349,7 @@ class CnvFormatter(object):
       # free to move around the tree.
       if current['frac'] == last['frac'] == 1.0:
         # Merge the CNVs.
+        log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
         last['total_reads'] = current['total_reads'] + last['total_reads']
         last['ref_reads'] = self._calc_ref_reads(last['frac'], last['total_reads'])
         self._merge_variants(last, current)
@@ -432,6 +433,9 @@ class VariantAndCnvGroup(object):
 
   def add_variants(self, variants_and_reads):
     self._variants_and_reads = variants_and_reads
+    # Estimate read depth before any filtering of variants is performed, in
+    # case no SSMs remain afterward.
+    self._estimated_read_depth = self._estimate_read_depth()
 
   def add_cnvs(self, cn_regions):
     self._cn_regions = cn_regions
@@ -480,7 +484,8 @@ class VariantAndCnvGroup(object):
       var_name = '%s_%s' % (var.CHROM, var.POS)
       for region in self._cn_regions[chrom]:
         if region['start'] <= var.POS <= region['end']:
-          log('%s\t[in region chr%s(%s, %s)]' % (var_name, var.CHROM, region['start'], region['end']))
+          region_type = (self._is_region_normal_cn(region) and 'normal') or 'abnormal'
+          log('%s\t[in %s-CN region chr%s(%s, %s)]' % (var_name, region_type, var.CHROM, region['start'], region['end']))
           break
       else:
         log('%s\t[outside all regions]' % var_name)
@@ -586,7 +591,7 @@ class VariantAndCnvGroup(object):
   def _estimate_read_depth(self):
     read_sum = 0
     if len(self._variants_and_reads) == 0:
-      return 1
+      return 50
     for variant, ref_reads, total_reads in self._variants_and_reads:
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
@@ -599,7 +604,7 @@ class VariantAndCnvGroup(object):
 
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
-      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimate_read_depth(), read_length)
+      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimated_read_depth, read_length)
       for cnv in formatter.format_and_merge_cnvs(abnormal_regions, self._variants):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
