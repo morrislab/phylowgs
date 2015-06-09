@@ -83,7 +83,6 @@ class VariantParser(object):
 
       variants.append(variant)
 
-    variants.sort(key = lambda v: (v.CHROM, v.POS))
     return variants
 
 class SangerParser(VariantParser):
@@ -232,9 +231,6 @@ class BattenbergParser(object):
         cn_regions[chrom].append(cnv1)
         if cnv2 is not None:
           cn_regions[chrom].append(cnv2)
-
-    for chrom, regions in cn_regions.items():
-      regions.sort(key = lambda c: c['start'])
     return cn_regions
 
 class CnvFormatter(object):
@@ -394,6 +390,8 @@ class VariantFormatter(object):
     return freq
 
   def format_variants(self, variant_list, error_rate):
+    variant_list.sort(key = lambda v: variant_key(v[0]))
+
     for variant, ref_reads, total_reads in variant_list:
       ssm_id = 's%s' % self._counter
       variant_name = '%s_%s' % (variant.CHROM, variant.POS)
@@ -435,6 +433,16 @@ def restricted_float(x):
     raise argparse.ArgumentTypeError('%r not in range [0.0, 1.0]' % x)
   return x
 
+def variant_key(var):
+  chrom = var.CHROM
+  if chrom == 'x':
+    chrom = 100
+  elif chrom == 'y':
+    chrom = 101
+  else:
+    chrom = int(chrom)
+  return (chrom, var.POS)
+
 class VariantAndCnvGroup(object):
   def __init__(self):
     self._cn_regions = None
@@ -470,19 +478,10 @@ class VariantAndCnvGroup(object):
     after = set([var for (var, _, _) in after])
     log('%s=%s %s=%s delta=%s' % (before_label, len(before), after_label, len(after), len(before) - len(after)))
 
-    def _key(var):
-      chrom = var.CHROM
-      if chrom == 'x':
-        chrom = 100
-      elif chrom == 'y':
-        chrom = 101
-      else:
-        chrom = int(chrom)
-      return (chrom, var.POS)
 
     assert after.issubset(before)
     removed = list(before - after)
-    removed.sort(key = _key)
+    removed.sort(key = variant_key)
 
     for var in removed:
       var_name = '%s_%s' % (var.CHROM, var.POS)
@@ -572,7 +571,6 @@ class VariantAndCnvGroup(object):
   def subsample_variants(self, sample_size):
     random.shuffle(self._variants_and_reads)
     self._variants_and_reads = self._variants_and_reads[:sample_size]
-    self._variants_and_reads.sort(key = lambda v: (v[0].CHROM, v[0].POS))
 
   def write_variants(self, outfn, error_rate):
     formatter = VariantFormatter()
