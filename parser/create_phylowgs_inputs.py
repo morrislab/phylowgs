@@ -27,12 +27,18 @@ class VariantParser(object):
 
   def _parse_vcf(self, vcf_filename):
     vcfr = vcf.Reader(filename=vcf_filename)
-    records = list(vcfr)
+    records = []
+    for variant in vcfr:
+      variant.CHROM = variant.CHROM.lower()
+      # Some VCF dialects prepend "chr", some don't. Remove the prefix to
+      # standardize.
+      if variant.CHROM.startswith('chr'):
+        variant.CHROM = variant.CHROM[3:]
+      records.append(variant)
     return records
 
   def _is_good_chrom(self, chrom):
-    chrom = chrom.lower()
-    if chrom.startswith('chrun') or chrom.endswith('_random'):
+    if chrom.startswith('un') or chrom.endswith('_random'):
       # Variant unmapped ('chrUn') or mapped to fragmented chromosome
       # ('_random'), so ignore.
       return False
@@ -42,13 +48,13 @@ class VariantParser(object):
       return False
 
     # Mitochondrial are weird, so ignore them.
-    if chrom == 'chrm':
+    if chrom == 'm':
       return False
     # Sex chromosomes difficult to deal with, as expected frequency depends on
     # whether patient is male or female, so ignore them for now.
     #
     # TODO: properly deal with sex chromsomes.
-    if chrom in ('chrx', 'chry'):
+    if chrom in ('x', 'y'):
       return False
 
     return True
@@ -140,8 +146,8 @@ class MutectParser(VariantParser):
   def _calc_read_counts(self, variant):
     # Currently hardcodes tumour sample as the second column.
     # Might not always be true
-    ref_reads = variant.samples[1]['AD'][0]
-    variant_reads = variant.samples[1]['AD'][1]
+    ref_reads = variant.samples[-1]['AD'][0]
+    variant_reads = variant.samples[-1]['AD'][1]
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
@@ -394,7 +400,7 @@ class VariantFormatter(object):
       # and mu_v fixed.
       # This is mu_r in PhyloWGS.
       expected_ref_freq = 1 - error_rate
-      if variant.CHROM.lower() in ('chrx', 'chry', 'chrm'):
+      if variant.CHROM in ('x', 'y', 'm'):
         # Haploid, so should only see non-variants when sequencing error
         # occurred. Note that chrY and chrM are always haploid; chrX is haploid
         # only in men, so script must know sex of patient to choose correct
@@ -447,8 +453,7 @@ class VariantAndCnvGroup(object):
     filtered = []
 
     for variant, ref_reads, total_reads in self._variants_and_reads:
-      chrom = variant.CHROM.lower()
-      for region in regions[chrom]:
+      for region in regions[variant.CHROM]:
         if region['start'] <= variant.POS <= region['end']:
           filtered.append((variant, ref_reads, total_reads))
           break
@@ -464,9 +469,7 @@ class VariantAndCnvGroup(object):
     log('%s=%s %s=%s delta=%s' % (before_label, len(before), after_label, len(after), len(before) - len(after)))
 
     def _key(var):
-      chrom = var.CHROM.lower()
-      if chrom.startswith('chr'):
-        chrom = chrom[3:]
+      chrom = var.CHROM
       if chrom == 'x':
         chrom = 100
       elif chrom == 'y':
@@ -480,9 +483,8 @@ class VariantAndCnvGroup(object):
     removed.sort(key = _key)
 
     for var in removed:
-      chrom = var.CHROM.lower()
       var_name = '%s_%s' % (var.CHROM, var.POS)
-      for region in self._cn_regions[chrom]:
+      for region in self._cn_regions[var.CHROM]:
         if region['start'] <= var.POS <= region['end']:
           region_type = (self._is_region_normal_cn(region) and 'normal') or 'abnormal'
           log('%s\t[in %s-CN region chr%s(%s, %s)]' % (var_name, region_type, var.CHROM, region['start'], region['end']))
