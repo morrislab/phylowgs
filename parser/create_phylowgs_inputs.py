@@ -140,8 +140,8 @@ class MutectParser(VariantParser):
   def _calc_read_counts(self, variant):
     # Currently hardcodes tumour sample as the second column.
     # Might not always be true
-    ref_reads = variant.samples[1]['AD'][0]
-    variant_reads = variant.samples[1]['AD'][1]
+    ref_reads = variant.samples[-1]['AD'][0]
+    variant_reads = variant.samples[-1]['AD'][1]
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
