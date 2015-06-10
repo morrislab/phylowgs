@@ -42,9 +42,9 @@ def load_data(fname1,fname2):
 
 		mu_r=mu_v=0
 		if 'mu_r' in row.keys():
-			mu_r = float(row['mu_r'])	    
+			mu_r = float(row['mu_r'])
 			mu_v = float(row['mu_v'])
-				    
+
 		data[id] = Datum(name, id, a, d, mu_r, mu_v)
 	
 	n_ssms = len(data.keys())
@@ -105,6 +105,32 @@ def check_bounds(p,l=0.0001,u=.9999):
 	if p < l: p=l
 	if p > u: p=u
 	return p
+
+# removes the empty nodes from the tssb tree
+# Does not removes root as it is not required
+# root: root of the current tree
+# parent: parent of the root
+def remove_empty_nodes(root, parent):
+	for child in list(root['children']):
+		remove_empty_nodes(child, root)
+	if (root['node'].get_data() == []):
+		if (root['children'] == []): # leaf
+			if (parent != None):
+				parent['children'].remove(root)
+				root['node'].kill()
+			return
+		else:
+			if (parent != None):
+				parent_ = root['node'].parent()
+				for child in list(root['children']):
+					parent['children'].append(child)
+					root['children'].remove(child)
+				for child in list(root['node'].children()):
+					child._parent = parent_
+					parent_.add_child(child)
+					root['node'].remove_child(child)
+				parent['children'].remove(root)
+				root['node'].kill()
 
 class TreeWriter(object):
     def __init__(self, archive_fn):
