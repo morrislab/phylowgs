@@ -80,35 +80,6 @@ def print_node2(node, parent,tree,wts,fout):
 		name_string = str(ctr)#+'('+str(len(child['node'].get_data()))+')'
 		print_node2(child, node_name,tree.add_child(name=name_string),wts,fout)
 	
-	
-# removes the empty nodes from the tssb tree
-# Does not removes root as it is not required
-# root: root of the current tree
-# parent: parent of the root
-def remove_empty_nodes(root, parent):
-	for child in list(root['children']):
-		remove_empty_nodes(child, root)
-	if (root['node'].get_data() == []):
-		if (root['children'] == []): # leaf
-			if (parent != None):
-				parent['children'].remove(root)
-				root['node'].kill()
-			return
-		else:
-			if (parent != None):
-				parent_ = root['node'].parent()
-				for child in list(root['children']):
-					parent['children'].append(child)
-					root['children'].remove(child)
-				for child in list(root['node'].children()):
-					child._parent = parent_
-					parent_.add_child(child)
-					root['node'].remove_child(child)
-				parent['children'].remove(root)
-				root['node'].kill()
-
-
-		
 ### printing stuff #################
 def print_best_tree_pdf(tssb,fout,score=0):
 	#wts, nodes = tssb.get_mixture()

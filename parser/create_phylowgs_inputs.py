@@ -43,6 +43,9 @@ class VariantParser(object):
       # ('_random'), so ignore.
       return False
 
+    if chrom.startswith('hs37d5') or chrom.startswith('gl'):
+      return False
+
     if '_' in chrom:
       # Reject weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
       return False
@@ -80,7 +83,6 @@ class VariantParser(object):
 
       variants.append(variant)
 
-    variants.sort(key = lambda v: (v.CHROM, v.POS))
     return variants
 
 class SangerParser(VariantParser):
@@ -138,8 +140,20 @@ class SangerParser(VariantParser):
 
     return (ref_reads, total_reads)
 
-class MutectParser(VariantParser):
+class MutectPcawgParser(VariantParser):
+  def __init__(self, vcf_filename):
+    self._vcf_filename = vcf_filename
 
+  def _calc_read_counts(self, variant):
+    # Currently hardcodes tumour sample as the second column.
+    # Might not always be true
+    ref_reads = int(variant.samples[-1].data.ref_count)
+    variant_reads = int(variant.samples[-1].data.alt_count)
+    total_reads = ref_reads + variant_reads
+
+    return (ref_reads, total_reads)
+
+class MutectSmchetParser(VariantParser):
   def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
 
@@ -151,29 +165,6 @@ class MutectParser(VariantParser):
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
-
-class OncoscanParser(VariantParser):
-  '''
-  Works with prostate data from Oncoscan.
-  '''
-  def __init__(self, vcf_filename, oncoscan_filename):
-    self._vcf_filename = vcf_filename
-    self._cnvs = self._parse_oncoscan(oncoscan_filename)
-
-  def _calc_read_counts(self, variant):
-    tumor = variant.genotype('TUMOR')
-    ref_forward, ref_reverse, alt_forward, alt_reverse = [int(e) for e in tumor['DP4']]
-    ref_reads = ref_forward + ref_reverse
-    total_reads = ref_reads + alt_forward + alt_reverse
-    return (ref_reads, total_reads)
-
-  def _parse_oncoscan(self, oncoscan_filename):
-    cnvs = defaultdict(list)
-    with open(oncoscan_filename) as cnv_file:
-      for line in cnv_file:
-        chr, start, end, delta = line.strip().split()
-        cnvs[chr].append((int(start), int(end)))
-    return cnvs
 
 class BattenbergParser(object):
   def __init__(self, bb_filename):
@@ -230,9 +221,6 @@ class BattenbergParser(object):
         cn_regions[chrom].append(cnv1)
         if cnv2 is not None:
           cn_regions[chrom].append(cnv2)
-
-    for chrom, regions in cn_regions.items():
-      regions.sort(key = lambda c: c['start'])
     return cn_regions
 
 class CnvFormatter(object):
@@ -392,6 +380,8 @@ class VariantFormatter(object):
     return freq
 
   def format_variants(self, variant_list, error_rate):
+    variant_list.sort(key = lambda v: variant_key(v[0]))
+
     for variant, ref_reads, total_reads in variant_list:
       ssm_id = 's%s' % self._counter
       variant_name = '%s_%s' % (variant.CHROM, variant.POS)
@@ -433,6 +423,16 @@ def restricted_float(x):
     raise argparse.ArgumentTypeError('%r not in range [0.0, 1.0]' % x)
   return x
 
+def variant_key(var):
+  chrom = var.CHROM
+  if chrom == 'x':
+    chrom = 100
+  elif chrom == 'y':
+    chrom = 101
+  else:
+    chrom = int(chrom)
+  return (chrom, var.POS)
+
 class VariantAndCnvGroup(object):
   def __init__(self):
     self._cn_regions = None
@@ -468,19 +468,10 @@ class VariantAndCnvGroup(object):
     after = set([var for (var, _, _) in after])
     log('%s=%s %s=%s delta=%s' % (before_label, len(before), after_label, len(after), len(before) - len(after)))
 
-    def _key(var):
-      chrom = var.CHROM
-      if chrom == 'x':
-        chrom = 100
-      elif chrom == 'y':
-        chrom = 101
-      else:
-        chrom = int(chrom)
-      return (chrom, var.POS)
 
     assert after.issubset(before)
     removed = list(before - after)
-    removed.sort(key = _key)
+    removed.sort(key = variant_key)
 
     for var in removed:
       var_name = '%s_%s' % (var.CHROM, var.POS)
@@ -570,7 +561,6 @@ class VariantAndCnvGroup(object):
   def subsample_variants(self, sample_size):
     random.shuffle(self._variants_and_reads)
     self._variants_and_reads = self._variants_and_reads[:sample_size]
-    self._variants_and_reads.sort(key = lambda v: (v[0].CHROM, v[0].POS))
 
   def write_variants(self, outfn, error_rate):
     formatter = VariantFormatter()
@@ -641,7 +631,7 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'oncoscan', 'mutect'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet'),
       help='Type of VCF file')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
       help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
@@ -657,36 +647,32 @@ def main():
   # invocation.
   random.seed(1)
 
-  if args.input_type in ('sanger', 'mutect'):
-    grouper = VariantAndCnvGroup()
-    if args.input_type == 'sanger':
-      variant_parser = SangerParser(args.vcf_file)
-    else:
-      variant_parser = MutectParser(args.vcf_file)
-    variants_and_reads = variant_parser.list_variants()
-    grouper.add_variants(variants_and_reads)
+  grouper = VariantAndCnvGroup()
+  if args.input_type == 'sanger':
+    variant_parser = SangerParser(args.vcf_file)
+  elif args.input_type == 'mutect_pcawg':
+    variant_parser = MutectPcawgParser(args.vcf_file)
+  elif args.input_type == 'mutect_smchet':
+    variant_parser = MutectSmchetParser(args.vcf_file)
+  variants_and_reads = variant_parser.list_variants()
+  grouper.add_variants(variants_and_reads)
 
-    if args.battenberg:
-      cnv_parser = BattenbergParser(args.battenberg)
-      cn_regions = cnv_parser.parse()
-      grouper.add_cnvs(cn_regions)
+  if args.battenberg:
+    cnv_parser = BattenbergParser(args.battenberg)
+    cn_regions = cnv_parser.parse()
+    grouper.add_cnvs(cn_regions)
 
-    if args.only_normal_cn:
-      grouper.retain_only_variants_in_normal_cn_regions()
-    elif grouper.has_cnvs():
-      grouper.exclude_variants_in_subclonal_cnvs()
+  if args.only_normal_cn:
+    grouper.retain_only_variants_in_normal_cn_regions()
+  elif grouper.has_cnvs():
+    grouper.exclude_variants_in_subclonal_cnvs()
 
-    if args.sample_size:
-      grouper.subsample_variants(args.sample_size)
+  if args.sample_size:
+    grouper.subsample_variants(args.sample_size)
 
-    grouper.write_variants(args.output_variants, args.error_rate)
-    if not args.only_normal_cn and grouper.has_cnvs():
-      grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
-
-  elif args.input_type == 'oncoscan':
-    raise Exception('Various changes necessary before this works again')
-    #parser = OncoscanParser(args.vcf_file, args.cnv_file)
-
+  grouper.write_variants(args.output_variants, args.error_rate)
+  if not args.only_normal_cn and grouper.has_cnvs():
+    grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
 
 if __name__ == '__main__':
   main()

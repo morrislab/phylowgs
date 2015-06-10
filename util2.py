@@ -43,9 +43,9 @@ def load_data(fname1,fname2):
 
 		mu_r=mu_v=0
 		if 'mu_r' in row.keys():
-			mu_r = float(row['mu_r'])	    
+			mu_r = float(row['mu_r'])
 			mu_v = float(row['mu_v'])
-				    
+
 		data[id] = Datum(name, id, a, d, mu_r, mu_v)
 	
 	n_ssms = len(data.keys())
@@ -100,12 +100,36 @@ def map_datum_to_node(tssb):
 			datum.node=node
 #################################################
 
-	
-
 def check_bounds(p,l=0.0001,u=.9999):
 	if p < l: p=l
 	if p > u: p=u
 	return p
+
+# removes the empty nodes from the tssb tree
+# Does not removes root as it is not required
+# root: root of the current tree
+# parent: parent of the root
+def remove_empty_nodes(root, parent = None):
+	for child in list(root['children']):
+		remove_empty_nodes(child, root)
+	if (root['node'].get_data() == []):
+		if (root['children'] == []): # leaf
+			if (parent != None):
+				parent['children'].remove(root)
+				root['node'].kill()
+			return
+		else:
+			if (parent != None):
+				parent_ = root['node'].parent()
+				for child in list(root['children']):
+					parent['children'].append(child)
+					root['children'].remove(child)
+				for child in list(root['node'].children()):
+					child._parent = parent_
+					parent_.add_child(child)
+					root['node'].remove_child(child)
+				parent['children'].remove(root)
+				root['node'].kill()
 
 def rm_safely(filename):
 	try:
@@ -159,6 +183,7 @@ class StateManager(object):
 
     def state_exists(self):
 	return os.path.isfile(self._last_state_fn)
+
 
 class TreeWriter(object):
     default_archive_fn = 'trees.zip'
@@ -235,15 +260,17 @@ class TreeReader(object):
 	for idx, llh, tree in self.load_trees_and_llhs(archive_fn, num_trees):
 	    yield tree
 
-    def load_trees_and_metadata(self, num_trees=None):
+    def load_trees_and_metadata(self, num_trees=None, remove_empty_vertices=False):
 	# Sort by LLH
 	trees = sorted(self._trees, key = lambda (tidx, llh, zinfo): llh, reverse=True)
 
 	if num_trees is not None:
-	    num_trees = min(num_trees,len(trees))
+	    num_trees = min(num_trees, len(trees))
 	    trees = trees[:num_trees]
 
 	for tidx, llh, zinfo in trees:
 	    pickled = self._archive.read(zinfo)
 	    tree = pickle.loads(pickled)
+	    if remove_empty_vertices:
+		remove_empty_nodes(tree.root)
 	    yield (tidx, llh, tree)
