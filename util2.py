@@ -110,7 +110,7 @@ def check_bounds(p,l=0.0001,u=.9999):
 # Does not removes root as it is not required
 # root: root of the current tree
 # parent: parent of the root
-def remove_empty_nodes(root, parent):
+def remove_empty_nodes(root, parent = None):
 	for child in list(root['children']):
 		remove_empty_nodes(child, root)
 	if (root['node'].get_data() == []):
@@ -178,15 +178,17 @@ class TreeReader(object):
 	for idx, llh, tree in self.load_trees_and_llhs(archive_fn, num_trees):
 	    yield tree
 
-    def load_trees_and_metadata(self, num_trees=None):
+    def load_trees_and_metadata(self, num_trees=None, remove_empty_vertices=False):
 	# Sort by LLH
 	trees = sorted(self._trees, key = lambda (tidx, llh, zinfo): llh, reverse=True)
 
 	if num_trees is not None:
-	    num_trees = min(num_trees,len(trees))
+	    num_trees = min(num_trees, len(trees))
 	    trees = trees[:num_trees]
 
 	for tidx, llh, zinfo in trees:
 	    pickled = self._archive.read(zinfo)
 	    tree = pickle.loads(pickled)
+	    if remove_empty_vertices:
+		remove_empty_nodes(tree.root)
 	    yield (tidx, llh, tree)
