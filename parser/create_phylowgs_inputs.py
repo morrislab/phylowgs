@@ -140,7 +140,7 @@ class SangerParser(VariantParser):
 
     return (ref_reads, total_reads)
 
-class MutectParser(VariantParser):
+class MutectPcawgParser(VariantParser):
   def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
 
@@ -153,28 +153,18 @@ class MutectParser(VariantParser):
 
     return (ref_reads, total_reads)
 
-class OncoscanParser(VariantParser):
-  '''
-  Works with prostate data from Oncoscan.
-  '''
-  def __init__(self, vcf_filename, oncoscan_filename):
+class MutectSmchetParser(VariantParser):
+  def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
-    self._cnvs = self._parse_oncoscan(oncoscan_filename)
 
   def _calc_read_counts(self, variant):
-    tumor = variant.genotype('TUMOR')
-    ref_forward, ref_reverse, alt_forward, alt_reverse = [int(e) for e in tumor['DP4']]
-    ref_reads = ref_forward + ref_reverse
-    total_reads = ref_reads + alt_forward + alt_reverse
-    return (ref_reads, total_reads)
+    # Currently hardcodes tumour sample as the second column.
+    # Might not always be true
+    ref_reads = variant.samples[-1]['AD'][0]
+    variant_reads = variant.samples[-1]['AD'][1]
+    total_reads = ref_reads + variant_reads
 
-  def _parse_oncoscan(self, oncoscan_filename):
-    cnvs = defaultdict(list)
-    with open(oncoscan_filename) as cnv_file:
-      for line in cnv_file:
-        chr, start, end, delta = line.strip().split()
-        cnvs[chr].append((int(start), int(end)))
-    return cnvs
+    return (ref_reads, total_reads)
 
 class BattenbergParser(object):
   def __init__(self, bb_filename):
@@ -641,7 +631,7 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'oncoscan', 'mutect'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet'),
       help='Type of VCF file')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
       help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
@@ -657,36 +647,32 @@ def main():
   # invocation.
   random.seed(1)
 
-  if args.input_type in ('sanger', 'mutect'):
-    grouper = VariantAndCnvGroup()
-    if args.input_type == 'sanger':
-      variant_parser = SangerParser(args.vcf_file)
-    else:
-      variant_parser = MutectParser(args.vcf_file)
-    variants_and_reads = variant_parser.list_variants()
-    grouper.add_variants(variants_and_reads)
+  grouper = VariantAndCnvGroup()
+  if args.input_type == 'sanger':
+    variant_parser = SangerParser(args.vcf_file)
+  elif args.input_type == 'mutect_pcawg':
+    variant_parser = MutectPcawgParser(args.vcf_file)
+  elif args.input_type == 'mutect_smchet':
+    variant_parser = MutectSmchetParser(args.vcf_file)
+  variants_and_reads = variant_parser.list_variants()
+  grouper.add_variants(variants_and_reads)
 
-    if args.battenberg:
-      cnv_parser = BattenbergParser(args.battenberg)
-      cn_regions = cnv_parser.parse()
-      grouper.add_cnvs(cn_regions)
+  if args.battenberg:
+    cnv_parser = BattenbergParser(args.battenberg)
+    cn_regions = cnv_parser.parse()
+    grouper.add_cnvs(cn_regions)
 
-    if args.only_normal_cn:
-      grouper.retain_only_variants_in_normal_cn_regions()
-    elif grouper.has_cnvs():
-      grouper.exclude_variants_in_subclonal_cnvs()
+  if args.only_normal_cn:
+    grouper.retain_only_variants_in_normal_cn_regions()
+  elif grouper.has_cnvs():
+    grouper.exclude_variants_in_subclonal_cnvs()
 
-    if args.sample_size:
-      grouper.subsample_variants(args.sample_size)
+  if args.sample_size:
+    grouper.subsample_variants(args.sample_size)
 
-    grouper.write_variants(args.output_variants, args.error_rate)
-    if not args.only_normal_cn and grouper.has_cnvs():
-      grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
-
-  elif args.input_type == 'oncoscan':
-    raise Exception('Various changes necessary before this works again')
-    #parser = OncoscanParser(args.vcf_file, args.cnv_file)
-
+  grouper.write_variants(args.output_variants, args.error_rate)
+  if not args.only_normal_cn and grouper.has_cnvs():
+    grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
 
 if __name__ == '__main__':
   main()
