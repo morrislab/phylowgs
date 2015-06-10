@@ -269,6 +269,7 @@ def main():
 	def sigterm_handler(_signo, _stack_frame):
 		safe_to_exit.wait()
 		# Exit with non-zero to indicate run didn't finish.
+		print >> sys.stderr, 'Signal %s received. Exiting.' % _signo
 		sys.exit(3)
 	# SciNet will supposedly send SIGTERM 30 s before hard-killing the process.
 	# This gives us time to clean up.
