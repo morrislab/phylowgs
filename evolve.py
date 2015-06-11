@@ -37,6 +37,9 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['write_backups_every'] = write_backups_every
 
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
+	if len(codes) == 0:
+		logmsg('No SSMs or CNVs provided. Exiting.', sys.stderr)
+		return
 	NTPS = len(codes[0].a) # number of samples / time point
 	state['glist'] = [datum.name for datum in codes if len(datum.name)>0]
 
