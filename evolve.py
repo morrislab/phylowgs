@@ -20,6 +20,7 @@ import argparse
 import threading
 import signal
 import traceback
+from datetime import datetime
 
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
@@ -76,7 +77,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_fil
 	
 	tree_writer = TreeWriter()
 	state_manager.write_initial_state(state)
-	print("Starting MCMC run...")
+	logmsg("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
 
 	do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
@@ -89,9 +90,9 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit):
 		state = state_manager.load_state()
 		tree_writer = TreeWriter(resume_run = True)
 	except:
-		print('Restoring state failed:')
+		logmsg('Restoring state failed:', sys.stderr)
 		traceback.print_exc()
-		print('Restoring from backup and trying again.')
+		logmsg('Restoring from backup and trying again.', sys.stderr)
 		backup_manager.restore_backup()
 
 		state = state_manager.load_state()
@@ -110,7 +111,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 	for iteration in range(start_iter, state['num_samples']):
 		safe_to_exit.set()
 		if iteration < 0:
-			print iteration
+			logmsg(iteration)
 
 		# Referring to tssb as local variable instead of dictionary element is much
 		# faster.
@@ -146,10 +147,10 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 		)
 		if float(state['mh_acc']) < 0.08 and state['mh_std'] < 10000:
 			state['mh_std'] = state['mh_std']*2.0
-			print "Shrinking MH proposals. Now %f" % state['mh_std']
+			logmsg("Shrinking MH proposals. Now %f" % state['mh_std'])
 		if float(state['mh_acc']) > 0.5 and float(state['mh_acc']) < 0.99:
 			state['mh_std'] = state['mh_std']/2.0
-			print "Growing MH proposals. Now %f" % state['mh_std']
+			logmsg("Growing MH proposals. Now %f" % state['mh_std'])
 	
 		tssb.resample_sticks()
 		tssb.resample_stick_orders()
@@ -159,9 +160,9 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 			state['cd_llh_traces'][iteration] = tssb.complete_data_log_likelihood()
 			if True or mod(iteration, 10) == 0:
 				weights, nodes = tssb.get_mixture()
-				print iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay
+				logmsg(' '.join([str(v) for v in (iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay)]))
 			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
-				print "\t%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration])
+				logmsg("%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration]))
 
 		# It's not safe to exit while performing file IO, as we don't want
 		# trees.zip or the computation state file to become corrupted from an
@@ -227,7 +228,7 @@ def run(safe_to_exit):
 	backup_manager = BackupManager([StateManager.default_last_state_fn, TreeWriter.default_archive_fn])
 
 	if state_manager.state_exists():
-		print 'Resuming existing run. Ignoring command-line parameters.'
+		logmsg('Resuming existing run. Ignoring command-line parameters.')
 		resume_existing_run(state_manager, backup_manager, safe_to_exit)
 	else:
 		args = parse_args()
@@ -267,10 +268,12 @@ def main():
 	safe_to_exit = threading.Event()
 
 	def sigterm_handler(_signo, _stack_frame):
+		logmsg('Signal %s received.' % _signo, sys.stderr)
 		safe_to_exit.wait()
 		# Exit with non-zero to indicate run didn't finish.
-		print >> sys.stderr, 'Signal %s received. Exiting.' % _signo
+		logmsg('Exiting now.')
 		sys.exit(3)
+
 	# SciNet will supposedly send SIGTERM 30 s before hard-killing the process.
 	# This gives us time to clean up.
 	signal.signal(signal.SIGTERM, sigterm_handler)
@@ -295,6 +298,9 @@ def main():
 		# *immediately* when the signal is sent -- i.e., even before the timeout
 		# has expired.
 		run_thread.join(10)
+
+def logmsg(msg, fd=sys.stdout):
+	  print >> fd, '[%s] %s' % (datetime.now(), msg)
 
 if __name__ == "__main__":
 	main()
