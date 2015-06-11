@@ -41,7 +41,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['glist'] = [datum.name for datum in codes if len(datum.name)>0]
 
 	# MCMC settings
-	state['burnin'] = 10
+	state['burnin'] = 1000
 	state['num_samples'] = num_samples
 	state['dp_alpha'] = 25.0
 	state['dp_gamma'] = 1.0
