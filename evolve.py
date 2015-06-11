@@ -25,7 +25,7 @@ from datetime import datetime
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
 	state = {}
 	state['rand_seed'] = rand_seed
 	seed(state['rand_seed'])
@@ -41,7 +41,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_fil
 	state['glist'] = [datum.name for datum in codes if len(datum.name)>0]
 
 	# MCMC settings
-	state['burnin'] = 1000
+	state['burnin'] = 10
 	state['num_samples'] = num_samples
 	state['dp_alpha'] = 25.0
 	state['dp_gamma'] = 1.0
@@ -80,9 +80,9 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, ssm_file, cnv_fil
 	logmsg("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
 
-	do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
 
-def resume_existing_run(state_manager, backup_manager, safe_to_exit):
+def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeeded):
 	# If error occurs, restore the backups and try again. Never try more than two
 	# times, however -- if the primary file and the backup file both fail, the
 	# error is unrecoverable.
@@ -103,9 +103,9 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit):
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
 
-	do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
 
-def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
+def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 	start_iter = state['last_iteration'] + 1
 
 	for iteration in range(start_iter, state['num_samples']):
@@ -191,7 +191,9 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, state, tree_writer, cod
 	glist.shape=(1,len(glist))
 	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 	state_manager.delete_state_file()
+
 	safe_to_exit.set()
+	run_succeeded.set()
 
 def test():
 	tssb=cPickle.load(open('ptree'))
@@ -223,13 +225,13 @@ def parse_args():
 	args = parser.parse_args()
 	return args
 
-def run(safe_to_exit):
+def run(safe_to_exit, run_succeeded):
 	state_manager = StateManager()
 	backup_manager = BackupManager([StateManager.default_last_state_fn, TreeWriter.default_archive_fn])
 
 	if state_manager.state_exists():
 		logmsg('Resuming existing run. Ignoring command-line parameters.')
-		resume_existing_run(state_manager, backup_manager, safe_to_exit)
+		resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeeded)
 	else:
 		args = parse_args()
 		# Ensure input files exist and can be read.
@@ -246,6 +248,7 @@ def run(safe_to_exit):
 			state_manager,
 			backup_manager,
 			safe_to_exit,
+			run_succeeded,
 			args.ssm_file,
 			args.cnv_file,
 			top_k_trees_file=args.top_k_trees,
@@ -267,6 +270,14 @@ def main():
 	# current write operation.
 	safe_to_exit = threading.Event()
 
+	# This will allow us to detect whether the run thread exited cleanly or not.
+	# This means we can properly report a non-zero exit code if something failed
+	# (e.g., something threw an exception). This is necessary because exceptions
+	# in the run thread will terminate it, but can't be detected from the main
+	# thread. A more robust strategy is here: http://stackoverflow.com/a/2830127.
+	# Our strategy should be sufficient for the moment, though.
+	run_succeeded = threading.Event()
+
 	def sigterm_handler(_signo, _stack_frame):
 		logmsg('Signal %s received.' % _signo, sys.stderr)
 		safe_to_exit.wait()
@@ -282,7 +293,7 @@ def main():
 	# data being written. Permit these operations to finish before exiting.
 	signal.signal(signal.SIGINT, sigterm_handler)
 
-	run_thread = threading.Thread(target=run, args=(safe_to_exit,))
+	run_thread = threading.Thread(target=run, args=(safe_to_exit, run_succeeded))
 	# Thread must be a daemon thread, or sys.exit() will wait until the thread
 	# finishes execution completely.
 	run_thread.daemon = True
@@ -298,6 +309,11 @@ def main():
 		# *immediately* when the signal is sent -- i.e., even before the timeout
 		# has expired.
 		run_thread.join(10)
+
+	if run_succeeded.is_set():
+		sys.exit(0)
+	else:
+		sys.exit(1)
 
 def logmsg(msg, fd=sys.stdout):
 	  print >> fd, '[%s] %s' % (datetime.now(), msg)
