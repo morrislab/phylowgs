@@ -203,6 +203,16 @@ class MutectSmchetParser(VariantParser):
 
     return (ref_reads, total_reads)
 
+class VarDictParser(MutectSmchetParser):
+  """Support VarDict somatic variant caller.
+
+  https://github.com/AstraZeneca-NGS/VarDictJava
+  https://github.com/AstraZeneca-NGS/VarDict
+
+  Uses the same read-extraction logic as MuTect (SMC-Het).
+  """
+  pass
+
 class DKFZParser(VariantParser):
   def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
@@ -685,7 +695,7 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz', 'vardict'),
     help='Type of VCF file')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
@@ -716,6 +726,8 @@ def main():
     variant_parser = MuseParser(args.vcf_file,args.tier, args.tumor_sample)
   elif args.input_type == 'dkfz':
     variant_parser = DKFZParser(args.vcf_file, args.tumor_sample)
+  elif args.input_type == 'vardict':
+    variant_parser = VarDictParser(args.vcf_file, args.tumor_sample)
   variants_and_reads = variant_parser.list_variants()
   grouper.add_variants(variants_and_reads)
 

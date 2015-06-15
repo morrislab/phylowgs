@@ -71,7 +71,7 @@ Usage
                             Fraction of sample that is cancerous rather than
                             somatic. Used only for estimating CNV confidence --
                             if no CNVs, need not specify argument. (default: 1.0)
-      -v {sanger,oncoscan,mutect}, --variant-type {sanger,oncoscan,mutect}
+      -v, --variant-type {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,vardict}
                             Type of VCF file (default: None)
       --tumor-sample TUMOR_SAMPLE
                             Name of the tumor sample in the input VCF file.
