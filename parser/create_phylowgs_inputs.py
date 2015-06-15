@@ -85,6 +85,19 @@ class VariantParser(object):
 
     return variants
 
+  def _get_tumor_index(self, variant, tumor_sample=None):
+    """Find the index of the tumor sample.
+
+    Currently hardcodes tumour sample as the last column if name not specified.
+    Might not always be true
+    """
+    if self._tumor_sample:
+      tumor_is = [i for i, s in enumerate(variant.samples) if s.sample == tumor_sample]
+      assert len(tumor_is) == 1, "Did not find tumor name %s in samples" % tumor_sample
+      return tumor_is[0]
+    else:
+      return -1
+
 class SangerParser(VariantParser):
   '''
   Works with Battenberg-formatted CNV calls.
@@ -141,13 +154,15 @@ class SangerParser(VariantParser):
     return (ref_reads, total_reads)
 
 class MuseParser(VariantParser):
-  def __init__(self, vcf_filename, tier=0):
+  def __init__(self, vcf_filename, tier=0, tumor_sample=None):
     self._vcf_filename = vcf_filename
     self._tier = tier
+    self._tumor_sample = tumor_sample
 
   def _calc_read_counts(self, variant):
-    total_reads = int(variant.samples[-1]['DP4'])
-    variant_reads = int(variant.samples[-1]['AD'])
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    total_reads = int(variant.samples[tumor_i]['DP4'])
+    variant_reads = int(variant.samples[tumor_i]['AD'])
 
     ref_reads = total_reads - variant_reads
 
@@ -163,43 +178,42 @@ class MuseParser(VariantParser):
 
 
 class MutectPcawgParser(VariantParser):
-  def __init__(self, vcf_filename):
+  def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
 
   def _calc_read_counts(self, variant):
-    # Currently hardcodes tumour sample as the last column.
-    # Might not always be true
-    ref_reads = int(variant.samples[-1].data.ref_count)
-    variant_reads = int(variant.samples[-1].data.alt_count)
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    ref_reads = int(variant.samples[tumor_i].data.ref_count)
+    variant_reads = int(variant.samples[tumor_i].data.alt_count)
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
 
 class MutectSmchetParser(VariantParser):
-  def __init__(self, vcf_filename):
+  def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
 
   def _calc_read_counts(self, variant):
-    # Currently hardcodes tumour sample as the last column.
-    # Might not always be true
-    ref_reads = variant.samples[-1]['AD'][0]
-    variant_reads = variant.samples[-1]['AD'][1]
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    ref_reads = variant.samples[tumor_i]['AD'][0]
+    variant_reads = variant.samples[tumor_i]['AD'][1]
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
 
-
 class DKFZParser(VariantParser):
-  def __init__(self, vcf_filename):
+  def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
 
   def _calc_read_counts(self, variant):
-    # Currently hardcodes tumour sample as the last column.
-    # Might not always be true
-    for_ref_reads = variant.samples[-1]['DP4'][0]
-    back_ref_reads = variant.samples[-1]['DP4'][1]
-    for_variant_reads = variant.samples[-1]['DP4'][2]
-    back_variant_reads = variant.samples[-1]['DP4'][3]
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    for_ref_reads = variant.samples[tumor_i]['DP4'][0]
+    back_ref_reads = variant.samples[tumor_i]['DP4'][1]
+    for_variant_reads = variant.samples[tumor_i]['DP4'][2]
+    back_variant_reads = variant.samples[tumor_i]['DP4'][3]
     ref_reads = for_ref_reads + back_ref_reads
     var_reads = for_variant_reads + back_variant_reads
     total_reads = ref_reads + var_reads
@@ -673,6 +687,8 @@ def main():
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
   parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz'),
     help='Type of VCF file')
+  parser.add_argument('--tumor-sample', dest='tumor_sample',
+    help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
     help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
@@ -693,13 +709,13 @@ def main():
   if args.input_type == 'sanger':
     variant_parser = SangerParser(args.vcf_file)
   elif args.input_type == 'mutect_pcawg':
-    variant_parser = MutectPcawgParser(args.vcf_file)
+    variant_parser = MutectPcawgParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'mutect_smchet':
-    variant_parser = MutectSmchetParser(args.vcf_file)
+    variant_parser = MutectSmchetParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'muse':
-    variant_parser = MuseParser(args.vcf_file,args.tier)
+    variant_parser = MuseParser(args.vcf_file,args.tier, args.tumor_sample)
   elif args.input_type == 'dkfz':
-    variant_parser = DKFZParser(args.vcf_file)
+    variant_parser = DKFZParser(args.vcf_file, args.tumor_sample)
   variants_and_reads = variant_parser.list_variants()
   grouper.add_variants(variants_and_reads)
 

@@ -73,6 +73,10 @@ Usage
                             if no CNVs, need not specify argument. (default: 1.0)
       -v {sanger,oncoscan,mutect}, --variant-type {sanger,oncoscan,mutect}
                             Type of VCF file (default: None)
+      --tumor-sample TUMOR_SAMPLE
+                            Name of the tumor sample in the input VCF file.
+                            Defaults to last sample if not specified. (default:
+                            None)
       --cnv-confidence CNV_CONFIDENCE
                             Confidence in CNVs. Set to < 1 to scale "d" values
                             used in CNV output file (default: 1.0)
