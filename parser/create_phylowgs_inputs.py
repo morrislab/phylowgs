@@ -140,12 +140,34 @@ class SangerParser(VariantParser):
 
     return (ref_reads, total_reads)
 
+class MuseParser(VariantParser):
+  def __init__(self, vcf_filename, tier=0):
+    self._vcf_filename = vcf_filename
+    self._tier = tier
+
+  def _calc_read_counts(self, variant):
+    total_reads = int(variant.samples[-1]['DP4'])
+    variant_reads = int(variant.samples[-1]['AD'])
+
+    ref_reads = total_reads - variant_reads
+
+    return (ref_reads, total_reads)
+
+  def _does_variant_pass_filters(self, variant):
+    if variant.FILTER is None or len(variant.FILTER) == 0:
+      return True
+    if int(variant.FILTER[0][-1]) <= self._tier:
+      # Variant failed one or more filters.
+      return True
+    return False
+
+
 class MutectPcawgParser(VariantParser):
   def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
 
   def _calc_read_counts(self, variant):
-    # Currently hardcodes tumour sample as the second column.
+    # Currently hardcodes tumour sample as the last column.
     # Might not always be true
     ref_reads = int(variant.samples[-1].data.ref_count)
     variant_reads = int(variant.samples[-1].data.alt_count)
@@ -158,11 +180,29 @@ class MutectSmchetParser(VariantParser):
     self._vcf_filename = vcf_filename
 
   def _calc_read_counts(self, variant):
-    # Currently hardcodes tumour sample as the second column.
+    # Currently hardcodes tumour sample as the last column.
     # Might not always be true
     ref_reads = variant.samples[-1]['AD'][0]
     variant_reads = variant.samples[-1]['AD'][1]
     total_reads = ref_reads + variant_reads
+
+    return (ref_reads, total_reads)
+
+
+class DKFZParser(VariantParser):
+  def __init__(self, vcf_filename):
+    self._vcf_filename = vcf_filename
+
+  def _calc_read_counts(self, variant):
+    # Currently hardcodes tumour sample as the last column.
+    # Might not always be true
+    for_ref_reads = variant.samples[-1]['DP4'][0]
+    back_ref_reads = variant.samples[-1]['DP4'][1]
+    for_variant_reads = variant.samples[-1]['DP4'][2]
+    back_variant_reads = variant.samples[-1]['DP4'][3]
+    ref_reads = for_ref_reads + back_ref_reads
+    var_reads = for_variant_reads + back_variant_reads
+    total_reads = ref_reads + var_reads
 
     return (ref_reads, total_reads)
 
@@ -631,13 +671,15 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet'),
-      help='Type of VCF file')
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz'),
+    help='Type of VCF file')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
-      help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
+    help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
-      help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
+    help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
+  parser.add_argument('--tier', dest='tier', type=int, default=0,
+    help='Maximum MuSE tier to include')
   parser.add_argument('vcf_file')
   args = parser.parse_args()
 
@@ -654,6 +696,10 @@ def main():
     variant_parser = MutectPcawgParser(args.vcf_file)
   elif args.input_type == 'mutect_smchet':
     variant_parser = MutectSmchetParser(args.vcf_file)
+  elif args.input_type == 'muse':
+    variant_parser = MuseParser(args.vcf_file,args.tier)
+  elif args.input_type == 'dkfz':
+    variant_parser = DKFZParser(args.vcf_file)
   variants_and_reads = variant_parser.list_variants()
   grouper.add_variants(variants_and_reads)
 
