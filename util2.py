@@ -174,8 +174,8 @@ class TreeReader(object):
 	pickled = self._archive.read(zinfo)
 	return pickle.loads(pickled)
 
-    def load_trees(self, num_trees=None):
-	for idx, llh, tree in self.load_trees_and_llhs(archive_fn, num_trees):
+    def load_trees(self, num_trees=None, remove_empty_vertices=False):
+	for idx, llh, tree in self.load_trees_and_metadata(num_trees, remove_empty_vertices):
 	    yield tree
 
     def load_trees_and_metadata(self, num_trees=None, remove_empty_vertices=False):
