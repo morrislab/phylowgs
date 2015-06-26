@@ -106,7 +106,10 @@ def compute_lineages(archive_fn, num_trees, fin1, fin2):
 		script_dir = os.path.dirname(os.path.realpath(__file__))
 		old_wd = os.getcwd()
 		os.chdir(script_dir)
-		call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/posterior_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+		try:
+			call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/posterior_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+		except OSError:  # pdflatex not available, do not die
+			pass
 		os.chdir(old_wd)
 
 		fidx+=1

@@ -40,7 +40,10 @@ def print_top_trees(tree_archive,fout,k=5):
 			script_dir = os.path.dirname(os.path.realpath(__file__))
 			old_wd = os.getcwd()
 			os.chdir(script_dir)
-			call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+			try:
+                                call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+			except OSError:  # pdflatex not available, do not die
+                                pass
 			os.chdir(old_wd)
 			
 	tree_reader.close()
