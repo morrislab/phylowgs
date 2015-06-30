@@ -94,7 +94,7 @@ class TSSB(object):
         epsilon = finfo(float64).eps
         lengths = []        
         for n in range(self.num_data):
-
+            llhmap = {}
             # Get an initial uniform variate.
             ancestors = self.assignments[n].get_ancestors()
             current   = self.root
@@ -106,7 +106,9 @@ class TSSB(object):
             
             max_u = 1.0
             min_u = 0.0
-            llh_s = log(rand()) + self.assignments[n].logprob(self.data[n:n+1])
+            old_llh = self.assignments[n].logprob(self.data[n:n+1])
+            llhmap[self.assignments[n]] = old_llh
+            llh_s = log(rand()) + old_llh
 
             while True:
                 new_u                = (max_u-min_u)*rand() + min_u
@@ -118,8 +120,11 @@ class TSSB(object):
                 old_node.remove_datum(n)
                 new_node.add_datum(n)
                 self.assignments[n] = new_node
-                new_llh = new_node.logprob(self.data[n:n+1])
-
+                if new_node in llhmap:
+                    new_llh = llhmap[new_node]
+                else:
+                    new_llh = new_node.logprob(self.data[n:n+1])
+                    llhmap[new_node] = new_llh
                 if new_llh > llh_s:
                     break
                 elif abs(max_u-min_u) < epsilon:
