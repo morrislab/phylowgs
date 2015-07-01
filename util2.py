@@ -2,6 +2,7 @@ import numpy
 from numpy import *
 import cPickle as pickle
 import zipfile
+import shutil
 
 import scipy.stats as stat
 from scipy.stats import beta, binom
@@ -99,8 +100,6 @@ def map_datum_to_node(tssb):
 			datum.node=node
 #################################################
 
-	
-
 def check_bounds(p,l=0.0001,u=.9999):
 	if p < l: p=l
 	if p > u: p=u
@@ -132,26 +131,109 @@ def remove_empty_nodes(root, parent = None):
 				parent['children'].remove(root)
 				root['node'].kill()
 
+def rm_safely(filename):
+	try:
+	    os.remove(filename)
+	except OSError as e:
+	    if e.errno == 2: # Ignore "no such file" errors
+		pass
+	    else:
+		raise e
+
+class CorruptZipFileError(Exception):
+    pass
+
+class BackupManager(object):
+    def __init__(self, filenames):
+	self._filenames = filenames
+	self._backup_filenames = [os.path.realpath(fn) + '.backup' for fn in self._filenames]
+
+    def save_backup(self):
+	for fn, backup_fn in zip(self._filenames, self._backup_filenames):
+	    shutil.copy2(fn, backup_fn)
+
+    def restore_backup(self):
+	for fn, backup_fn in zip(self._filenames, self._backup_filenames):
+	    shutil.copy2(backup_fn, fn)
+
+class StateManager(object):
+    default_last_state_fn = 'state.last.pickle'
+    default_initial_state_fn = 'state.initial.pickle'
+
+    def __init__(self):
+	self._initial_state_fn = StateManager.default_initial_state_fn
+	self._last_state_fn = StateManager.default_last_state_fn
+
+    def _write_state(self, state, state_fn):
+	with open(state_fn, 'w') as state_file:
+	    pickle.dump(state, state_file, protocol=pickle.HIGHEST_PROTOCOL)
+
+    def write_state(self, state):
+	self._write_state(state, self._last_state_fn)
+
+    def load_state(self):
+	with open(self._last_state_fn) as state_file:
+	    return pickle.load(state_file)
+
+    def write_initial_state(self, state):
+	self._write_state(state, self._initial_state_fn)
+
+    def delete_state_file(self):
+	rm_safely(self._last_state_fn)
+
+    def state_exists(self):
+	return os.path.isfile(self._last_state_fn)
+
+
 class TreeWriter(object):
-    def __init__(self, archive_fn):
-	self._archive = zipfile.ZipFile(archive_fn, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-	self._counter = 0
+    default_archive_fn = 'trees.zip'
 
-    def write_tree(self, tree, llh):
-	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
-	self._archive.writestr('tree_%s_%s' % (self._counter, llh), serialized)
-	self._counter += 1
+    def __init__(self, resume_run = False):
+	self._archive_fn = TreeWriter.default_archive_fn
+	if resume_run:
+	    self._ensure_archive_is_valid()
+	else:
+	    # Remove file to avoid unwanted behaviour. By the zipfile module's
+	    # behaviour, given that we open the file with the "a" flag, if a
+	    # non-zip file exists at this path, a zip file will be appended to
+	    # the file; otherwise, if the file is already a zip, additional
+	    # files will be written into the zip. On a new run, neither case is
+	    # something we want.
+	    rm_safely(self._archive_fn)
 
-    def close(self):
+    def _ensure_archive_is_valid(self):
+	with zipfile.ZipFile(self._archive_fn) as zipf:
+	    if zipf.testzip() is not None:
+		raise CorruptZipFileError('Corrupt zip file: %s' % self._archive_fn)
+
+    def _open_archive(self):
+	self._archive = zipfile.ZipFile(self._archive_fn, 'a', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+
+    def _close_archive(self):
 	self._archive.close()
+
+    def _write_tree(self, tree, tree_fn):
+	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
+	self._open_archive()
+	self._archive.writestr(tree_fn, serialized)
+	self._close_archive()
+
+    def write_tree(self, tree, llh, idx):
+	self._write_tree(tree, 'tree_%s_%s' % (idx, llh))
+
+    def write_burnin_tree(self, burnin_tree, idx):
+	self._write_tree(burnin_tree, 'burnin_%s' % idx)
 
 class TreeReader(object):
     def __init__(self, archive_fn):
 	self._archive = zipfile.ZipFile(archive_fn)
 	infolist = self._archive.infolist()
-	infolist.sort(key = lambda zinfo: self._extract_metadata(zinfo)[0])
+	tree_info = [t for t in infolist if t.filename.startswith('tree_')]
+
+	# Sort by index
+	tree_info.sort(key = lambda tinfo: self._extract_metadata(tinfo)[0])
 	self._trees = []
-	for info in infolist:
+	for info in tree_info:
 	    idx, llh = self._extract_metadata(info)
 	    assert idx == len(self._trees)
 	    self._trees.append((idx, llh, info))
