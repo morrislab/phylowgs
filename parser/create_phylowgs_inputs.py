@@ -34,7 +34,6 @@ class VariantParser(object):
       # standardize.
       if variant.CHROM.startswith('chr'):
         variant.CHROM = variant.CHROM[3:]
-        
       records.append(variant)
     return records
 
@@ -52,7 +51,7 @@ class VariantParser(object):
       return False
 
     # Mitochondrial are weird, so ignore them.
-    if chrom == 'm' or chrom == 'mt':
+    if chrom in ('m', 'mt'):
       return False
     # Sex chromosomes difficult to deal with, as expected frequency depends on
     # whether patient is male or female, so ignore them for now.
@@ -64,7 +63,7 @@ class VariantParser(object):
     return True
 
   def _does_variant_pass_filters(self, variant):
-    if variant.FILTER is None: 
+    if variant.FILTER is None:
       return True
     if len(variant.FILTER) > 0:
       # Variant failed one or more filters.
@@ -81,9 +80,7 @@ class VariantParser(object):
         continue
       if not self._does_variant_pass_filters(variant):
         continue
-      
       variants.append(variant)
-      
     return variants
 
 class SangerParser(VariantParser):
@@ -178,15 +175,13 @@ class StrelkaParser(VariantParser):
     alt = variant.ALT[0]
     total_reads = int(variant.samples[-1]['DP'])
 	
-    if(alt is None): 
+    if alt is None:
       total_reads = 0
       variant_reads = 0
     else:
-      alt = str(alt)
-      variant_reads = getattr(variant.samples[-1].data, alt+'U')[0]
+      variant_reads = getattr(variant.samples[-1].data, str(alt)+'U')[0]
 
     ref_reads = total_reads - variant_reads
-
     return (ref_reads, total_reads)
 
 class MutectPcawgParser(VariantParser):
