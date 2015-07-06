@@ -700,7 +700,7 @@ def main():
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
     help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
-  parser.add_argument('--tier', dest='tier', type=int, default=0,
+  parser.add_argument('--muse-tier', dest='muse_tier', type=int, default=0,
     help='Maximum MuSE tier to include')
   parser.add_argument('vcf_file')
   args = parser.parse_args()
@@ -719,7 +719,7 @@ def main():
   elif args.input_type == 'mutect_smchet':
     variant_parser = MutectSmchetParser(args.vcf_file)
   elif args.input_type == 'muse':
-    variant_parser = MuseParser(args.vcf_file,args.tier)
+    variant_parser = MuseParser(args.vcf_file, args.muse_tier)
   elif args.input_type == 'dkfz':
     variant_parser = DKFZParser(args.vcf_file)
   elif args.input_type == 'strelka':
