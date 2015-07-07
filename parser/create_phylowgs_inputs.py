@@ -51,7 +51,7 @@ class VariantParser(object):
       return False
 
     # Mitochondrial are weird, so ignore them.
-    if chrom == 'm':
+    if chrom in ('m', 'mt'):
       return False
     # Sex chromosomes difficult to deal with, as expected frequency depends on
     # whether patient is male or female, so ignore them for now.
@@ -80,9 +80,7 @@ class VariantParser(object):
         continue
       if not self._does_variant_pass_filters(variant):
         continue
-
       variants.append(variant)
-
     return variants
 
 class SangerParser(VariantParser):
@@ -160,7 +158,31 @@ class MuseParser(VariantParser):
       # Variant failed one or more filters.
       return True
     return False
+    
+class StrelkaParser(VariantParser):
+  def __init__(self, vcf_filename):
+    self._vcf_filename = vcf_filename
+    
+  def _does_variant_pass_filters(self, variant):
+    # Strelka outputs two files one for SNPs, the other for InDels
+    # For now only deal with SNP file from Strelka
+    if variant.is_snp:
+      if variant.FILTER is None or len(variant.FILTER) == 0: 
+        return True
+    return False
 
+  def _calc_read_counts(self, variant):
+    alt = variant.ALT[0]
+    total_reads = int(variant.samples[-1]['DP'])
+	
+    if alt is None:
+      total_reads = 0
+      variant_reads = 0
+    else:
+      variant_reads = getattr(variant.samples[-1].data, str(alt)+'U')[0]
+
+    ref_reads = total_reads - variant_reads
+    return (ref_reads, total_reads)
 
 class MutectPcawgParser(VariantParser):
   def __init__(self, vcf_filename):
@@ -671,14 +693,14 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz','strelka'),
     help='Type of VCF file')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
     help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
     help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
-  parser.add_argument('--tier', dest='tier', type=int, default=0,
+  parser.add_argument('--muse-tier', dest='muse_tier', type=int, default=0,
     help='Maximum MuSE tier to include')
   parser.add_argument('vcf_file')
   args = parser.parse_args()
@@ -697,9 +719,11 @@ def main():
   elif args.input_type == 'mutect_smchet':
     variant_parser = MutectSmchetParser(args.vcf_file)
   elif args.input_type == 'muse':
-    variant_parser = MuseParser(args.vcf_file,args.tier)
+    variant_parser = MuseParser(args.vcf_file, args.muse_tier)
   elif args.input_type == 'dkfz':
     variant_parser = DKFZParser(args.vcf_file)
+  elif args.input_type == 'strelka':
+    variant_parser = StrelkaParser(args.vcf_file)
   variants_and_reads = variant_parser.list_variants()
   grouper.add_variants(variants_and_reads)
 
