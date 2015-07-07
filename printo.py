@@ -47,14 +47,13 @@ def print_top_trees(tree_archive,fout,k=5):
 	fout.close()	
 
 def print_best_tree(tssb,fout):
-	wts, nodes = tssb.get_mixture()
-	w = dict([(n[1], n[0]) for n in zip(wts,nodes)])
+	nodes = tssb.get_nodes()
 	nnodes = sum( [ 1 for node in nodes if len(node.get_data()) ] )
 	
 	#fout=open(fout,'w')
 	t = Tree();t.name='0'
 	fout.write('id, \t phi, \t nChildren, \t nGenes, \t genes \n')
-	print_node2(tssb.root,None,t,w,fout)
+	print_node2(tssb.root,None,t,fout)
 	fout.write('\n\n')
 	fout.write(t.get_ascii(show_internal=True))
 	fout.write('\n\n')	
@@ -62,7 +61,7 @@ def print_best_tree(tssb,fout):
 	fout.write('\n\n\n')	
 	#fout.close()
 
-def print_node2(node, parent,tree,wts,fout):
+def print_node2(node, parent,tree,fout):
 	global ctr;
 	num_data = node['node'].num_data()
 	node_name  = ctr ; ctr+=1;
@@ -78,13 +77,12 @@ def print_node2(node, parent,tree,wts,fout):
 	
 	for child in node['children']:
 		name_string = str(ctr)#+'('+str(len(child['node'].get_data()))+')'
-		print_node2(child, node_name,tree.add_child(name=name_string),wts,fout)
+		print_node2(child, node_name,tree.add_child(name=name_string),fout)
 	
 ### printing stuff #################
 def print_best_tree_pdf(tssb,fout,score=0):
 	#wts, nodes = tssb.get_mixture()
 	#w = dict([(n[1], n[0]) for n in zip(wts,nodes)])
-	
 	print_tree_latex(tssb,fout,score)	
 
 
