@@ -62,6 +62,9 @@ Running PhyloWGS
   * Install Python 2 versions of NumPy (www.numpy.org) and SciPy (www.scipy.org).
   * Install Python 2 version of ETE2 (e.g.: `pip2 install --user ete2`).
   * Install GSL (http://www.gnu.org/software/gsl/).
+  * Install LaTeX (with `pdflatex` on your PATH), along with the TikZ/PGF
+    packages. The "medium scheme" install of TeX Live
+    (https://www.tug.org/texlive/quickinstall.html) includes all that you need.
 
 2. Compile the C++ file.
 
