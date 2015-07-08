@@ -179,7 +179,7 @@ class StrelkaParser(VariantParser):
       total_reads = 0
       variant_reads = 0
     else:
-      variant_reads = getattr(variant.samples[-1].data, str(alt)+'U')[0]
+      variant_reads = int(getattr(variant.samples[-1].data, str(alt)+'U')[0])
 
     ref_reads = total_reads - variant_reads
     return (ref_reads, total_reads)
@@ -204,12 +204,11 @@ class MutectSmchetParser(VariantParser):
   def _calc_read_counts(self, variant):
     # Currently hardcodes tumour sample as the last column.
     # Might not always be true
-    ref_reads = variant.samples[-1]['AD'][0]
-    variant_reads = variant.samples[-1]['AD'][1]
+    ref_reads = int(variant.samples[-1]['AD'][0])
+    variant_reads = int(variant.samples[-1]['AD'][1])
     total_reads = ref_reads + variant_reads
 
     return (ref_reads, total_reads)
-
 
 class DKFZParser(VariantParser):
   def __init__(self, vcf_filename):
@@ -218,10 +217,10 @@ class DKFZParser(VariantParser):
   def _calc_read_counts(self, variant):
     # Currently hardcodes tumour sample as the last column.
     # Might not always be true
-    for_ref_reads = variant.samples[-1]['DP4'][0]
-    back_ref_reads = variant.samples[-1]['DP4'][1]
-    for_variant_reads = variant.samples[-1]['DP4'][2]
-    back_variant_reads = variant.samples[-1]['DP4'][3]
+    for_ref_reads = int(variant.samples[-1]['DP4'][0])
+    back_ref_reads = int(variant.samples[-1]['DP4'][1])
+    for_variant_reads = int(variant.samples[-1]['DP4'][2])
+    back_variant_reads = int(variant.samples[-1]['DP4'][3])
     ref_reads = for_ref_reads + back_ref_reads
     var_reads = for_variant_reads + back_variant_reads
     total_reads = ref_reads + var_reads
