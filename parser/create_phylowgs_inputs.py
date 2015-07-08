@@ -38,29 +38,16 @@ class VariantParser(object):
     return records
 
   def _is_good_chrom(self, chrom):
-    if chrom.startswith('un') or chrom.endswith('_random'):
-      # Variant unmapped ('chrUn') or mapped to fragmented chromosome
-      # ('_random'), so ignore.
+    # Ignore the following:
+    #   * Variants unmapped ('chrUn') or mapped to fragmented chromosome ('_random')
+    #   * Weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
+    #   * Mitochondrial ("mt" or "m"), which are weird
+    #   * Sex chromosomes difficult to deal with, as expected frequency depends on
+    #     whether patient is male or female, so ignore them for now. TODO: fix this.
+    if chrom in [str(i) for i in range(1, 23)]:
+      return True
+    else:
       return False
-
-    if chrom.startswith('hs37d5') or chrom.startswith('gl'):
-      return False
-
-    if '_' in chrom:
-      # Reject weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
-      return False
-
-    # Mitochondrial are weird, so ignore them.
-    if chrom in ('m', 'mt'):
-      return False
-    # Sex chromosomes difficult to deal with, as expected frequency depends on
-    # whether patient is male or female, so ignore them for now.
-    #
-    # TODO: properly deal with sex chromsomes.
-    if chrom in ('x', 'y'):
-      return False
-
-    return True
 
   def _does_variant_pass_filters(self, variant):
     if variant.FILTER is None:
