@@ -7,6 +7,7 @@ from util2 import *
 from ete2 import *
 
 from subprocess import call
+import sys
 
 ctr=0
 def print_top_trees(tree_archive,fout,k=5):
@@ -31,16 +32,17 @@ def print_top_trees(tree_archive,fout,k=5):
 			
 			# print top K trees in pdf format
 					
-			tex_fn = 'top_trees/tree_%s_%s.tex' % (idx, llh)
-			print_best_tree_pdf(tree, tex_fn)
-			
+			tex_fn = 'top_trees/tree_%s_%s.tex' % (idx, llh) print_best_tree_pdf(tree, tex_fn) 
 			# Call pdflatex. To permit it to find standalone.* files,
 			# change into PhyloWGS directory to run the command, then
 			# change back to previous directory.
 			script_dir = os.path.dirname(os.path.realpath(__file__))
 			old_wd = os.getcwd()
 			os.chdir(script_dir)
-			call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+			try:
+                                call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
+			except OSError:  # pdflatex not available, do not die
+				print >> sys.stderr, 'pdflatex not available'
 			os.chdir(old_wd)
 			
 	tree_reader.close()
