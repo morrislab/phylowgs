@@ -17,12 +17,12 @@ For `cnv_data.txt`, the parser requires CNV calls.
 [Battenberg](https://github.com/cancerit/cgpBattenberg) and
 [TITAN](http://compbio.bccrc.ca/software/titan/) are supported. As the process of going from CNV calls to PhyloWGS input is complex -- the `a` and `d` values used by PhyloWGS for each CNV depend on the size of the CNV, the read depth, the total copy-number change, and other factors -- we perform CNV parsing as a two-step process:
   
-    1. Run `parse_cnvs.py` to create the intermediate `cnvs.txt` file, which
-       will contain for each CNV its chromosome, start and end coordinates, major
-       and minor copy numbers, and clonal fraction (i.e., fraction of canceous
-       cells containing the CNV, *not* the fraction of sample containing the CNV).
+  1. Run `parse_cnvs.py` to create the intermediate `cnvs.txt` file, which
+     will contain for each CNV its chromosome, start and end coordinates, major
+     and minor copy numbers, and clonal fraction (i.e., fraction of canceous
+     cells containing the CNV, *not* the fraction of sample containing the CNV).
 
-    2. Run `create_phylowgs_inputs.py` with the `--cnvs cnvs.txt` parameter.
+  2. Run `create_phylowgs_inputs.py` with the `--cnvs cnvs.txt` parameter.
 
 Supporting other CNV callers is simply a matter of converting their results to
 our intermediate `cnvs.txt` format. For an example of how this file should be
