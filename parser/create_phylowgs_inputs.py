@@ -1,10 +1,11 @@
 #!/usr/bin/env python2
 from __future__ import print_function
 
-# Requires PyVCF. To install: pip3 install pyvcf
+# Requires PyVCF. To install: pip2 install pyvcf
 import vcf
 import argparse
-from collections import namedtuple, defaultdict, OrderedDict
+import csv
+from collections import defaultdict
 import random
 
 class VariantParser(object):
@@ -85,7 +86,7 @@ class VariantParser(object):
 
 class SangerParser(VariantParser):
   '''
-  Works with Battenberg-formatted CNV calls.
+  Works with PCAWG variant calls from the Sanger.
   '''
   def __init__(self, vcf_filename):
     self._vcf_filename = vcf_filename
@@ -240,63 +241,6 @@ class DKFZParser(VariantParser):
 
     return (ref_reads, total_reads)
 
-class BattenbergParser(object):
-  def __init__(self, bb_filename):
-    self._bb_filename = bb_filename
-
-  def _compute_cn(self, cnv1, cnv2):
-    cn1 = (cnv1['nmaj'] + cnv1['nmin']) * cnv1['frac']
-    if cnv2:
-      cn2 = (cnv2['nmaj'] + cnv2['nmin']) * cnv2['frac']
-    else:
-      cn2 = 0
-    total_cn = cn1 + cn2
-    return total_cn
-
-  def parse(self):
-    cn_regions = defaultdict(list)
-    pval_threshold = 0.05
-
-    with open(self._bb_filename) as bbf:
-      header = bbf.next()
-      for line in bbf:
-        fields = line.strip().split()
-        chrom = fields[1].lower()
-        start = int(fields[2])
-        end = int(fields[3])
-        pval = float(fields[5])
-
-        cnv1 = OrderedDict()
-        cnv1['start'] = start
-        cnv1['end'] = end
-        cnv1['nmaj'] = int(fields[8])
-        cnv1['nmin'] = int(fields[9])
-        cnv1['frac'] = float(fields[10])
-
-        cnv2 = None
-        # Stefan's comment on p values: The p-values correspond "to whether a
-        # segment should be clonal or subclonal copynumber. We first fit a
-        # clonal copynumber profile for the whole sample and then perform a
-        # simple two-sided t-test twhere the null hypothesis is: A particular
-        # segment is clonal. And the alternative: It is subclonal."
-        #
-        # Thus: if t-test falls below significance threshold, we push cnv1 to
-        # clonal frequency.
-        if pval <= pval_threshold:
-          cnv2 = OrderedDict()
-          cnv2['start'] = start
-          cnv2['end'] = end
-          cnv2['nmaj'] = int(fields[11])
-          cnv2['nmin'] = int(fields[12])
-          cnv2['frac'] = float(fields[13])
-        else:
-          cnv1['frac'] = 1.0
-
-        cn_regions[chrom].append(cnv1)
-        if cnv2 is not None:
-          cn_regions[chrom].append(cnv2)
-    return cn_regions
-
 class CnvFormatter(object):
   def __init__(self, cnv_confidence, cellularity, read_depth, read_length):
     self._cnv_confidence = cnv_confidence
@@ -367,21 +311,21 @@ class CnvFormatter(object):
       for cnv in chrom_cnvs:
         overlapping_variants = self._find_overlapping_variants(chrom, cnv, variants)
         total_reads = self._calc_total_reads(
-          cnv['frac'],
+          cnv['clonal_frac'],
           cnv['start'],
           cnv['end'],
-          cnv['nmaj'] + cnv['nmin'],
+          cnv['major_cn'] + cnv['minor_cn'],
         )
         yield {
           'chrom': chrom,
           'start': cnv['start'],
           'end': cnv['end'],
-          'nmaj': cnv['nmaj'],
-          'nmin': cnv['nmin'],
-          'frac': cnv['frac'],
-          'ref_reads': self._calc_ref_reads(cnv['frac'], total_reads),
+          'major_cn': cnv['major_cn'],
+          'minor_cn': cnv['minor_cn'],
+          'clonal_frac': cnv['clonal_frac'],
+          'ref_reads': self._calc_ref_reads(cnv['clonal_frac'], total_reads),
           'total_reads': total_reads,
-          'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['nmaj'], cnv['nmin']),
+          'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['major_cn'], cnv['minor_cn']),
         }
 
   def _merge_variants(self, cnv1, cnv2):
@@ -402,7 +346,7 @@ class CnvFormatter(object):
   # do the same with SNVs bearing similar frequencies later on.
   def format_and_merge_cnvs(self, cnvs, variants):
     formatted = list(self._format_cnvs(cnvs, variants))
-    formatted.sort(key = lambda f: f['frac'])
+    formatted.sort(key = lambda f: f['clonal_frac'])
     if len(formatted) == 0:
       return []
 
@@ -415,11 +359,11 @@ class CnvFormatter(object):
 
       # Only merge CNVs if they're clonal. If they're subclonal, leave them
       # free to move around the tree.
-      if current['frac'] == last['frac'] == 1.0:
+      if current['clonal_frac'] == last['clonal_frac'] == 1.0:
         # Merge the CNVs.
         log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
         last['total_reads'] = current['total_reads'] + last['total_reads']
-        last['ref_reads'] = self._calc_ref_reads(last['frac'], last['total_reads'])
+        last['ref_reads'] = self._calc_ref_reads(last['clonal_frac'], last['total_reads'])
         self._merge_variants(last, current)
       else:
         # Do not merge the CNVs.
@@ -535,7 +479,7 @@ class VariantAndCnvGroup(object):
     return filtered
 
   def _is_region_normal_cn(self, region):
-    return region['nmaj'] == region['nmin'] == 1
+    return region['major_cn'] == region['minor_cn'] == 1
 
   def _print_variant_differences(self, before, after, before_label, after_label):
     before = set([var for (var, _, _) in before])
@@ -565,7 +509,7 @@ class VariantAndCnvGroup(object):
 
     for chrom, regions in self._cn_regions.items():
       for region in regions:
-        if self._is_region_normal_cn(region) and region['frac'] == 1:
+        if self._is_region_normal_cn(region) and region['clonal_frac'] == 1:
           normal_cn[chrom].append(region)
 
     filtered = self._filter_variants_outside_regions(self._variants_and_reads, normal_cn)
@@ -580,7 +524,7 @@ class VariantAndCnvGroup(object):
         region = reg[idx]
 
         # Accept clonal regions unconditonally, whether normal or abnormal CN.
-        if region['frac'] == 1.0:
+        if region['clonal_frac'] == 1.0:
           good_regions[chrom].append(region)
           idx += 1
 
@@ -596,38 +540,47 @@ class VariantAndCnvGroup(object):
             regions_at_same_coords.append(reg[i])
             i += 1
 
-          # This is assumption again specific to Battenberg.
-          assert len(regions_at_same_coords) == 2
           abnormal_regions = [r for r in regions_at_same_coords if not self._is_region_normal_cn(r)]
-          # In Battenberg, either one region is normal and the other abnormal, or both are abnormal.
-          assert 1 <= len(abnormal_regions) <= 2
-          # Ignore normal region and add only the single abnormal one. We do
+          # In Battenberg, either one region is normal and the other abnormal,
+          # or both are abnormal.
+          # In TITAN, only one abnormal region will be listed, without a
+          # corresponding normal region.
+          # Ignore normal region(s) and add only one abnormal one. We do
           # this so PWGS can recalculate the frequencies based on the
           # major/minor CN of the region, according to the a & d values we will
-          # assign to the region. (Does this make sense?)
+          # assign to the region.
           if len(abnormal_regions) == 1:
             good_regions[chrom].append(abnormal_regions[0])
           else:
-            # Ignore CNV regions with multiple abnormal CN states.
-            pass
+            # Ignore CNV regions with multiple abnormal CN states, as we don't
+            # know what order the CN events occurred in.
+            log('Multiple abnormal regions: %s' % abnormal_regions)
           idx += len(regions_at_same_coords)
 
     return good_regions
 
-
   def exclude_variants_in_subclonal_cnvs(self):
-    # Five possible placements for variant in Battenberg according to CN records:
-    # 1 record:
-    #   That record has normal CN: include
-    #   That record has abnormal CN: include
-    # 2 records:
-    #   One record is normal CN, one record is abnormal CN: include
-    #   Both records are abnormal CN: exclude (as we don't know what order the CN events occurred in)
-    # Variant isn't listed in *any* region: exclude (as we suspect Battenberg didn't know what to do with the region)
+    # Battenberg:
+    #   Five possible placements for variant in Battenberg according to CN records:
+    #   1 record:
+    #     That record has normal CN: include
+    #     That record has abnormal CN: include
+    #   2 records:
+    #     One record is normal CN, one record is abnormal CN: include
+    #     Both records are abnormal CN: exclude (as we don't know what order the CN events occurred in)
+    # TITAN:
+    #   In output seen to date, TITAN will only list one record per region. If
+    #   the CN state is abnormal and clonal_frac < 1, this implies the
+    #   remainder of the region will be normal CN. Multiple abnormal records
+    #   for the same region are likely possible, but I haven't yet seen any.
+    #   Regardless, when they occur, they should be properly handled by the
+    #   code.
     if not self.has_cnvs():
       raise Exception('CN regions not yet provided')
 
     good_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
+    # If variant isn't listed in *any* region: exclude (as we suspect CNV
+    # caller didn't know what to do with the region).
     filtered = self._filter_variants_outside_regions(self._variants_and_reads, good_regions)
     self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'outside_subclonal_cn')
     self._variants_and_reads = filtered
@@ -657,7 +610,9 @@ class VariantAndCnvGroup(object):
   def _estimate_read_depth(self):
     read_sum = 0
     if len(self._variants_and_reads) == 0:
-      return 50
+      default_read_depth = 50
+      log('No variants available, so fixing read depth at %s.' % default_read_depth)
+      return default_read_depth
     for variant, ref_reads, total_reads in self._variants_and_reads:
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
@@ -686,6 +641,25 @@ def log(msg):
     print(msg)
 log.verbose = False
 
+class CnvParser(object):
+  def __init__(self, cn_filename):
+    self._cn_filename = cn_filename
+
+  def parse(self):
+    cn_regions = defaultdict(list)
+
+    with open(self._cn_filename) as cnf:
+      reader = csv.DictReader(cnf, delimiter='\t')
+      for record in reader:
+        chrom = record['chrom']
+        del record['chrom']
+        for key in ('start', 'end', 'major_cn', 'minor_cn'):
+          record[key] = int(record[key])
+        record['clonal_frac'] = float(record['clonal_frac'])
+        cn_regions[chrom].append(record)
+
+    return cn_regions
+
 def main():
   parser = argparse.ArgumentParser(
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
@@ -695,8 +669,8 @@ def main():
     help='Expected error rate of sequencing platform')
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,
     help='Subsample SSMs to reduce PhyloWGS runtime')
-  parser.add_argument('-b', '--battenberg', dest='battenberg',
-    help='Path to Battenberg-formatted list of CNVs')
+  parser.add_argument('--cnvs', dest='cnv_file',
+    help='Path to CNV records')
   parser.add_argument('--only-normal-cn', dest='only_normal_cn', action='store_true', default=False,
       help='Only output variants lying in normal CN regions. Do not output CNV data directly.')
   parser.add_argument('--output-cnvs', dest='output_cnvs', default='cnv_data.txt',
@@ -743,8 +717,8 @@ def main():
   variants_and_reads = variant_parser.list_variants()
   grouper.add_variants(variants_and_reads)
 
-  if args.battenberg:
-    cnv_parser = BattenbergParser(args.battenberg)
+  if args.cnv_file:
+    cnv_parser = CnvParser(args.cnv_file)
     cn_regions = cnv_parser.parse()
     grouper.add_cnvs(cn_regions)
 
