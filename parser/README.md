@@ -28,6 +28,39 @@ Supporting other CNV callers is simply a matter of converting their results to
 our intermediate `cnvs.txt` format. For an example of how this file should be
 formatted, please see `cnvs.txt.example`.
 
+Please note that your listing of CNVs *must* list regions of normal copy number
+as well. Any SSMs given in your VCF that fall outside regions listed in
+`cnvs.txt` will be ignored by the parser, as it assumes your CNV caller could
+not make a proper determination of copy number (whether normal or abnormal) for
+unlisted regions, meaning that PhyloWGS will be unable to correct for
+copy-number changes for the SSMs in question.
+
+There are two modes of operation for the parser:
+
+  1. You specify `--only-normal-cn`: Only variants falling in regions
+     explicitly listed as normal will be output. This means the region in question
+     must be listed in `cnvs.txt` with `major_cn=1`, `minor_cn=1`, and
+     `clonal_frac=1.0`. In this case, an empty `cnv_data.txt` will be output for
+     use with PhyloWGS' `evolve.py`.
+
+  2. You do not specify `--only-normal-cn`: All variants falling in regions
+     listed in `cnvs.txt` will be output. Note, however, that variants falling in
+     regions for which multiple overlapping subclonal-copy-number-change calls
+     exist will be ignored, as we don't know what order the CNVs occurred in, and
+     thus cannot properly correct the variant allele frequency for contained
+     variants. (Variants falling in regions for which a single
+     subclonal-coy-number-change call exists, alongside an overlapping demarcation
+     of normal copy number for the same region in the remaining cells, are
+     perfectly fine, however.) In this case, both `ssm_data.txt` and
+     `cnv_data.txt` will be output with appropriate information for use with
+     PhyloWGS.
+
+Only SSMs on chromosomes 1 through 22 are considered. All other variants are
+ignored. (Variants on sex chromosomes are difficult to deal with, as the
+expected reference frequency will differ depending on whether the sample
+originated from a male or female patient. Mitochondiral variants are generally
+weird, and so are ignored by the parser.)
+
 Installation
 ------------
 The parser requires Python 2 and [PyVCF](https://pypi.python.org/pypi/PyVCF).
