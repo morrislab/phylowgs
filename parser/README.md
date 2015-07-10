@@ -8,22 +8,25 @@ used by PhyloWGS.
 
 The parser will create `ssm_data.txt` from a provided VCF file. Though VCF
 itself is standardized, different variant callers differ in how they represent
-read counts, and so minor adjustments must be made for each caller. Currently,
-Sanger and MuTect VCFs are supported. To add support for your own flavour, you
-may subclass `VariantParser` (see `SangerParser` and `MutectParser` for
+read counts, and so minor adjustments must be made for each caller. A variety
+of variant callers are already supported. To add support for your own flavour,
+you may subclass `VariantParser` (see `SangerParser` or `MutectParser` for
 examples).
 
-For `cnv_data.txt`, the parser requires CNV calls. At the moment, only
-[Battenberg](https://github.com/cancerit/cgpBattenberg) is supported. In the
-future, we will likely support parsing
-[TITAN](http://compbio.bccrc.ca/software/titan/) calls as well. Adding support
-for a different CNV-caller is possible, but more difficult than supporting
-other variant callers. Regardless, seeing how to generate the `d` value in
-`cnv_data.txt`, which represents your confidence in the correctness of the
-observed fraction of cells bearing the CNV, will be informative, as
-establishing a proper value for this is difficult, given that it depends on the
-size of the CNV, the read depth, the total copy-number change, and other
-factors. For this code, please see the method `CnvFormatter._calc_total_reads`.
+For `cnv_data.txt`, the parser requires CNV calls.
+[Battenberg](https://github.com/cancerit/cgpBattenberg) and
+[TITAN](http://compbio.bccrc.ca/software/titan/) are supported. As the process of going from CNV calls to PhyloWGS input is complex -- the `a` and `d` values used by PhyloWGS for each CNV depend on the size of the CNV, the read depth, the total copy-number change, and other factors -- we perform CNV parsing as a two-step process:
+  
+    1. Run `parse_cnvs.py` to create the intermediate `cnvs.txt` file, which
+       will contain for each CNV its chromosome, start and end coordinates, major
+       and minor copy numbers, and clonal fraction (i.e., fraction of canceous
+       cells containing the CNV, *not* the fraction of sample containing the CNV).
+
+    2. Run `create_phylowgs_inputs.py` with the `--cnvs cnvs.txt` parameter.
+
+Supporting other CNV callers is simply a matter of converting their results to
+our intermediate `cnvs.txt` format. For an example of how this file should be
+formatted, please see `cnvs.txt.example`.
 
 Installation
 ------------
@@ -32,15 +35,60 @@ The latter can be installed via pip:
 
     pip2 install --user pyvcf
 
+Examples
+--------
+* Create ssm_data.txt from Sanger's PCAWG variant-calling
+  pipeline, subsampling to 5000 mutations:
+
+        ./create_phylowgs_inputs.py -s 5000 -v sanger sample.vcf
+
+    * Note that no cnv_data.txt is created in this scenario, as no Battenberg
+      data was provided. In this case, please provide an empty cnv_data.txt for
+      PhyloWGS (e.g., created via `touch cnv_data.txt`).
+
+* Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
+  pipeline, including all mutations, assuming 0.72 cellularity (i.e., sample purity):
+
+        ./parse_cnvs.py -f battenberg cnv_calls_from_battenberg.txt 
+        ./create_phylowgs_inputs.py -v sanger --cnvs cnvs.txt -c 0.72 sample.vcf
+
+* Only use variants in copy-number-normal regions:
+
+        ./parse_cnvs.py -f battenberg cnv_calls_from_battenberg.txt 
+        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 --only-normal-cn sample.vcf
+
 Usage
 -----
+### CNV pre-parser
+
+    usage: parse_cnvs.py [-h] -f {battenberg,titan}
+                         [--cnv-output CNV_OUTPUT_FILENAME]
+                         cnv_file
+
+    Create CNV input file for parser from Battenberg or TITAN data
+
+    positional arguments:
+      cnv_file
+
+    optional arguments:
+      -h, --help            show this help message and exit
+      -f {battenberg,titan}, --cnv-format {battenberg,titan}
+                            Type of CNV input (default: None)
+      --cnv-output CNV_OUTPUT_FILENAME
+                            Output destination for parsed CNVs (default: cnvs.txt)
+
+### Primary parser
+
     usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE] [-s SAMPLE_SIZE]
-                                     [-b BATTENBERG] [--only-normal-cn]
+                                     [--cnvs CNV_FILE] [--only-normal-cn]
                                      [--output-cnvs OUTPUT_CNVS]
                                      [--output-variants OUTPUT_VARIANTS]
-                                     [-c CELLULARITY] -v {sanger,oncoscan,mutect}
+                                     [-c CELLULARITY] -v
+                                     {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}
+                                     [--tumor-sample TUMOR_SAMPLE]
                                      [--cnv-confidence CNV_CONFIDENCE]
                                      [--read-length READ_LENGTH] [--verbose]
+                                     [--muse-tier MUSE_TIER]
                                      vcf_file
 
     Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV
@@ -57,8 +105,7 @@ Usage
       -s SAMPLE_SIZE, --sample-size SAMPLE_SIZE
                             Subsample SSMs to reduce PhyloWGS runtime (default:
                             None)
-      -b BATTENBERG, --battenberg BATTENBERG
-                            Path to Battenberg-formatted list of CNVs (default:
+      --cnvs CNV_FILE       Path to CNV list created with parse_cnvs.py (default:
                             None)
       --only-normal-cn      Only output variants lying in normal CN regions. Do
                             not output CNV data directly. (default: False)
@@ -69,9 +116,9 @@ Usage
                             ssm_data.txt)
       -c CELLULARITY, --cellularity CELLULARITY
                             Fraction of sample that is cancerous rather than
-                            somatic. Used only for estimating CNV confidence --
-                            if no CNVs, need not specify argument. (default: 1.0)
-      -v, --variant-type {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,vardict}
+                            somatic. Used only for estimating CNV confidence -- if
+                            no CNVs, need not specify argument. (default: 1.0)
+      -v {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}, --variant-type {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}
                             Type of VCF file (default: None)
       --tumor-sample TUMOR_SAMPLE
                             Name of the tumor sample in the input VCF file.
@@ -84,26 +131,8 @@ Usage
                             Approximate length of reads. Used to calculate
                             confidence in CNV frequencies (default: 100)
       --verbose
-
-Examples
---------
-* Create ssm_data.txt from Sanger's PCAWG variant-calling
-  pipeline, subsampling to 5000 mutations:
-
-        ./create_phylowgs_inputs.py -s 5000 -v sanger sample.vcf
-
-    * Note that no cnv_data.txt is created in this scenario, as no Battenberg
-      data was provided. In this case, please provide an empty cnv_data.txt for
-      PhyloWGS (e.g., created via `touch cnv_data.txt`).
-
-* Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
-  pipeline, including all mutations, assuming 0.72 cellularity:
-
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 sample.vcf
-
-* Only use variants in copy-number-normal regions:
-
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 --only-normal-cn sample.vcf
+      --muse-tier MUSE_TIER
+                            Maximum MuSE tier to include (default: 0)
 
 Notes
 -----
@@ -121,4 +150,6 @@ Notes
   `d` values unchanged; lower values will reduce every `d` value's magnitude by
   the specified factor, permitting CNVs to move more freely betwen populations,
   and reducing the probability that a CNV will be assigned a population unto
-  itself because of excessively high confidence in its population frequency.
+  itself because of excessively high confidence in its population frequency. To
+  date, we've achieved our best results leaving this value at its default of
+  1.0.
