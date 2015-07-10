@@ -56,6 +56,13 @@ Examples
         ./parse_cnvs.py -f battenberg cnv_calls_from_battenberg.txt 
         ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 --only-normal-cn sample.vcf
 
+* Run with SSMs from VarDict and CNVs from TITAN, using cellularity of 0.81
+  (which may be estimated from [1 - "Normal contamination estimate"] in TITAN's
+  `*params.txt` output):
+
+        ./parse_cnvs.py -f titan cnv_calls_segs.txt
+        ./create_phylowgs_inputs.py -v vardict --cnvs cnvs.txt -c 0.81 sample.vcf
+
 Usage
 -----
 ### CNV pre-parser
