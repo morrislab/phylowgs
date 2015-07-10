@@ -6,21 +6,24 @@ import shutil
 
 def compare(vcf_format, input_vcf, good_ssm_output):
   output_dir = tempfile.mkdtemp()
-  output_path = os.path.join(output_dir, 'output.ssm')
+  ssm_output_path = os.path.join(output_dir, 'output.ssm')
+  cnv_output_path = os.path.join(output_dir, 'output.cnv')
   subprocess.call([
     'python2',
     '../create_phylowgs_inputs.py',
     '-v', vcf_format,
-    '--output-variants', output_path,
+    '--output-variants', ssm_output_path,
+    '--output-cnvs', cnv_output_path,
     input_vcf
   ])
 
-  output_matches = filecmp.cmp(output_path, good_ssm_output)
+  variant_output_matches = filecmp.cmp(ssm_output_path, good_ssm_output)
+  cnv_output_matches = os.path.getsize(cnv_output_path) == 0
   shutil.rmtree(output_dir)
-  if output_matches:
+  if variant_output_matches and cnv_output_matches:
     print('%s passed' % vcf_format)
   else:
-    raise Exception('VCFs do not match for %s' % vcf_format)
+    raise Exception('Outputs do not match for %s' % vcf_format)
 
 def main():
   #for vcf_format in ('dkfz', 'muse', 'mutect_pcawg', 'mutect_smchet', 'sanger', 'vardict'):

@@ -670,7 +670,7 @@ def main():
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,
     help='Subsample SSMs to reduce PhyloWGS runtime')
   parser.add_argument('--cnvs', dest='cnv_file',
-    help='Path to CNV records')
+    help='Path to CNV list created with parse_cnvs.py')
   parser.add_argument('--only-normal-cn', dest='only_normal_cn', action='store_true', default=False,
       help='Only output variants lying in normal CN regions. Do not output CNV data directly.')
   parser.add_argument('--output-cnvs', dest='output_cnvs', default='cnv_data.txt',
@@ -733,6 +733,10 @@ def main():
   grouper.write_variants(args.output_variants, args.error_rate)
   if not args.only_normal_cn and grouper.has_cnvs():
     grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
+  else:
+    # Write empty CNV file.
+    with open(args.output_cnvs, 'w'):
+      pass
 
 if __name__ == '__main__':
   main()

@@ -42,9 +42,8 @@ Examples
 
         ./create_phylowgs_inputs.py -s 5000 -v sanger sample.vcf
 
-    * Note that no cnv_data.txt is created in this scenario, as no Battenberg
-      data was provided. In this case, please provide an empty cnv_data.txt for
-      PhyloWGS (e.g., created via `touch cnv_data.txt`).
+    * Note that an empty cnv_data.txt is created in this scenario, as no CNV
+      data was provided.
 
 * Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
   pipeline, including all mutations, assuming 0.72 cellularity (i.e., sample purity):
