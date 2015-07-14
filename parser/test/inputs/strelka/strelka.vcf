@@ -1,0 +1,46 @@
+##fileformat=VCFv4.1
+##fileDate=20130116
+##source=strelka
+##source_version=2.0.2-29-ged3977a
+##startTime=Wed Jan 16 19:42:09 2013
+##reference=file:///home/csaunders/devel/strelka_workflow/scratch/strelka_workflow-1.0.0-10-g37f7f70/install/bin/demo/data/chr20_860k_only.fa
+##contig=<ID=chr20,length=63025520>
+##content=strelka somatic snv calls
+##germlineSnvTheta=0.001
+##priorSomaticSnvRate=1e-06
+##INFO=<ID=QSS,Number=1,Type=Integer,Description="Quality score for any somatic snv, ie. for the ALT allele to be present at a significantly different frequency in the tumor and normal">
+##INFO=<ID=TQSS,Number=1,Type=Integer,Description="Data tier used to compute QSS">
+##INFO=<ID=NT,Number=1,Type=String,Description="Genotype of the normal in all data tiers, as used to classify somatic variants. One of {ref,het,hom,conflict}.">
+##INFO=<ID=QSS_NT,Number=1,Type=Integer,Description="Quality score reflecting the joint probability of a somatic variant and NT">
+##INFO=<ID=TQSS_NT,Number=1,Type=Integer,Description="Data tier used to compute QSS_NT">
+##INFO=<ID=SGT,Number=1,Type=String,Description="Most likely somatic genotype excluding normal noise states">
+##INFO=<ID=SOMATIC,Number=0,Type=Flag,Description="Somatic mutation">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth for tier1 (used+filtered)">
+##FORMAT=<ID=FDP,Number=1,Type=Integer,Description="Number of basecalls filtered from original read depth for tier1">
+##FORMAT=<ID=SDP,Number=1,Type=Integer,Description="Number of reads with deletions spanning this site at tier1">
+##FORMAT=<ID=SUBDP,Number=1,Type=Integer,Description="Number of reads below tier1 mapping quality threshold aligned across this site">
+##FORMAT=<ID=AU,Number=2,Type=Integer,Description="Number of 'A' alleles used in tiers 1,2">
+##FORMAT=<ID=CU,Number=2,Type=Integer,Description="Number of 'C' alleles used in tiers 1,2">
+##FORMAT=<ID=GU,Number=2,Type=Integer,Description="Number of 'G' alleles used in tiers 1,2">
+##FORMAT=<ID=TU,Number=2,Type=Integer,Description="Number of 'T' alleles used in tiers 1,2">
+##FILTER=<ID=BCNoise,Description="Fraction of basecalls filtered at this site in either sample is at or above 0.4">
+##FILTER=<ID=SpanDel,Description="Fraction of reads crossing site with spanning deletions in either sample exceeeds 0.75">
+##FILTER=<ID=QSS_ref,Description="Normal sample is not homozygous ref or ssnv Q-score < 15, ie calls with NT!=ref or QSS_NT < 15">
+##cmdline=/home/csaunders/devel/strelka_workflow/scratch/strelka_workflow-1.0.0-10-g37f7f70/install/libexec/consolidateResults.pl --config=/home/csaunders/devel/strelka_workflow/scratch/strelka_workflow-1.0.0-10-g37f7f70/install/bin/demo/strelkaDemoAnalysis/config/run.config.ini
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	NORMAL	TUMOR
+chr20	862991	.	C	G	.	QSS_ref	NT=ref;QSS=3;QSS_NT=3;SGT=CG->CG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	12:0:0:0:0,0:12,12:0,0:0,0	10:0:0:0:0,0:5,5:5,5:0,0
+chr20	863271	.	A	G	.	PASS	NT=ref;QSS=40;QSS_NT=40;SGT=AA->AG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	26:0:0:0:26,26:0,0:0,0:0,0	18:0:0:0:8,8:0,0:10,10:0,0
+chr20	863508	.	A	G	.	PASS	NT=ref;QSS=68;QSS_NT=68;SGT=AA->AG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	39:0:0:0:39,39:0,0:0,0:0,0	23:0:0:0:11,11:0,0:12,12:0,0
+chr20	863706	.	C	T	.	PASS	NT=ref;QSS=109;QSS_NT=83;SGT=CC->TT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	33:2:0:0:0,0:31,33:0,0:0,0	19:0:0:0:0,0:0,0:0,0:19,19
+chr20	863744	.	C	T	.	PASS	NT=ref;QSS=43;QSS_NT=43;SGT=CC->CT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	27:0:0:0:0,0:27,27:0,0:0,0	21:0:0:0:0,0:9,9:0,0:12,12
+chr20	863846	.	C	T	.	PASS	NT=ref;QSS=27;QSS_NT=27;SGT=CC->CT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	21:0:0:0:0,0:21,21:0,0:0,0	25:0:0:0:0,0:16,16:0,0:9,9
+chr20	864074	.	T	C	.	PASS	NT=ref;QSS=39;QSS_NT=39;SGT=TT->CT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	26:0:0:0:0,0:0,0:0,0:26,26	25:0:0:0:0,0:11,11:0,0:14,14
+chr20	864199	.	G	A	.	PASS	NT=ref;QSS=58;QSS_NT=58;SGT=GG->AG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	33:0:0:0:0,0:0,0:33,33:0,0	29:0:0:0:14,14:0,0:15,15:0,0
+chr20	864301	.	G	T	.	PASS	NT=ref;QSS=41;QSS_NT=41;SGT=GG->GT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	27:1:0:0:0,0:0,0:26,27:0,0	30:0:0:0:0,0:0,0:12,12:18,18
+chr20	864455	.	T	C	.	PASS	NT=ref;QSS=138;QSS_NT=79;SGT=TT->CC;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	28:0:0:0:0,0:0,0:0,0:28,28	33:1:0:0:0,0:32,33:0,0:0,0
+chr20	864512	.	A	G	.	PASS	NT=ref;QSS=43;QSS_NT=43;SGT=AA->AG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	26:1:0:0:25,26:0,0:0,0:0,0	40:0:0:0:14,14:0,0:26,27:0,0
+chr20	864640	.	C	T	.	PASS	NT=ref;QSS=147;QSS_NT=86;SGT=CC->TT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	35:0:0:0:0,0:35,35:0,0:0,0	28:0:0:0:0,0:0,0:0,0:28,28
+chr20	864660	.	G	T	.	PASS	NT=ref;QSS=115;QSS_NT=82;SGT=GG->TT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	30:0:0:0:0,0:0,0:30,30:0,0	22:0:0:0:0,0:0,0:0,0:22,22
+chr20	865054	.	G	C	.	QSS_ref	NT=ref;QSS=1;QSS_NT=1;SGT=CG->CG;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	11:0:0:0:0,0:0,0:11,11:0,0	20:0:0:0:0,0:10,10:10,10:0,0
+chr20	865366	.	G	T	.	PASS	NT=ref;QSS=114;QSS_NT=74;SGT=GG->TT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	26:0:0:0:0,0:0,0:26,26:0,0	26:0:0:0:0,0:0,0:0,0:26,26
+chr20	865537	.	C	T	.	PASS	NT=ref;QSS=40;QSS_NT=40;SGT=CC->CT;SOMATIC;TQSS=1;TQSS_NT=1	DP:FDP:SDP:SUBDP:AU:CU:GU:TU	30:0:0:0:0,0:30,30:0,0:0,0	32:0:0:0:0,0:21,21:0,0:11,11
