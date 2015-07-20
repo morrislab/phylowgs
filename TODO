@@ -1,0 +1,14 @@
+Show:
+  Tree visualization
+  Summary of node counts, # SSMs, # CNVs, phis
+  Listing of SSMs & CNVs assigned to particular node
+
+UI:
+  Switch between:
+    Sampled trees
+      Choose tree
+    Summary stats
+    Clustered trees
+  Choose:
+    Batch
+    Sample
