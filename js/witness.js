@@ -1,7 +1,7 @@
 function draw_tree(root) {
-  var m = [20, 120, 20, 120],
+  var m = [10, 20, 10, 20],
       w = 800 - m[1] - m[3],
-      h = 800 - m[0] - m[2],
+      h = 400 - m[0] - m[2],
       i = 0;
 
   var tree = d3.layout.tree()
