@@ -126,6 +126,16 @@ function main() {
   var sample_container = $('#samples');
   var tree_container = $('#trees');
 
+  $('.filter').keyup(function(evt) {
+    var self = $(this);
+    var filter_text = self.val();
+    var elems = self.parents('.sidebar').find('.nav-sidebar').find('li');
+    elems.hide();
+    elems.filter(function() {
+      return !($(this).text().indexOf(filter_text) === -1);
+    }).show();
+  });
+
   d3.json('data/index.json', function(data_index) {
     Object.keys(data_index).sort().forEach(function(run_name) {
       var li = $('<li/>').appendTo(run_container);
