@@ -76,13 +76,13 @@ function find_max_ssms(populations) {
   return max_ssms;
 }
 
-function display_tree(summary, tree_id) {
-  var adjlist = summary.trees[tree_id].structure;
-  var pops = summary.trees[tree_id].populations;
+function display_tree(summary) {
+  var adjlist = summary.structure;
+  var pops = summary.populations;
 
   var max_area = 8000;
   var min_area = 700;
-  var max_ssms = find_max_ssms(summary.trees[tree_id].populations);
+  var max_ssms = find_max_ssms(pops);
 
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
@@ -113,6 +113,12 @@ function make_parent_active(elem) {
   var parent = elem.parent();
   parent.siblings('li').removeClass('active');
   parent.addClass('active');
+}
+
+function sort_numeric(arr) {
+  return arr.sort(function(a, b) {
+    return parseInt(a, 10) - parseInt(b, 10);
+  });
 }
 
 function main() {
@@ -150,9 +156,7 @@ function main() {
 
         var dataset_path = self.attr('href');
         d3.json(dataset_path, function(summary) {
-          var tree_indices = Object.keys(summary.trees).sort(function(a, b) {
-            return parseInt(a, 10) - parseInt(b, 10);
-          });
+          var tree_indices = sort_numeric(Object.keys(summary.trees));
           tree_container.empty();
           tree_indices.forEach(function(tidx) {
             var li = $('<li/>').appendTo(tree_container);
@@ -165,16 +169,23 @@ function main() {
             make_parent_active(self);
 
             var tidx = self.text();
-            display_tree(summary, tidx);
+            display_tree(summary.trees[tidx]);
+
+            var summary_table = $('#tree-summary').show().find('tbody').empty();
+            var pop_ids = sort_numeric(Object.keys(summary.trees[tidx].populations));
+            pop_ids.forEach(function(pop_id) {
+              var pop = summary.trees[tidx].populations[pop_id];
+              var entries = [pop_id, pop.phi, pop.num_ssms, pop.num_cnvs].map(function(entry) {
+                return '<td>' + entry + '</td>';
+              });
+              $('<tr/>').html(entries.join('')).appendTo(summary_table);
+            });
           }).first().click();
           $('#tree-list').scrollTop(0);
-
         });
-
       });
     });
   });
-
 }
 
 main()

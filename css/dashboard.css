@@ -131,3 +131,7 @@ body {
   display: inline-block;
   border-radius: 50%;
 }
+
+#tree-summary {
+  display: none;
+}
