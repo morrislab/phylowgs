@@ -1,3 +1,6 @@
+google.load('visualization', '1.1', {packages: ['corechart', 'bar']});
+google.setOnLoadCallback(main);
+
 function draw_tree(root) {
   var m = [10, 20, 10, 20],
       w = 800 - m[1] - m[3],
@@ -121,10 +124,101 @@ function sort_numeric(arr) {
   });
 }
 
+function mean(arr) {
+  var sum = 0;
+  for(var i = 0; i < arr.length; i++)
+    sum += arr[i];
+  return sum / arr.length;
+}
+
+function plot_vafs(muts) {
+  var vafs = [];
+  for(var ssm_id in muts.ssms) {
+    var ssm = muts.ssms[ssm_id];
+    var ssm_vafs = [];
+    for(var i = 0; i < ssm.ref_reads.length; i++) {
+      var a = ssm.ref_reads[i];
+      var d = ssm.total_reads[i];
+      ssm_vafs.push((d - a)/d);
+    }
+    vafs.push([mean(ssm_vafs)]);
+  }
+
+  var data = new google.visualization.DataTable();
+  data.addColumn('number', 'VAF');
+  data.addRows(vafs);
+
+  var x_min = 0;
+  var x_max = Math.max(1.0, array_max(vafs));
+  var options = {
+    title: 'VAFs (' + vafs.length + ' variants)',
+    histogram: { bucketSize: 0.03 },
+    hAxis: {
+      title: 'VAF',
+      viewWindow: {
+        min: x_min,
+        max: x_max
+      }
+    },
+    vAxis: {
+      title: 'Number of Santa Cruz variants',
+    },
+    width: 1000,
+    height: 450,
+  };
+
+  var chart = new google.visualization.Histogram(document.getElementById('vafs'));
+  chart.draw(data, options);
+}
+
+function array_max(arr) {
+  return Math.max.apply(null, arr);
+}
+
+function render_vafs(evt, trigger) {
+  var muts_path = trigger.data('dataset').muts_path;
+  d3.json(muts_path, function(muts) {
+    plot_vafs(muts);
+  });
+}
+
+function render_tree(evt, trigger) {
+  var tree_container = $('#trees');
+  var summary_path = trigger.data('dataset').summary_path;
+
+  d3.json(summary_path, function(summary) {
+    var tree_indices = sort_numeric(Object.keys(summary.trees));
+    tree_container.empty();
+    tree_indices.forEach(function(tidx) {
+      var li = $('<li/>').appendTo(tree_container);
+      $('<a/>').text(tidx).attr('href', '#').appendTo(li)
+    });
+
+    tree_container.find('a').click(function(evt) {
+      evt.preventDefault();
+      var self = $(this);
+      make_parent_active(self);
+
+      var tidx = self.text();
+      display_tree(summary.trees[tidx]);
+
+      var summary_table = $('#tree-summary').show().find('tbody').empty();
+      var pop_ids = sort_numeric(Object.keys(summary.trees[tidx].populations));
+      pop_ids.forEach(function(pop_id) {
+        var pop = summary.trees[tidx].populations[pop_id];
+        var entries = [pop_id, pop.phi, pop.num_ssms, pop.num_cnvs].map(function(entry) {
+          return '<td>' + entry + '</td>';
+        });
+        $('<tr/>').html(entries.join('')).appendTo(summary_table);
+      });
+    }).first().click();
+    $('#tree-list').scrollTop(0);
+  });
+}
+
 function main() {
   var run_container = $('#runs');
   var sample_container = $('#samples');
-  var tree_container = $('#trees');
 
   $('.filter').keyup(function(evt) {
     var self = $(this);
@@ -156,46 +250,17 @@ function main() {
         return 0;
       }).forEach(function(dataset) {
         var li = $('<li/>').appendTo(sample_container);
-        $('<a/>').text(dataset.name).attr('href', dataset.path).appendTo(li)
+        $('<a/>').text(dataset.name).attr('href', '#').data('dataset', dataset).appendTo(li)
       });
 
       sample_container.find('a').click(function(evt) {
-        evt.preventDefault();
         var self = $(this);
+        evt.preventDefault();
         make_parent_active(self);
 
-        var dataset_path = self.attr('href');
-        d3.json(dataset_path, function(summary) {
-          var tree_indices = sort_numeric(Object.keys(summary.trees));
-          tree_container.empty();
-          tree_indices.forEach(function(tidx) {
-            var li = $('<li/>').appendTo(tree_container);
-            $('<a/>').text(tidx).attr('href', '#').appendTo(li)
-          });
-
-          tree_container.find('a').click(function(evt) {
-            evt.preventDefault();
-            var self = $(this);
-            make_parent_active(self);
-
-            var tidx = self.text();
-            display_tree(summary.trees[tidx]);
-
-            var summary_table = $('#tree-summary').show().find('tbody').empty();
-            var pop_ids = sort_numeric(Object.keys(summary.trees[tidx].populations));
-            pop_ids.forEach(function(pop_id) {
-              var pop = summary.trees[tidx].populations[pop_id];
-              var entries = [pop_id, pop.phi, pop.num_ssms, pop.num_cnvs].map(function(entry) {
-                return '<td>' + entry + '</td>';
-              });
-              $('<tr/>').html(entries.join('')).appendTo(summary_table);
-            });
-          }).first().click();
-          $('#tree-list').scrollTop(0);
-        });
+        render_vafs(evt, self);
+        //render_tree(evt, self);
       });
     });
   });
 }
-
-main()

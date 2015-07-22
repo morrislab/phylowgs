@@ -8,10 +8,11 @@ def main():
 
   base_dir = 'data'
   for run_name in os.listdir(base_dir):
-    for dataset_path in glob.glob(os.path.join(base_dir, run_name, '*.summ.json.gz')):
-      dataset_name = dataset_path.split('/')[-1].split('.')[0]
+    for summary_path in glob.glob(os.path.join(base_dir, run_name, '*.summ.json.gz')):
+      dataset_name = summary_path.split('/')[-1].split('.')[0]
       datasets[run_name].append({
-        'path': dataset_path,
+        'summary_path': summary_path,
+        'muts_path': os.path.join(base_dir, run_name, dataset_name + '.muts.json.gz'),
         'name': dataset_name,
       })
 
