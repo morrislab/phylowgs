@@ -34,8 +34,7 @@ function draw_tree(root) {
       .attr('class', 'node');
 
   nodeEnter.append('svg:circle')
-      .attr('r', function(d) { return d.radius; })
-      .style('fill', 'lightsteelblue');
+      .attr('r', function(d) { return d.radius; });
 
   nodeEnter.append('svg:text')
       .attr('font-size', '30')
@@ -167,7 +166,8 @@ function plot_vafs(muts) {
     height: 450,
   };
 
-  var chart = new google.visualization.Histogram(document.getElementById('vafs'));
+  $('#container').empty();
+  var chart = new google.visualization.Histogram(document.getElementById('container'));
   chart.draw(data, options);
 }
 
@@ -175,16 +175,17 @@ function array_max(arr) {
   return Math.max.apply(null, arr);
 }
 
-function render_vafs(evt, trigger) {
-  var muts_path = trigger.data('dataset').muts_path;
+function render_vafs(dataset) {
+  $('#tree-summary').hide();
+  var muts_path = dataset.muts_path;
   d3.json(muts_path, function(muts) {
     plot_vafs(muts);
   });
 }
 
-function render_tree(evt, trigger) {
+function render_tree(dataset) {
   var tree_container = $('#trees');
-  var summary_path = trigger.data('dataset').summary_path;
+  var summary_path = dataset.summary_path;
 
   d3.json(summary_path, function(summary) {
     var tree_indices = sort_numeric(Object.keys(summary.trees));
@@ -220,6 +221,9 @@ function main() {
   var run_container = $('#runs');
   var sample_container = $('#samples');
 
+  var renderer = render_tree;
+  var dataset = null;
+
   $('.filter').keyup(function(evt) {
     var self = $(this);
     var filter_text = self.val();
@@ -230,11 +234,31 @@ function main() {
     }).show();
   });
 
+  $('.navbar-nav a').click(function(evt) {
+    evt.preventDefault();
+    var self = $(this);
+    make_parent_active(self);
+
+    var mapping = {
+      'nav-tree-summaries': render_vafs,
+      'nav-tree-viewer': render_tree
+    };
+    renderer = null;
+    for(var nav_class in mapping) {
+      if(self.hasClass(nav_class)) {
+        renderer = mapping[nav_class];
+        break;
+      }
+    }
+
+    if(renderer !== null && dataset !== null)
+      renderer(dataset);
+  });
+
   d3.json('data/index.json', function(data_index) {
     Object.keys(data_index).sort().forEach(function(run_name) {
       var li = $('<li/>').appendTo(run_container);
       $('<a/>').text(run_name).attr('href', '#').appendTo(li)
-
     });
 
     run_container.find('a').click(function(evt) {
@@ -243,14 +267,16 @@ function main() {
       make_parent_active(self);
       var run_name = self.text();
 
+      dataset = null;
       sample_container.empty();
+
       data_index[run_name].sort(function(a, b) {
         if(a.name > b.name) return 1;
         if(a.name < b.name) return -1;
         return 0;
-      }).forEach(function(dataset) {
+      }).forEach(function(ds) {
         var li = $('<li/>').appendTo(sample_container);
-        $('<a/>').text(dataset.name).attr('href', '#').data('dataset', dataset).appendTo(li)
+        $('<a/>').text(ds.name).attr('href', '#').data('dataset', ds).appendTo(li)
       });
 
       sample_container.find('a').click(function(evt) {
@@ -258,8 +284,10 @@ function main() {
         evt.preventDefault();
         make_parent_active(self);
 
-        render_vafs(evt, self);
-        //render_tree(evt, self);
+
+        dataset = self.data('dataset');
+        if(renderer !== null && dataset !== null)
+          renderer(dataset);
       });
     });
   });

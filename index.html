@@ -8,7 +8,7 @@
     <meta name="description" content="">
     <meta name="author" content="">
 
-    <title>Dashboard Template for Bootstrap</title>
+    <title>PhyloWGS Witness</title>
 
     <!-- Bootstrap core CSS -->
     <link href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css" rel="stylesheet">
@@ -38,9 +38,9 @@
         </div>
         <div id="navbar" class="navbar-collapse collapse">
           <ul class="nav navbar-nav navbar-right">
-            <li><a href="#">Tree viewer</a></li>
-            <li><a href="#">Tree summaries</a></li>
-            <li><a href="#">Clustered trees</a></li>
+            <li class="active"><a class="nav-tree-viewer" href="#">Tree viewer</a></li>
+            <li><a class="nav-tree-summaries" href="#">Tree summaries</a></li>
+            <li><a class="nav-clustered-trees" href="#">Clustered trees</a></li>
           </ul>
         </div>
       </div>
@@ -69,8 +69,6 @@
         <div class="col-sm-6 col-sm-offset-3 col-md-8 col-md-offset-2 main">
           <h1 class="page-header">Dashboard</h1>
           <div id="container"></div>
-
-          <div id="vafs"></div>
 
           <div id="tree-summary" class="table-responsive tree-summary">
             <table class="table tabled-striped table-hover">
