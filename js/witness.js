@@ -160,14 +160,14 @@ function plot_vafs(muts) {
       }
     },
     vAxis: {
-      title: 'Number of Santa Cruz variants',
+      title: 'Number of variants',
     },
     width: 1000,
     height: 450,
   };
 
-  $('#container').empty();
-  var chart = new google.visualization.Histogram(document.getElementById('container'));
+  var container = $('<div/>').appendTo('#container').get(0);
+  var chart = new google.visualization.Histogram(container);
   chart.draw(data, options);
 }
 
@@ -175,19 +175,10 @@ function array_max(arr) {
   return Math.max.apply(null, arr);
 }
 
-function render_vafs(dataset) {
-  $('#tree-summary').hide();
-  var muts_path = dataset.muts_path;
-  d3.json(muts_path, function(muts) {
-    plot_vafs(muts);
-  });
-}
-
 function render_tree(dataset) {
   var tree_container = $('#trees');
-  var summary_path = dataset.summary_path;
 
-  d3.json(summary_path, function(summary) {
+  d3.json(dataset.summary_path, function(summary) {
     var tree_indices = sort_numeric(Object.keys(summary.trees));
     tree_container.empty();
     tree_indices.forEach(function(tidx) {
@@ -217,6 +208,167 @@ function render_tree(dataset) {
   });
 }
 
+function extract_pops_with_top_phis(populations, desired_pops) {
+  var pops = [];
+  for(var pop_idx in populations) {
+    pops.push(populations[pop_idx]);
+  }
+  pops.sort(function(a, b) {
+    return parseInt(b.phi, 10) - parseInt(a.phi, 10);
+  });
+
+  // Exclude clonal population.
+  var sliced = pops.slice(1, desired_pops + 1);
+  while(sliced.length < desired_pops)
+    sliced.push(null);
+  return sliced;
+}
+
+function _render_phis(phis) {
+  for(var i = 0; i < phis.length; i++) {
+    var data = new google.visualization.DataTable();
+    data.addColumn('number', 'Phi');
+    data.addRows(phis[i]);
+
+    var x_min = 0;
+    var x_max = 1.0;
+    var options = {
+      title: 'Phi distribution (' + (i + 1) + ') (' + phis[i].length + ' values)',
+      hAxis: {
+        title: 'Phi',
+      },
+      vAxis: {
+        title: 'Trees',
+      },
+      width: 1000,
+      height: 450,
+    };
+
+    var container = $('<div/>').appendTo('#container').get(0);
+    var chart = new google.visualization.Histogram(container);
+    chart.draw(data, options);
+  }
+}
+
+function _render_ssm_counts(ssm_counts) {
+  for(var i = 0; i < ssm_counts.length; i++) {
+    var data = new google.visualization.DataTable();
+    data.addColumn('number', 'SSMs');
+    data.addRows(ssm_counts[i]);
+
+    var options = {
+      title: 'Number of SSMs (' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
+      hAxis: {
+        title: 'SSMs',
+      },
+      vAxis: {
+        title: 'Trees',
+      },
+      width: 1000,
+      height: 450,
+    };
+
+    var container = $('<div/>').appendTo('#container').get(0);
+    var chart = new google.visualization.Histogram(container);
+    chart.draw(data, options);
+  }
+}
+
+function _render_vafs(dataset) {
+  var muts_path = dataset.muts_path;
+  d3.json(muts_path, function(muts) {
+    plot_vafs(muts);
+  });
+}
+
+function _render_pop_counts(pop_counts, min_ssms) {
+  var histogram = {};
+  var min_count = pop_counts.length, max_count = 0;
+  console.log(pop_counts);
+  pop_counts.forEach(function(count) {
+    if(count < min_count)
+      min_count = count;
+    if(count > max_count)
+      max_count = count;
+    if(count in histogram) {
+      histogram[count]++;
+    } else {
+      histogram[count] = 1;
+    }
+  });
+
+  var rows = [];
+  for(var i = min_count; i <= max_count; i++) {
+    if(i in histogram)
+      rows.push([i.toString(), histogram[i]]);
+    else
+      rows.push([i.toString(), 0]);
+  }
+
+  var data = new google.visualization.DataTable();
+  data.addColumn('string', 'Populations');
+  data.addColumn('number', 'Count');
+  data.addRows(rows);
+
+  var options = {
+    title: 'Distribution of cancerous populations (' + pop_counts.length + ' values)',
+    hAxis: {
+      title: 'Number of cancerous populations with at least one CNV or ' + min_ssms + ' SSMs',
+    },
+    vAxis: {
+      title: 'Trees',
+    },
+    width: 1000,
+    height: 450,
+  };
+
+  var container = $('<div/>').appendTo('#container').get(0);
+  var chart = new google.visualization.ColumnChart(container);
+  chart.draw(data, options);
+}
+
+function render_summary(dataset) {
+  _render_vafs(dataset);
+
+  var pops_to_examine = 3;
+  var min_ssms = 3;
+
+  var pop_counts = [];
+  var phis = new Array(pops_to_examine);
+  var ssm_counts = new Array(pops_to_examine);
+  for(var i = 0; i < pops_to_examine; i++) {
+    phis[i] = [];
+    ssm_counts[i] = [];
+  }
+
+  d3.json(dataset.summary_path, function(summary) {
+    for(var tidx in summary.trees) {
+      var populations = summary.trees[tidx].populations;
+
+      var num_pops = 0;
+      for(var pop_idx in populations) {
+        var pop = populations[pop_idx];
+        if(pop.num_cnvs > 0 || pop.num_ssms >= min_ssms) {
+          num_pops++;
+        }
+      }
+      pop_counts.push(num_pops);
+
+      var pops = extract_pops_with_top_phis(populations, pops_to_examine);
+      for(var i = 0; i < pops.length; i++) {
+        if(pops[i] !== null) {
+          phis[i].push([pops[i].phi]);
+          ssm_counts[i].push([pops[i].num_ssms]);
+        }
+      }
+    }
+
+    _render_phis(phis);
+    _render_ssm_counts(ssm_counts);
+    _render_pop_counts(pop_counts, min_ssms);
+  });
+}
+
 function main() {
   var run_container = $('#runs');
   var sample_container = $('#samples');
@@ -240,7 +392,7 @@ function main() {
     make_parent_active(self);
 
     var mapping = {
-      'nav-tree-summaries': render_vafs,
+      'nav-tree-summaries': render_summary,
       'nav-tree-viewer': render_tree
     };
     renderer = null;
@@ -251,8 +403,11 @@ function main() {
       }
     }
 
-    if(renderer !== null && dataset !== null)
+    if(renderer !== null && dataset !== null) {
+      $('#container').empty();
+      $('#tree-summary').hide();
       renderer(dataset);
+    }
   });
 
   d3.json('data/index.json', function(data_index) {
@@ -286,8 +441,11 @@ function main() {
 
 
         dataset = self.data('dataset');
-        if(renderer !== null && dataset !== null)
+        if(renderer !== null && dataset !== null) {
+          $('#container').empty();
+          $('#tree-summary').hide();
           renderer(dataset);
+        }
       });
     });
   });
