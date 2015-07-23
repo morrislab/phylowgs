@@ -2,7 +2,11 @@ google.load('visualization', '1.1', {packages: ['corechart', 'bar']});
 google.setOnLoadCallback(main);
 
 function draw_tree(root) {
-  var m = [10, 20, 10, 20],
+  // horiz_padding should be set to the maximum radius of a node, so a node
+  // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
+  // we have horiz_padding = sqrt(8000 / pi) =~ 51.
+  var horiz_padding = 51;
+  var m = [10, horiz_padding, 10, horiz_padding],
       w = 800 - m[1] - m[3],
       h = 600 - m[0] - m[2],
       i = 0;
