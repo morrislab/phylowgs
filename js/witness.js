@@ -190,9 +190,7 @@ function render_tree(dataset) {
       $('<tr/>').html(row).appendTo(tree_container);
     });
 
-    console.log($('#trees'));
     $('#trees').stupidtable();
-
 
     tree_container.find('tr').click(function(evt) {
       evt.preventDefault();
@@ -293,7 +291,6 @@ function _render_vafs(dataset) {
 function _render_pop_counts(pop_counts, min_ssms) {
   var histogram = {};
   var min_count = pop_counts.length, max_count = 0;
-  console.log(pop_counts);
   pop_counts.forEach(function(count) {
     if(count < min_count)
       min_count = count;
@@ -382,7 +379,8 @@ function main() {
   var run_container = $('#runs');
   var sample_container = $('#samples');
 
-  var renderer = render_tree;
+  // Show tree summaries by default.
+  var renderer = render_summary;
   var dataset = null;
 
   $('.filter').keyup(function(evt) {
