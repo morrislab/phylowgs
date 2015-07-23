@@ -448,8 +448,8 @@ function main() {
         evt.preventDefault();
         make_parent_active(self);
 
-
         dataset = self.data('dataset');
+        $('.page-header').text(dataset.name);
         if(renderer !== null && dataset !== null) {
           $('#container').empty();
           $('#tree-summary').hide();
