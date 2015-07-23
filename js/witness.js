@@ -176,22 +176,27 @@ function array_max(arr) {
 }
 
 function render_tree(dataset) {
-  var tree_container = $('#trees');
+  var tree_container = $('#trees tbody');
 
   d3.json(dataset.summary_path, function(summary) {
     var tree_indices = sort_numeric(Object.keys(summary.trees));
     tree_container.empty();
     tree_indices.forEach(function(tidx) {
-      var li = $('<li/>').appendTo(tree_container);
-      $('<a/>').text(tidx).attr('href', '#').appendTo(li)
+      var row = '<td class="tree-index">' + tidx + '</td><td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>';
+      $('<tr/>').html(row).appendTo(tree_container);
     });
 
-    tree_container.find('a').click(function(evt) {
+    console.log($('#trees'));
+    $('#trees').stupidtable();
+
+
+    tree_container.find('tr').click(function(evt) {
       evt.preventDefault();
       var self = $(this);
-      make_parent_active(self);
+      self.siblings().removeClass('active');
+      self.addClass('active');
 
-      var tidx = self.text();
+      var tidx = self.find('.tree-index').text();
       display_tree(summary.trees[tidx]);
 
       var summary_table = $('#tree-summary').show().find('tbody').empty();

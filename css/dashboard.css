@@ -135,3 +135,16 @@ body {
 #tree-summary {
   display: none;
 }
+
+#trees .active, #trees .active td {
+  background-color: #428bca;
+  color: #fff;
+}
+
+#trees tr:hover {
+  background-color: white;
+}
+
+#trees td, #trees th {
+  cursor: pointer;
+}

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -61,9 +61,17 @@
         </div>
 
         <div id="tree-list" class="col-sm-3 col-md-2 secondary-sidebar sidebar">
-          <p><input type="text" class="form-control filter" placeholder="Filter ..."></p>
-          <ul id="trees" class="nav nav-sidebar">
-          </ul>
+          <div class="table-responsive">
+            <table id="trees" class="table table-hover">
+              <thead>
+                <tr>
+                  <th data-sort="int">Index</th><th data-sort="float" data-sort-default="desc">LLH</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div class="col-sm-6 col-sm-offset-3 col-md-8 col-md-offset-2 main">
@@ -98,6 +106,7 @@
     <script type="text/javascript" src="//code.jquery.com/jquery-2.1.4.min.js"></script>
     <script type="text/javascript" src="//cdnjs.cloudflare.com/ajax/libs/d3/3.5.6/d3.min.js"></script>
     <script type="text/javascript" src="//www.google.com/jsapi?autoload={'modules':[{'name':'visualization','version':'1.1','packages':['scatter']}]}"></script>
+    <script type="text/javascript" src="js/stupidtable.min.js"></script>
     <script type="text/javascript" src="js/witness.js"></script>
   </body>
 </html>
