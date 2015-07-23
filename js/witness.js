@@ -179,6 +179,18 @@ function array_max(arr) {
   return Math.max.apply(null, arr);
 }
 
+function calc_ccf(tree, pop_id) {
+  if(parseInt(pop_id, 10) === 0)
+    return 0;
+
+  var cellularity = 0;
+  tree.structure[0].forEach(function(clonal_pop_id) {
+    cellularity += tree.populations[clonal_pop_id].phi;
+  });
+  var ccf = tree.populations[pop_id].phi / cellularity;
+  return ccf;
+}
+
 function render_tree(dataset) {
   var tree_container = $('#trees tbody');
 
@@ -205,7 +217,8 @@ function render_tree(dataset) {
       var pop_ids = sort_numeric(Object.keys(summary.trees[tidx].populations));
       pop_ids.forEach(function(pop_id) {
         var pop = summary.trees[tidx].populations[pop_id];
-        var entries = [pop_id, pop.phi, pop.num_ssms, pop.num_cnvs].map(function(entry) {
+        var ccf = calc_ccf(summary.trees[tidx], pop_id);
+        var entries = [pop_id, pop.phi.toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
           return '<td>' + entry + '</td>';
         });
         $('<tr/>').html(entries.join('')).appendTo(summary_table);
