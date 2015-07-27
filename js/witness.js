@@ -240,7 +240,8 @@ TreeSummarizer.prototype._render_vafs = function(dataset) {
       height: 450,
     };
 
-    var container = $('<div/>').appendTo('#container').get(0);
+    // Use prependTo() to ensure VAFs are always first plot displayed.
+    var container = $('<div/>').prependTo('#container').get(0);
     var chart = new google.visualization.Histogram(container);
     chart.draw(data, options);
   });
