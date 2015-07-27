@@ -11,10 +11,8 @@ TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
   if(parseInt(pop_id, 10) === 0)
     return 0;
 
-  var cellularity = 0;
-  tree.structure[0].forEach(function(clonal_pop_id) {
-    cellularity += tree.populations[clonal_pop_id].phi;
-  });
+  // This only works for monoclonal trees, but it's the desired behaviour according to Quaid.
+  var cellularity = tree.populations[1].phi;
   var ccf = tree.populations[pop_id].phi / cellularity;
   return ccf;
 }
