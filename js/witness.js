@@ -203,6 +203,7 @@ function render_tree(dataset) {
     });
 
     $('#trees').stupidtable();
+    $('#tree-llh').stupidsort();
 
     tree_container.find('tr').click(function(evt) {
       evt.preventDefault();
