@@ -33,6 +33,15 @@ TreePlotter.prototype.render = function(dataset) {
     });
 
     $('#trees').stupidtable();
+
+    var already_autosorted = false;
+    $('#trees').bind('aftertablesort', function() {
+      if(already_autosorted)
+        return;
+      tree_container.find('tr:first').click();
+      already_autosorted = true;
+    });
+
     // If direction not specified, this can end up being ascending or
     // descending sort, depending on prior sort state of table.
     $('#tree-llh').stupidsort('desc');
@@ -58,7 +67,7 @@ TreePlotter.prototype.render = function(dataset) {
         });
         $('<tr/>').html(entries.join('')).appendTo(summary_table);
       });
-    }).first().click();
+    });
     $('#tree-list').scrollTop(0);
   });
 }
