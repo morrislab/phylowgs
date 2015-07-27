@@ -1,7 +1,70 @@
-google.load('visualization', '1.1', {packages: ['corechart', 'bar']});
-google.setOnLoadCallback(main);
+function TreePlotter() {
+}
 
-function draw_tree(root) {
+TreePlotter.prototype._sort_numeric = function(arr) {
+  return arr.sort(function(a, b) {
+    return parseInt(a, 10) - parseInt(b, 10);
+  });
+}
+
+TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
+  if(parseInt(pop_id, 10) === 0)
+    return 0;
+
+  var cellularity = 0;
+  tree.structure[0].forEach(function(clonal_pop_id) {
+    cellularity += tree.populations[clonal_pop_id].phi;
+  });
+  var ccf = tree.populations[pop_id].phi / cellularity;
+  return ccf;
+}
+
+TreePlotter.prototype.render = function(dataset) {
+  var tree_container = $('#trees tbody');
+
+  var tplotter = this;
+  d3.json(dataset.summary_path, function(summary) {
+    var tree_indices = tplotter._sort_numeric(Object.keys(summary.trees));
+    tree_container.empty();
+    tree_indices.forEach(function(tidx) {
+      var row = '<td class="tree-index">' + tidx + '</td>'
+        + '<td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>'
+        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
+      $('<tr/>').html(row).appendTo(tree_container);
+    });
+
+    $('#trees').stupidtable();
+    // If direction not specified, this can end up being ascending or
+    // descending sort, depending on prior sort state of table.
+    $('#tree-llh').stupidsort('desc');
+
+    tree_container.find('tr').click(function(evt) {
+      evt.preventDefault();
+      var self = $(this);
+      self.siblings().removeClass('active');
+      self.addClass('active');
+
+      var tidx = self.find('.tree-index').text();
+      var root = tplotter._generate_tree_struct(summary.trees[tidx]);
+      tplotter._draw_tree(root);
+
+
+      var summary_table = $('#tree-summary').show().find('tbody').empty();
+      var pop_ids = tplotter._sort_numeric(Object.keys(summary.trees[tidx].populations));
+      pop_ids.forEach(function(pop_id) {
+        var pop = summary.trees[tidx].populations[pop_id];
+        var ccf = tplotter._calc_ccf(summary.trees[tidx], pop_id);
+        var entries = [pop_id, pop.phi.toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
+          return '<td>' + entry + '</td>';
+        });
+        $('<tr/>').html(entries.join('')).appendTo(summary_table);
+      });
+    }).first().click();
+    $('#tree-list').scrollTop(0);
+  });
+}
+
+TreePlotter.prototype._draw_tree = function(root) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -65,14 +128,7 @@ function draw_tree(root) {
   link.exit().remove();
 }
 
-function get_url_param(name) {
-  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
-  var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
-      results = regex.exec(location.search);
-  return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
-}
-
-function find_max_ssms(populations) {
+TreePlotter.prototype._find_max_ssms = function(populations) {
   var max_ssms = 0;
   for(var pop_id in populations) {
     var pop = populations[pop_id];
@@ -82,13 +138,13 @@ function find_max_ssms(populations) {
   return max_ssms;
 }
 
-function display_tree(summary) {
+TreePlotter.prototype._generate_tree_struct = function(summary) {
   var adjlist = summary.structure;
   var pops = summary.populations;
 
   var max_area = 8000;
   var min_area = 700;
-  var max_ssms = find_max_ssms(pops);
+  var max_ssms = this._find_max_ssms(pops);
 
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
@@ -112,7 +168,18 @@ function display_tree(summary) {
 
   var root = {};
   _add_node(0, root);
-  draw_tree(root);
+  return root;
+}
+
+function TreeSummarizer() {
+}
+
+
+function get_url_param(name) {
+  name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
+  var regex = new RegExp("[\\?&]" + name + "=([^&#]*)"),
+      results = regex.exec(location.search);
+  return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
 function make_parent_active(elem) {
@@ -121,117 +188,68 @@ function make_parent_active(elem) {
   parent.addClass('active');
 }
 
-function sort_numeric(arr) {
-  return arr.sort(function(a, b) {
-    return parseInt(a, 10) - parseInt(b, 10);
-  });
+function Util() {
 }
 
-function mean(arr) {
+Util.mean = function(arr) {
   var sum = 0;
   for(var i = 0; i < arr.length; i++)
     sum += arr[i];
   return sum / arr.length;
 }
 
-function plot_vafs(muts) {
-  var vafs = [];
-  for(var ssm_id in muts.ssms) {
-    var ssm = muts.ssms[ssm_id];
-    var ssm_vafs = [];
-    for(var i = 0; i < ssm.ref_reads.length; i++) {
-      var a = ssm.ref_reads[i];
-      var d = ssm.total_reads[i];
-      ssm_vafs.push((d - a)/d);
-    }
-    vafs.push([mean(ssm_vafs)]);
-  }
-
-  var data = new google.visualization.DataTable();
-  data.addColumn('number', 'VAF');
-  data.addRows(vafs);
-
-  var x_min = 0;
-  var x_max = Math.max(1.0, array_max(vafs));
-  var options = {
-    title: 'VAFs (' + vafs.length + ' variants)',
-    histogram: { bucketSize: 0.03 },
-    hAxis: {
-      title: 'VAF',
-      viewWindow: {
-        min: x_min,
-        max: x_max
-      }
-    },
-    vAxis: {
-      title: 'Number of variants',
-    },
-    width: 1000,
-    height: 450,
-  };
-
-  var container = $('<div/>').appendTo('#container').get(0);
-  var chart = new google.visualization.Histogram(container);
-  chart.draw(data, options);
-}
-
-function array_max(arr) {
+Util.array_max = function(arr) {
   return Math.max.apply(null, arr);
 }
 
-function calc_ccf(tree, pop_id) {
-  if(parseInt(pop_id, 10) === 0)
-    return 0;
+TreeSummarizer.prototype._render_vafs = function(dataset) {
+  var muts_path = dataset.muts_path;
 
-  var cellularity = 0;
-  tree.structure[0].forEach(function(clonal_pop_id) {
-    cellularity += tree.populations[clonal_pop_id].phi;
-  });
-  var ccf = tree.populations[pop_id].phi / cellularity;
-  return ccf;
-}
+  d3.json(muts_path, function(muts) {
+    var vafs = [];
+    for(var ssm_id in muts.ssms) {
+      var ssm = muts.ssms[ssm_id];
+      var ssm_vafs = [];
+      for(var i = 0; i < ssm.ref_reads.length; i++) {
+        var a = ssm.ref_reads[i];
+        var d = ssm.total_reads[i];
+        ssm_vafs.push((d - a)/d);
+      }
+      vafs.push([Util.mean(ssm_vafs)]);
+    }
 
-function render_tree(dataset) {
-  var tree_container = $('#trees tbody');
+    var data = new google.visualization.DataTable();
+    data.addColumn('number', 'VAF');
+    data.addRows(vafs);
 
-  d3.json(dataset.summary_path, function(summary) {
-    var tree_indices = sort_numeric(Object.keys(summary.trees));
-    tree_container.empty();
-    tree_indices.forEach(function(tidx) {
-      var row = '<td class="tree-index">' + tidx + '</td>'
-        + '<td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>'
-        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
-      $('<tr/>').html(row).appendTo(tree_container);
-    });
+    var x_min = 0;
+    var x_max = Math.max(1.0, Util.array_max(vafs));
+    var options = {
+      title: 'VAFs (' + vafs.length + ' variants)',
+      histogram: { bucketSize: 0.03 },
+      hAxis: {
+        title: 'VAF',
+        viewWindow: {
+          min: x_min,
+          max: x_max
+        }
+      },
+      vAxis: {
+        title: 'Number of variants',
+      },
+      width: 1000,
+      height: 450,
+    };
 
-    $('#trees').stupidtable();
-    $('#tree-llh').stupidsort();
-
-    tree_container.find('tr').click(function(evt) {
-      evt.preventDefault();
-      var self = $(this);
-      self.siblings().removeClass('active');
-      self.addClass('active');
-
-      var tidx = self.find('.tree-index').text();
-      display_tree(summary.trees[tidx]);
-
-      var summary_table = $('#tree-summary').show().find('tbody').empty();
-      var pop_ids = sort_numeric(Object.keys(summary.trees[tidx].populations));
-      pop_ids.forEach(function(pop_id) {
-        var pop = summary.trees[tidx].populations[pop_id];
-        var ccf = calc_ccf(summary.trees[tidx], pop_id);
-        var entries = [pop_id, pop.phi.toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
-          return '<td>' + entry + '</td>';
-        });
-        $('<tr/>').html(entries.join('')).appendTo(summary_table);
-      });
-    }).first().click();
-    $('#tree-list').scrollTop(0);
+    var container = $('<div/>').appendTo('#container').get(0);
+    var chart = new google.visualization.Histogram(container);
+    chart.draw(data, options);
   });
 }
 
-function extract_pops_with_top_phis(populations, desired_pops) {
+
+
+TreeSummarizer.prototype._extract_pops_with_top_phis = function(populations, desired_pops) {
   var pops = [];
   for(var pop_idx in populations) {
     pops.push(populations[pop_idx]);
@@ -247,7 +265,7 @@ function extract_pops_with_top_phis(populations, desired_pops) {
   return sliced;
 }
 
-function _render_phis(phis) {
+TreeSummarizer.prototype._render_phis = function(phis) {
   for(var i = 0; i < phis.length; i++) {
     var data = new google.visualization.DataTable();
     data.addColumn('number', 'Phi');
@@ -273,7 +291,7 @@ function _render_phis(phis) {
   }
 }
 
-function _render_ssm_counts(ssm_counts) {
+TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
   for(var i = 0; i < ssm_counts.length; i++) {
     var data = new google.visualization.DataTable();
     data.addColumn('number', 'SSMs');
@@ -297,14 +315,7 @@ function _render_ssm_counts(ssm_counts) {
   }
 }
 
-function _render_vafs(dataset) {
-  var muts_path = dataset.muts_path;
-  d3.json(muts_path, function(muts) {
-    plot_vafs(muts);
-  });
-}
-
-function _render_pop_counts(pop_counts, min_ssms) {
+TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   var histogram = {};
   var min_count = pop_counts.length, max_count = 0;
   pop_counts.forEach(function(count) {
@@ -349,8 +360,8 @@ function _render_pop_counts(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
-function render_summary(dataset) {
-  _render_vafs(dataset);
+TreeSummarizer.prototype.render = function(dataset) {
+  this._render_vafs(dataset);
 
   var pops_to_examine = 3;
   var min_ssms = 3;
@@ -363,6 +374,7 @@ function render_summary(dataset) {
     ssm_counts[i] = [];
   }
 
+  var self = this;
   d3.json(dataset.summary_path, function(summary) {
     for(var tidx in summary.trees) {
       var populations = summary.trees[tidx].populations;
@@ -376,7 +388,7 @@ function render_summary(dataset) {
       }
       pop_counts.push(num_pops);
 
-      var pops = extract_pops_with_top_phis(populations, pops_to_examine);
+      var pops = self._extract_pops_with_top_phis(populations, pops_to_examine);
       for(var i = 0; i < pops.length; i++) {
         if(pops[i] !== null) {
           phis[i].push([pops[i].phi]);
@@ -385,20 +397,24 @@ function render_summary(dataset) {
       }
     }
 
-    _render_phis(phis);
-    _render_ssm_counts(ssm_counts);
-    _render_pop_counts(pop_counts, min_ssms);
+    self._render_phis(phis);
+    self._render_ssm_counts(ssm_counts);
+    self._render_pop_counts(pop_counts, min_ssms);
   });
 }
 
-function main() {
-  var run_container = $('#runs');
-  var sample_container = $('#samples');
+function Interface() {
+  this._activate_filters();
+  this._activate_navbar();
+  this._load_samples();
 
-  // Show tree summaries by default.
-  var renderer = render_summary;
-  var dataset = null;
+  this._available_renderers = {
+    'summarizer': new TreeSummarizer(),
+    'plotter': new TreePlotter()
+  };
+}
 
+Interface.prototype._activate_filters = function() {
   $('.filter').keyup(function(evt) {
     var self = $(this);
     var filter_text = self.val();
@@ -408,31 +424,49 @@ function main() {
       return !($(this).text().indexOf(filter_text) === -1);
     }).show();
   });
+}
 
+Interface.prototype._activate_navbar = function() {
+  var iface = this;
   $('.navbar-nav a').click(function(evt) {
     evt.preventDefault();
     var self = $(this);
     make_parent_active(self);
 
     var mapping = {
-      'nav-tree-summaries': render_summary,
-      'nav-tree-viewer': render_tree
+      'nav-tree-summaries': 'summarizer',
+      'nav-tree-viewer': 'plotter'
     };
-    renderer = null;
+    iface._renderer = null;
     for(var nav_class in mapping) {
       if(self.hasClass(nav_class)) {
-        renderer = mapping[nav_class];
+        iface._renderer = mapping[nav_class];
         break;
       }
     }
 
-    if(renderer !== null && dataset !== null) {
-      $('#container').empty();
-      $('#tree-summary').hide();
-      renderer(dataset);
-    }
+    iface._render();
   });
+}
 
+Interface.prototype._render = function() {
+  if(this._renderer !== null && this._dataset !== null) {
+    $('#container').empty();
+    $('#tree-summary').hide();
+    this._available_renderers[this._renderer].render(this._dataset);
+  }
+
+}
+
+Interface.prototype._load_samples = function() {
+  var run_container = $('#runs');
+  var sample_container = $('#samples');
+  //
+  // Show tree summaries by default.
+  this._renderer = 'summarizer';
+  this._dataset = null;
+
+  var iface = this;
   d3.json('data/index.json', function(data_index) {
     Object.keys(data_index).sort().forEach(function(run_name) {
       var li = $('<li/>').appendTo(run_container);
@@ -445,7 +479,7 @@ function main() {
       make_parent_active(self);
       var run_name = self.text();
 
-      dataset = null;
+      iface._dataset = null;
       sample_container.empty();
 
       data_index[run_name].sort(function(a, b) {
@@ -462,14 +496,17 @@ function main() {
         evt.preventDefault();
         make_parent_active(self);
 
-        dataset = self.data('dataset');
-        $('.page-header').text(dataset.name);
-        if(renderer !== null && dataset !== null) {
-          $('#container').empty();
-          $('#tree-summary').hide();
-          renderer(dataset);
-        }
+        iface._dataset = self.data('dataset');
+        $('.page-header').text(iface._dataset.name);
+        iface._render();
       });
     });
   });
+}
+
+google.load('visualization', '1.1', {packages: ['corechart', 'bar']});
+google.setOnLoadCallback(main);
+
+function main() {
+  new Interface();
 }
