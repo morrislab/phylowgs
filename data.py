@@ -57,7 +57,7 @@ class Datum(object):
 				ll.append(log(1e-99)) # to handle cases with zero likelihood
 			llh = u.logsumexp(ll)
 		else: ## CNV datum
-			mu = (1 - phi) * mu_r + 0.5*phi
+			mu = (1 - phi) * mu_r + phi*mu_v # (mu_r=0.999, mu_v=0.5)
 			llh = u.log_binomial_likelihood(self.a[tp], self.d[tp], mu) +  self._log_bin_norm_const[tp]
 		return 	llh
 	
