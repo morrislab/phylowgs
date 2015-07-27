@@ -20,6 +20,7 @@ TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
 }
 
 TreePlotter.prototype.render = function(dataset) {
+  $('#tree-list').show();
   var tree_container = $('#trees tbody');
 
   var tplotter = this;
@@ -362,6 +363,7 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
 
 TreeSummarizer.prototype.render = function(dataset) {
   this._render_vafs(dataset);
+  $('#tree-list').hide();
 
   var pops_to_examine = 3;
   var min_ssms = 3;
