@@ -198,7 +198,9 @@ function render_tree(dataset) {
     var tree_indices = sort_numeric(Object.keys(summary.trees));
     tree_container.empty();
     tree_indices.forEach(function(tidx) {
-      var row = '<td class="tree-index">' + tidx + '</td><td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>';
+      var row = '<td class="tree-index">' + tidx + '</td>'
+        + '<td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>'
+        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
       $('<tr/>').html(row).appendTo(tree_container);
     });
 
