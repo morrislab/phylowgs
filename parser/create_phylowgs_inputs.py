@@ -163,9 +163,10 @@ class MuseParser(VariantParser):
     return False
     
 class StrelkaParser(VariantParser):
-  def __init__(self, vcf_filename):
+  def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
-    
+    self._tumor_sample = tumor_sample    
+
   def _does_variant_pass_filters(self, variant):
     # Strelka outputs two files one for SNPs, the other for InDels
     # For now only deal with SNP file from Strelka
@@ -711,7 +712,7 @@ def main():
   elif args.input_type == 'dkfz':
     variant_parser = DKFZParser(args.vcf_file)
   elif args.input_type == 'strelka':
-    variant_parser = StrelkaParser(args.vcf_file)
+    variant_parser = StrelkaParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'vardict':
     variant_parser = VarDictParser(args.vcf_file, args.tumor_sample)
   variants_and_reads = variant_parser.list_variants()
