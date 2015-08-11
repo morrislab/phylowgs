@@ -90,11 +90,11 @@ def set_node_height(tssb):
 	descend(tssb.root['node'],1)
 	
 def set_path_from_root_to_node(tssb):
-	wts, nodes = tssb.get_mixture()
+	nodes = tssb.get_nodes()
 	for node in nodes: node.path = node.get_ancestors()
 
 def map_datum_to_node(tssb):
-	wts, nodes = tssb.get_mixture()
+	nodes = tssb.get_nodes()
 	for node in nodes:
 		for datum in node.get_data():
 			datum.node=node
