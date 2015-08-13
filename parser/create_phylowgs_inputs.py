@@ -586,17 +586,22 @@ class VariantAndCnvGroup(object):
     self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'outside_subclonal_cn')
     self._variants_and_reads = filtered
 
-  def subsample_variants(self, sample_size):
+  def format_variants(self, sample_size, error_rate):
+    if sample_size is None:
+      sample_size = len(self._variants_and_reads)
     random.shuffle(self._variants_and_reads)
-    self._variants_and_reads = self._variants_and_reads[:sample_size]
+    subsampled, nonsubsampled = self._variants_and_reads[:sample_size], self._variants_and_reads[sample_size:]
 
-  def write_variants(self, outfn, error_rate):
     formatter = VariantFormatter()
-    self._variants = list(formatter.format_variants(self._variants_and_reads, error_rate))
+    subsampled = list(formatter.format_variants(subsampled, error_rate))
+    nonsubsampled = list(formatter.format_variants(nonsubsampled, error_rate))
 
+    return (subsampled, nonsubsampled)
+
+  def write_variants(self, variants, outfn):
     with open(outfn, 'w') as outf:
       print('\t'.join(('id', 'gene', 'a', 'd', 'mu_r', 'mu_v')), file=outf)
-      for variant in self._variants:
+      for variant in variants:
         vals = (
           'ssm_id',
           'variant_name',
@@ -618,7 +623,7 @@ class VariantAndCnvGroup(object):
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
 
-  def write_cnvs(self, outfn, cnv_confidence, cellularity, read_length):
+  def write_cnvs(self, variants, outfn, cnv_confidence, cellularity, read_length):
     abnormal_regions = {}
     filtered_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     for chrom, regions in filtered_regions.items():
@@ -627,7 +632,7 @@ class VariantAndCnvGroup(object):
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
       formatter = CnvFormatter(cnv_confidence, cellularity, self._estimated_read_depth, read_length)
-      for cnv in formatter.format_and_merge_cnvs(abnormal_regions, self._variants):
+      for cnv in formatter.format_and_merge_cnvs(abnormal_regions, variants):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
           cnv['cnv_id'],
@@ -688,9 +693,13 @@ def main():
     help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
     help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
-  parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('--muse-tier', dest='muse_tier', type=int, default=0,
     help='Maximum MuSE tier to include')
+  parser.add_argument('--nonsubsampled-variants', dest='output_nonsubsampled_variants',
+    help='If subsampling, write nonsubsampled variants to separate file, in addition to subsampled variants')
+  parser.add_argument('--nonsubsampled-variants-cnvs', dest='output_nonsubsampled_variants_cnvs',
+    help='If subsampling, write CNVs for nonsubsampled variants to separate file')
+  parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('vcf_file')
   args = parser.parse_args()
 
@@ -728,12 +737,15 @@ def main():
   elif grouper.has_cnvs():
     grouper.exclude_variants_in_subclonal_cnvs()
 
-  if args.sample_size:
-    grouper.subsample_variants(args.sample_size)
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate)
+  grouper.write_variants(subsampled_vars, args.output_variants)
+  if args.output_nonsubsampled_variants:
+    grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
 
-  grouper.write_variants(args.output_variants, args.error_rate)
   if not args.only_normal_cn and grouper.has_cnvs():
-    grouper.write_cnvs(args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
+    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
+    if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
+      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
   else:
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):
