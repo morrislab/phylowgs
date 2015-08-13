@@ -278,16 +278,16 @@ TreeSummarizer.prototype._extract_pops_with_top_phis = function(populations, des
 TreeSummarizer.prototype._render_phis = function(phis) {
   for(var i = 0; i < phis.length; i++) {
     var data = new google.visualization.DataTable();
-    data.addColumn('number', 'Phi');
+    data.addColumn('number', 'Cellular prevalence');
     data.addRows(phis[i]);
 
     var x_min = 0;
     var x_max = 1.0;
     var options = {
-      title: 'Phi distribution (' + (i + 1) + ') (' + phis[i].length + ' values)',
+      title: 'Cellular prevalence (subclone ' + (i + 1) + ') (' + phis[i].length + ' values)',
       fontSize: 22,
       hAxis: {
-        title: 'Phi',
+        title: 'Cellular prevalence',
       },
       vAxis: {
         title: 'Trees',
@@ -309,7 +309,7 @@ TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
     data.addRows(ssm_counts[i]);
 
     var options = {
-      title: 'Number of SSMs (' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
+      title: 'Number of SSMs (subclone ' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
       fontSize: 22,
       hAxis: {
         title: 'SSMs',
