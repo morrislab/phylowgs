@@ -96,6 +96,8 @@ def main():
       help='SSM file whose mutations you wish to reassign')
   parser.add_argument('trees_file',
     help='Path to sampled trees')
+  parser.add_argument('ssm_ids', nargs='+',
+      help='ID of SSM in ssm_file to reassign')
   args = parser.parse_args()
 
   if args.cnv_file:
@@ -106,20 +108,22 @@ def main():
   ssm_assignments = {}
 
   for ssm_id, ssm_name, a, d, mu_r, mu_v in read_ssms(args.ssm_file):
-     overlapping_cnvs = find_overlapping_cnvs(ssm_id, cnvs)
-     if overlapping_cnvs:
-       cnv_ids = [c[0] for c in overlapping_cnvs]
-       cnv_copies = [c[1:3] for c in overlapping_cnvs]
-     else:
-       cnv_ids = None
-       cnv_copies = None
+    if ssm_id not in args.ssm_ids:
+      continue
+    overlapping_cnvs = find_overlapping_cnvs(ssm_id, cnvs)
+    if overlapping_cnvs:
+      cnv_ids = [c[0] for c in overlapping_cnvs]
+      cnv_copies = [c[1:3] for c in overlapping_cnvs]
+    else:
+      cnv_ids = None
+      cnv_copies = None
 
-     a = [int(i) for i in a.split(',')]
-     d = [int(i) for i in d.split(',')]
-     mu_r = float(mu_r)
-     mu_v = float(mu_v)
+    a = [int(i) for i in a.split(',')]
+    d = [int(i) for i in d.split(',')]
+    mu_r = float(mu_r)
+    mu_v = float(mu_v)
 
-     ssm_assignments[ssm_id] = post_assignments(ssm_name, ssm_id, a, d, mu_r, mu_v, args.trees_file, cnv_ids, cnv_copies)
+    ssm_assignments[ssm_id] = post_assignments(ssm_name, ssm_id, a, d, mu_r, mu_v, args.trees_file, cnv_ids, cnv_copies)
 
   print(json.dumps(ssm_assignments))
 
