@@ -5,6 +5,7 @@ import tssb
 import numpy as np
 import data
 import json
+import os
 
 def post_assignments(name, id, a, d, mu_r, mu_v, tree_file, cnv_ids=None, copies=None):
   reader = util2.TreeReader(tree_file)
@@ -125,7 +126,10 @@ def main():
 
     ssm_assignments[ssm_id] = post_assignments(ssm_name, ssm_id, a, d, mu_r, mu_v, args.trees_file, cnv_ids, cnv_copies)
 
-  print(json.dumps(ssm_assignments))
+  print(json.dumps({
+    'assignments': ssm_assignments,
+    'trees': os.path.realpath(args.trees_file)
+  }))
 
 
 if __name__ == '__main__':
