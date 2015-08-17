@@ -109,27 +109,36 @@ def check_bounds(p,l=0.0001,u=.9999):
 # Does not removes root as it is not required
 # root: root of the current tree
 # parent: parent of the root
+# Note this funciton modifies the sticks so they remain valid.
 def remove_empty_nodes(root, parent = None):
 	for child in list(root['children']):
 		remove_empty_nodes(child, root)
 	if (root['node'].get_data() == []):
 		if (root['children'] == []): # leaf
 			if (parent != None):
+				ind = parent['children'].index(root)
 				parent['children'].remove(root)
 				root['node'].kill()
+				parent['sticks'] = delete(parent['sticks'],ind,0)
 			return
 		else:
 			if (parent != None):
 				parent_ = root['node'].parent()
-				for child in list(root['children']):
+				ind = parent['children'].index(root)
+				for i,child in enumerate(list(root['children'])):
 					parent['children'].append(child)
+					toappend = zeros((1,1))
+					toappend[0] = root['sticks'][i]
+					parent['sticks'] = append(parent['sticks'],toappend,0)
 					root['children'].remove(child)
 				for child in list(root['node'].children()):
 					child._parent = parent_
 					parent_.add_child(child)
 					root['node'].remove_child(child)
 				parent['children'].remove(root)
+				parent['sticks'] = delete(parent['sticks'],ind,0)
 				root['node'].kill()
+
 
 def rm_safely(filename):
 	try:
