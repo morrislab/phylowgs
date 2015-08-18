@@ -238,14 +238,23 @@ class TreeReader(object):
 	self._archive = zipfile.ZipFile(archive_fn)
 	infolist = self._archive.infolist()
 	tree_info = [t for t in infolist if t.filename.startswith('tree_')]
+	burnin_info = [t for t in infolist if t.filename.startswith('burnin_')]
 
 	# Sort by index
 	tree_info.sort(key = lambda tinfo: self._extract_metadata(tinfo)[0])
+	burnin_info.sort(key = lambda tinfo: self._extract_burnin_idx(tinfo))
+
 	self._trees = []
+	self._burnin_trees = []
+
 	for info in tree_info:
 	    idx, llh = self._extract_metadata(info)
 	    assert idx == len(self._trees)
 	    self._trees.append((idx, llh, info))
+	for info in burnin_info:
+	    idx = self._extract_burnin_idx(info)
+	    assert len(burnin_info) + idx == len(self._burnin_trees)
+	    self._burnin_trees.append((idx, info))
 
     def num_trees(self):
 	return len(self._trees)
@@ -259,15 +268,33 @@ class TreeReader(object):
 	llh = float(tokens[2])
 	return (idx, llh)
 
-    def load_tree(self, idx):
+    def _extract_burnin_idx(self, zinfo):
+	idx = int(zinfo.filename.split('_')[1])
+	return idx
+
+    def _parse_tree(self, zinfo, remove_empty_vertices=False):
+	pickled = self._archive.read(zinfo)
+	tree = pickle.loads(pickled)
+	if remove_empty_vertices:
+	    remove_empty_nodes(tree.root)
+	return tree
+
+    def load_tree(self, idx, remove_empty_vertices=False):
 	tidx, llh, zinfo = self._trees[idx]
 	assert tidx == idx
-	pickled = self._archive.read(zinfo)
-	return pickle.loads(pickled)
+	return self._parse_tree(zinfo, remove_empty_vertices)
 
     def load_trees(self, num_trees=None, remove_empty_vertices=False):
 	for idx, llh, tree in self.load_trees_and_metadata(num_trees, remove_empty_vertices):
 	    yield tree
+
+    def load_trees_and_burnin(self, remove_empty_vertices=False):
+	for tidx, zinfo in self._burnin_trees:
+	    tree = self._parse_tree(zinfo, remove_empty_vertices)
+	    yield (tidx, tree)
+	for tidx, llh, zinfo in self._trees:
+	    tree = self._parse_tree(zinfo, remove_empty_vertices)
+	    yield (tidx, tree)
 
     def load_trees_and_metadata(self, num_trees=None, remove_empty_vertices=False):
 	# Sort by LLH
@@ -278,8 +305,5 @@ class TreeReader(object):
 	    trees = trees[:num_trees]
 
 	for tidx, llh, zinfo in trees:
-	    pickled = self._archive.read(zinfo)
-	    tree = pickle.loads(pickled)
-	    if remove_empty_vertices:
-		remove_empty_nodes(tree.root)
+	    tree = self._parse_tree(zinfo, remove_empty_vertices)
 	    yield (tidx, llh, tree)

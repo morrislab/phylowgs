@@ -16,7 +16,7 @@ def post_assignments(ssms, tree_file):
   assignments = collections.defaultdict(list)
   old_tree = None
   error = 0
-  for idx, llh, tree in reader.load_trees_and_metadata(remove_empty_vertices = True):
+  for idx, tree in reader.load_trees_and_burnin(remove_empty_vertices = True):
     tree.assignments.append(None)
     tree.data.append(None)
     for name, id, a, d, mu_r, mu_v, cnv_ids, copies in ssms:
@@ -43,7 +43,7 @@ def post_assignments(ssms, tree_file):
       llh_s = np.log(np.random.rand()) + old_llh
 
       while True:
-        new_u                = (max_u-min_u)*np.random.rand() + min_u
+        new_u = (max_u-min_u)*np.random.rand() + min_u
         new_node = find_node2(n,nodes,new_u)
         old_node = tree.assignments[n]                 
         old_node.remove_datum(n)
@@ -203,7 +203,7 @@ def main():
     ssms.append((ssm_name, ssm_id, a, d, mu_r, mu_v, cnv_ids, cnv_copies))
 
   ssm_assignments = post_assignments(ssms, args.trees_file)
-  
+
   print(json.dumps({
     'assignments': ssm_assignments,
     'trees': os.path.realpath(args.trees_file)
