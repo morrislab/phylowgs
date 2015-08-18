@@ -9,72 +9,75 @@ import collections
 import json
 import os
 
-def post_assignments(name, id, a, d, mu_r, mu_v, tree_file, cnv_ids=None, copies=None):
+def post_assignments(ssms, tree_file):
   epsilon = np.finfo(np.float64).eps
   reader = util2.TreeReader(tree_file)
-  other_ssms =[]
+  other_ssms = collections.defaultdict(list)
+  assignments = collections.defaultdict(list)
   old_tree = None
-  assignments = []
-
+  error = 0
   for idx, llh, tree in reader.load_trees_and_metadata(remove_empty_vertices = True):
-    data_ob = data.Datum(name, id, a, d, mu_r, mu_v)
-    data_ob.tssb = tree
-    if cnv_ids:
-      cnv_obs = [x for x in tree.data if x.name in cnv_ids]
-      for i,c in enumerate(cnv_obs):
-        data_ob.cnv.append((c,copies[i][0],copies[i][1]))
-    nodes = tree.get_nodes()
-    tree.data.append(data_ob)
+    tree.assignments.append(None)
+    tree.data.append(None)
+    for name, id, a, d, mu_r, mu_v, cnv_ids, copies in ssms:
+      data_ob = data.Datum(name, id, a, d, mu_r, mu_v)
+      data_ob.tssb = tree
+      if cnv_ids:
+        cnv_obs = [x for x in tree.data if x.name in cnv_ids]
+        for i,c in enumerate(cnv_obs):
+          data_ob.cnv.append((c,copies[i][0],copies[i][1]))
+      nodes = tree.get_nodes()
+      tree.data[-1] = data_ob
 
-    new_node = get_new_node(tree,other_ssms)
+      new_node = get_new_node(tree,other_ssms[name])
 
-    tree.assignments.append(new_node)
-    n = len(tree.data)-1
-    new_node.add_datum(n)
-    llhmap = {}
-
-    max_u = 1.0
-    min_u = 0.0
-    old_llh = tree.assignments[n].logprob(tree.data[n:n+1])
-    llhmap[tree.assignments[n]] = old_llh
-    llh_s = np.log(np.random.rand()) + old_llh
-
-    while True:
-      new_u                = (max_u-min_u)*np.random.rand() + min_u
-      new_node = find_node2(n,nodes,new_u)
-      old_node = tree.assignments[n]
-      old_node.remove_datum(n)
+      tree.assignments[-1] = new_node
+      n = len(tree.data)-1
       new_node.add_datum(n)
-      tree.assignments[n] = new_node
-      if new_node in llhmap:
-        new_llh = llhmap[new_node]
-      else:
-        new_llh = new_node.logprob(tree.data[n:n+1])
-        llhmap[new_node] = new_llh
-      if new_llh > llh_s:
-        break
-      elif abs(max_u-min_u) < epsilon:
-        new_node.remove_datum(n)
-        old_node.add_datum(n)
-        tree.assignments[n] = old_node
-        new_node = old_node
-        break
-      else:
-        new_node.remove_datum(n)
-        old_node.add_datum(n)
-        tree.assignments[n] = old_node
-        if nodes.index(old_node) > nodes.index(new_node):
-          min_u = new_u
+      llhmap = {}
+
+      max_u = 1.0
+      min_u = 0.0
+      old_llh = tree.assignments[n].logprob(tree.data[n:n+1])
+      llhmap[tree.assignments[n]] = old_llh
+      llh_s = np.log(np.random.rand()) + old_llh
+
+      while True:
+        new_u                = (max_u-min_u)*np.random.rand() + min_u
+        new_node = find_node2(n,nodes,new_u)
+        old_node = tree.assignments[n]                 
+        old_node.remove_datum(n)
+        new_node.add_datum(n)
+        tree.assignments[n] = new_node
+        if new_node in llhmap:
+          new_llh = llhmap[new_node]
         else:
-          max_u = new_u
+          new_llh = new_node.logprob(tree.data[n:n+1])
+          llhmap[new_node] = new_llh
+        if new_llh > llh_s:
+          break
+        elif abs(max_u-min_u) < epsilon:
+          new_node.remove_datum(n)
+          old_node.add_datum(n)
+          tree.assignments[n] = old_node
+          new_node = old_node
+          #print >>sys.stderr, "Slice sampler shrank down.  Keep current state."
+          break
+        else:
+          new_node.remove_datum(n)
+          old_node.add_datum(n)
+          tree.assignments[n] = old_node
+          if nodes.index(old_node) > nodes.index(new_node):
+            min_u = new_u
+          else:
+            max_u = new_u
+    
+      other_ssms[name] = list(new_node.data)
+      other_ssms[name].remove(n)
 
-    other_ssms = list(new_node.data)
-    other_ssms.remove(n)
-
-    nodes = tree.get_nodes()
-    mapping = construct_index_map(tree,nodes)
-    assignments.append(mapping[nodes.index(new_node)])
-
+      nodes = tree.get_nodes()
+      mapping = construct_index_map(tree,nodes)
+      assignments[name].append(mapping[nodes.index(new_node)])
   return assignments
 
 def get_new_node(tree,other_ssms):
@@ -181,6 +184,7 @@ def main():
 
   ssm_assignments = {}
 
+  ssms = []
   for ssm_id, ssm_name, a, d, mu_r, mu_v in read_ssms(args.ssm_file):
     if ssm_id not in args.ssm_ids:
       continue
@@ -196,9 +200,10 @@ def main():
     d = [int(i) for i in d.split(',')]
     mu_r = float(mu_r)
     mu_v = float(mu_v)
+    ssms.append((ssm_name, ssm_id, a, d, mu_r, mu_v, cnv_ids, cnv_copies))
 
-    ssm_assignments[ssm_id] = post_assignments(ssm_name, ssm_id, a, d, mu_r, mu_v, args.trees_file, cnv_ids, cnv_copies)
-
+  ssm_assignments = post_assignments(ssms, args.trees_file)
+  
   print(json.dumps({
     'assignments': ssm_assignments,
     'trees': os.path.realpath(args.trees_file)
