@@ -23,7 +23,7 @@ def post_assignments(ssms, tree_file):
       data_ob = data.Datum(name, id, a, d, mu_r, mu_v)
       data_ob.tssb = tree
       if cnv_ids:
-        cnv_obs = [x for x in tree.data if x.name in cnv_ids]
+        cnv_obs = [x for x in tree.data[:-1] if x.name in cnv_ids]
         for i,c in enumerate(cnv_obs):
           data_ob.cnv.append((c,copies[i][0],copies[i][1]))
       nodes = tree.get_nodes()
