@@ -182,7 +182,7 @@ class TSSB(object):
             post_alpha   = 1.0 + data_here
             post_beta    = (self.alpha_decay**depth)*self.dp_alpha + data_down
             root['main'] = boundbeta( post_alpha, post_beta ) if self.min_depth <= depth else 0.0
-            if depth==0: root['main'] = 0.001 # to make root node empty (shankar)
+            if depth==0: root['main'] = 1e-30 # to make root node empty (shankar)
 
             return data_here + data_down
 
