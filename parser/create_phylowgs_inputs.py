@@ -664,6 +664,11 @@ class CnvParser(object):
         record['clonal_frac'] = float(record['clonal_frac'])
         cn_regions[chrom].append(record)
 
+    # Ensure CN regions are properly sorted, which we later rely on when
+    # filtering out regions with multiple abnormal CN states.
+    for chrom, regions in cn_regions.items():
+      cn_regions[chrom] = sorted(regions, key = lambda r: r['start'])
+
     return cn_regions
 
 def main():
