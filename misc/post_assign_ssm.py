@@ -77,7 +77,7 @@ def post_assignments(ssms, tree_file):
 
       nodes = tree.get_nodes()
       mapping = construct_index_map(tree,nodes)
-      assignments[name].append(mapping[nodes.index(new_node)])
+      assignments[id].append(mapping[nodes.index(new_node)])
   return assignments
 
 def get_new_node(tree,other_ssms):
