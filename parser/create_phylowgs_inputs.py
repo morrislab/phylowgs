@@ -555,7 +555,7 @@ class VariantAndCnvGroup(object):
           else:
             # Ignore CNV regions with multiple abnormal CN states, as we don't
             # know what order the CN events occurred in.
-            log('Multiple abnormal regions: %s' % abnormal_regions)
+            log('Multiple abnormal regions: chrom=%s %s' % (chrom, abnormal_regions))
           idx += len(regions_at_same_coords)
 
     return good_regions
