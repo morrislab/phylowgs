@@ -27,8 +27,21 @@ from datetime import datetime
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
 def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
 	state = {}
-	state['rand_seed'] = rand_seed
-	seed(state['rand_seed'])
+
+	with open('random_seed.txt', 'w') as seedf:
+		seedf.write('%s\n' % rand_seed)
+	try:
+		rand_seed = int(rand_seed)
+		state['rand_seed'] = rand_seed
+		seed(state['rand_seed'])
+	except TypeError:
+		# If rand_seed is not provided as command-line arg, it will be None,
+		# meaning it will hit this code path. Explicitly avoid calling seed(None)
+		# -- though this is currently the equivalent of calling seed() in that it
+		# seeds the PRNG with /dev/urandom, the semantics of seed(None) might
+		# change in later NumPy versions to always seed to the same state.
+		state['rand_seed'] = rand_seed
+		seed()
 
 	state['ssm_file'] = ssm_file
 	state['cnv_file'] = cnv_file
@@ -219,7 +232,7 @@ def parse_args():
 		help='Number of MCMC samples')
 	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
 		help='Number of Metropolis-Hastings iterations')
-	parser.add_argument('-r', '--random-seed', dest='random_seed', default=1, type=int,
+	parser.add_argument('-r', '--random-seed', dest='random_seed', type=int,
 		help='Random seed for initializing MCMC sampler')
 	parser.add_argument('ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
