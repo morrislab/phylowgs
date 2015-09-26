@@ -70,6 +70,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['mh_std'] = mh_std
 
 	state['cd_llh_traces'] = zeros((state['num_samples'], 1))
+	state['burnin_cd_llh_traces'] = zeros((state['burnin'], 1))
 	state['working_directory'] = os.getcwd()
 
 	root = alleles(conc=0.1, ntps=NTPS)
@@ -179,6 +180,8 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 				logmsg(' '.join([str(v) for v in (iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay)]))
 			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
 				logmsg("%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration]))
+		else:
+			state['burnin_cd_llh_traces'][iteration + state['burnin']] = tssb.complete_data_log_likelihood()
 
 		# It's not safe to exit while performing file IO, as we don't want
 		# trees.zip or the computation state file to become corrupted from an
