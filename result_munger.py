@@ -135,8 +135,7 @@ class ResultMunger(object):
 
   def _move_muts_to_best_node(self, muts, mutass, populations):
     for mut_type in ('ssms', 'cnvs'):
-      for mut in muts[mut_type]:
-        mut_id = mut['id']
+      for mut_id in muts[mut_type]:
         mut_stats = self._mutlist[mut_type][mut_id]
         ref_reads = np.mean(mut_stats['ref_reads'])
         total_reads = np.mean(mut_stats['total_reads'])
@@ -156,7 +155,7 @@ class ResultMunger(object):
             lowest_phi_delta = phi_delta
             best_node = pidx
 
-        mutass[best_node][mut_type].append(mut)
+        mutass[best_node][mut_type].append(mut_id)
 
   def _reassign_muts(self, tree_idx):
     deleted_muts = []

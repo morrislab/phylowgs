@@ -11,7 +11,7 @@ class ResultGenerator(object):
 
     summaries = {}
     all_mutass = {}
-    for idx, llh, pops, mutass, structure in self._summarize_all_pops(tree_file, include_ssm_names):
+    for idx, llh, pops, mutass, structure in self._summarize_all_pops(tree_file):
       summaries[idx] = {
         'llh': llh,
         'structure': structure,
@@ -21,13 +21,13 @@ class ResultGenerator(object):
 
     return summaries, mutlist, all_mutass
 
-  def _summarize_all_pops(self, tree_file, include_ssm_names):
+  def _summarize_all_pops(self, tree_file):
     reader = util2.TreeReader(tree_file)
     for idx, llh, tree in reader.load_trees_and_metadata(remove_empty_vertices = True):
-      yield (idx, llh) + self._summarize_pops(tree, include_ssm_names)
+      yield (idx, llh) + self._summarize_pops(tree)
     reader.close()
 
-  def _summarize_pops(self, tree, include_ssm_names):
+  def _summarize_pops(self, tree):
     pops = {}
     structure = defaultdict(list)
     # Note that there will be an entry in mut_assignments for a given subclone
@@ -48,13 +48,10 @@ class ResultGenerator(object):
       num_cnvs = 0
       for mut in mutations:
         if mut.id.startswith('s'):
-          mut_data = {'id': mut.id}
-          if include_ssm_names:
-            mut_data['name'] = mut.name
-          mut_assignments[current_idx]['ssms'].append(mut_data)
+          mut_assignments[current_idx]['ssms'].append(mut.id)
           num_ssms += 1
         elif mut.id.startswith('c'):
-          mut_assignments[current_idx]['cnvs'].append({'id': mut.id})
+          mut_assignments[current_idx]['cnvs'].append(mut.id)
           num_cnvs += 1
         else:
           raise Exception('Unknown mutation ID type: %s' % mut.id)
