@@ -50,26 +50,3 @@ class ResultLoader(object):
       for zinfo in mutf.infolist():
         tree_idx = int(zinfo.filename.split('.')[0])
         yield (tree_idx, self._load_assignments(mutf, tree_idx))
-
-  def get_ssm_names(mutass):
-    def _ssm_key(name):
-      chrom, pos = name.split('_')
-      chrom = chrom.lower()
-      pos = int(pos)
-
-      if chrom == 'x':
-        chrom = 100
-      elif chrom == 'y':
-        chrom = 101
-      else:
-        chrom = int(chrom)
-      return (chrom, pos)
-
-    _, mut_assignments = next(load_mut_assignments(mutass))
-    ssm_names = []
-    for _, muts in mut_assignments.items():
-      ssm_names += [m['name'] for m in muts['ssms']]
-    ssm_names.sort(key = _ssm_key)
-
-    idx_lookup = {name: i for (i, name) in enumerate(ssm_names)}
-    return (ssm_names, idx_lookup)
