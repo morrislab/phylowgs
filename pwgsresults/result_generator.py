@@ -1,6 +1,10 @@
 import numpy as np
-import util2
 from collections import defaultdict
+
+import sys
+import os
+sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
+import util2
 
 class ResultGenerator(object):
   def generate(self, tree_file, include_ssm_names):
