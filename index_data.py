@@ -1,6 +1,8 @@
+from __future__ import print_function
 import os
 import glob
 import json
+import os
 from collections import defaultdict
 
 def main():
@@ -16,6 +18,8 @@ def main():
         'name': dataset_name,
       })
 
-  print(json.dumps(datasets))
+  out_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'index.json')
+  with open(out_path, 'w') as outf:
+    print(json.dumps(datasets), file=outf)
 
 main()
