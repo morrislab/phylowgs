@@ -3,8 +3,8 @@ import argparse
 import json
 import gzip
 import zipfile
-from result_generator import ResultGenerator
-from result_munger import ResultMunger
+from pwgsresults.result_generator import ResultGenerator
+from pwgsresults.result_munger import ResultMunger
 
 class JsonWriter(object):
   def __init__(self, dataset_name):
