@@ -1,3 +1,7 @@
+Config = {
+  font_size: 15
+};
+
 function TreePlotter() {
 }
 
@@ -235,7 +239,7 @@ TreeSummarizer.prototype._render_vafs = function(dataset) {
     var options = {
       title: 'VAFs (' + vafs.length + ' variants)',
       histogram: { bucketSize: 0.03 },
-      fontSize: 22,
+      fontSize: Config.font_size,
       hAxis: {
         title: 'VAF',
         viewWindow: {
@@ -285,7 +289,7 @@ TreeSummarizer.prototype._render_phis = function(phis) {
     var x_max = 1.0;
     var options = {
       title: 'Cellular prevalence (subclone ' + (i + 1) + ') (' + phis[i].length + ' values)',
-      fontSize: 22,
+      fontSize: Config.font_size,
       hAxis: {
         title: 'Cellular prevalence',
       },
@@ -310,7 +314,7 @@ TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
 
     var options = {
       title: 'Number of SSMs (subclone ' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
-      fontSize: 22,
+      fontSize: Config.font_size,
       hAxis: {
         title: 'SSMs',
       },
@@ -357,9 +361,9 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
 
   var options = {
     title: 'Distribution of cancerous populations (' + pop_counts.length + ' values)',
-    fontSize: 22,
+    fontSize: Config.font_size,
     hAxis: {
-      title: 'Number of cancerous populations with at least one CNV or ' + min_ssms + ' SSMs',
+      title: 'Number of cancerous populations',
     },
     vAxis: {
       title: 'Trees',
