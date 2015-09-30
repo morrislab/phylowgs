@@ -204,6 +204,18 @@ class StrelkaParser(VariantParser):
     ref_reads = total_reads - variant_reads
     return (ref_reads, total_reads)
 
+class MutectTcgaParser(VariantParser):
+  def __init__(self, vcf_filename, tumor_sample=None):
+    self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
+
+  def _calc_read_counts(self, variant):
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    # TD: Tumor allelic depths for the ref and alt alleles in the order listed
+    ref_reads, variant_reads = variant.samples[tumor_i]['TD']
+    total_reads = ref_reads + variant_reads
+    return (ref_reads, total_reads)
+
 class MutectPcawgParser(VariantParser):
   def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
@@ -705,7 +717,7 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz', 'strelka', 'vardict'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'),
     help='Type of VCF file')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
@@ -736,6 +748,8 @@ def main():
     variant_parser = MutectPcawgParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'mutect_smchet':
     variant_parser = MutectSmchetParser(args.vcf_file, args.tumor_sample)
+  elif args.input_type == 'mutect_tcga':
+    variant_parser = MutectTcgaParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'muse':
     variant_parser = MuseParser(args.vcf_file, args.muse_tier, args.tumor_sample)
   elif args.input_type == 'dkfz':

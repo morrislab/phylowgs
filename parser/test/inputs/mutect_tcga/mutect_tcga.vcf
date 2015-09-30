@@ -1,0 +1,13 @@
+##fileformat=VCFv4.1									
+##INFO=<ID=DB,Number=0,Type=Flag,Description="dbSNP Membership">
+##FORMAT=<ID=TD,Number=.,Type=Integer,Description="Tumor allelic depths for the ref and alt alleles in the order listed">
+##FORMAT=<ID=ND,Number=.,Type=Integer,Description="Normal allelic depths for the ref and alt alleles in the order listed">
+##INFO=<ID=TR,Number=1,Type=Integer,Description="Approximate tumor read depth; some reads may have been filtered">
+##INFO=<ID=NR,Number=1,Type=Integer,Description="Approximate normal read depth; some reads may have been filtered">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	TCGA-BJ-A191-01A-11D-A13W-08
+1	241152	.	C	T	7.312238	.	SOMATIC	TD:ND:TR:NR	15,3:31,2:18:33
+1	730938	.	C	G	13.356408	.	SOMATIC	TD:ND:TR:NR	18,5:35,0:23:35
+1	820662	.	G	C	8.770869	.	SOMATIC	TD:ND:TR:NR	43,4:40,1:47:41
+1	823561	.	A	G	9.56202	.	SOMATIC	TD:ND:TR:NR	30,4:51,1:34:52
+1	828341	.	A	G	6.309121	.	SOMATIC	TD:ND:TR:NR	40,3:37,1:43:38
+1	1034799	.	C	T	11.654593	.	SOMATIC	TD:ND:TR:NR	30,5:72,0:35:72
