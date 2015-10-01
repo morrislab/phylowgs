@@ -45,7 +45,7 @@ class ResultGenerator(object):
       mutations = vertex.get_data()
       # vertex.params represents phis (i.e., population freqs) associated with
       # each sample.
-      cell_prev = np.mean(vertex.params)
+      cell_prev = list(vertex.params)
       current_idx = idx[0]
 
       num_ssms = 0

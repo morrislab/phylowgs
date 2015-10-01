@@ -7,6 +7,7 @@ import argparse
 import csv
 from collections import defaultdict
 import random
+import sys
 
 class VariantParser(object):
   def __init__(self):
@@ -82,14 +83,16 @@ class VariantParser(object):
       assert len(tumor_is) == 1, "Did not find tumor name %s in samples" % tumor_sample
       return tumor_is[0]
     else:
-      return -1
+      # Don't make this -1, as some code assumes it will be >= 0.
+      return len(variant.samples) - 1
 
 class SangerParser(VariantParser):
   '''
   Works with PCAWG variant calls from the Sanger.
   '''
-  def __init__(self, vcf_filename):
+  def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
 
   def _find_ref_and_variant_nt(self, variant):
     # Try most probable genotype called by CaVEMan. If can't find variant nt in
@@ -103,8 +106,9 @@ class SangerParser(VariantParser):
       genotype = genotypes.pop(0)
       normal_genotype, tumor_genotype = genotype.split('/')
       # TODO: We throw out hetero germline. Deal with this later.
+      # BUG: we don't actually ignore hetero germline calls. Fix this later.
       if normal_genotype[0] != normal_genotype[1]:
-        print('Ignoring heterozygous normal genotype %s' % normal_genotype, file=sys.stderr)
+        log('Ignoring heterozygous normal genotype %s' % normal_genotype, file=sys.stderr)
       reference_nt = normal_genotype[0]
       variant_set = set(tumor_genotype) - set(reference_nt)
 
@@ -145,16 +149,27 @@ class MuseParser(VariantParser):
     self._tier = tier
     self._tumor_sample = tumor_sample
 
-  def _calc_read_counts(self, variant):
+  def _get_normal_genotype(self, variant):
     tumor_i = self._get_tumor_index(variant, self._tumor_sample)
-    total_reads = int(variant.samples[tumor_i]['DP4'])
-    variant_reads = int(variant.samples[tumor_i]['AD'])
+    assert tumor_i in (0, 1), 'Tumor index %s is not 0 or 1' % tumor_i
+    normal_i = 1 - tumor_i
+    return set([int(t) for t in variant.samples[normal_i]['GT'].split('/')])
 
-    ref_reads = total_reads - variant_reads
+  def _calc_read_counts(self, variant):
+    normal_gt = self._get_normal_genotype(variant)
+    assert len(normal_gt) == 1
+    normal_gt = normal_gt.pop()
+
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    total_reads = int(variant.samples[tumor_i]['DP'])
+    ref_reads = int(variant.samples[tumor_i]['AD'][normal_gt])
 
     return (ref_reads, total_reads)
 
   def _does_variant_pass_filters(self, variant):
+    # Ignore heterozygous normal variants.
+    if len(self._get_normal_genotype(variant)) != 1:
+      return False
     if variant.FILTER is None or len(variant.FILTER) == 0:
       return True
     if int(variant.FILTER[0][-1]) <= self._tier:
@@ -187,6 +202,18 @@ class StrelkaParser(VariantParser):
       variant_reads = int(getattr(variant.samples[tumor_i].data, str(alt)+'U')[0])
 
     ref_reads = total_reads - variant_reads
+    return (ref_reads, total_reads)
+
+class MutectTcgaParser(VariantParser):
+  def __init__(self, vcf_filename, tumor_sample=None):
+    self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
+
+  def _calc_read_counts(self, variant):
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    # TD: Tumor allelic depths for the ref and alt alleles in the order listed
+    ref_reads, variant_reads = variant.samples[tumor_i]['TD']
+    total_reads = ref_reads + variant_reads
     return (ref_reads, total_reads)
 
 class MutectPcawgParser(VariantParser):
@@ -644,7 +671,7 @@ class VariantAndCnvGroup(object):
 
 def log(msg):
   if log.verbose:
-    print(msg)
+    print(msg, file=sys.stderr)
 log.verbose = False
 
 class CnvParser(object):
@@ -690,7 +717,7 @@ def main():
     help='Output destination for variants')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet','muse','dkfz', 'strelka', 'vardict'),
+  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'),
     help='Type of VCF file')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
@@ -716,15 +743,17 @@ def main():
 
   grouper = VariantAndCnvGroup()
   if args.input_type == 'sanger':
-    variant_parser = SangerParser(args.vcf_file)
+    variant_parser = SangerParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'mutect_pcawg':
     variant_parser = MutectPcawgParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'mutect_smchet':
     variant_parser = MutectSmchetParser(args.vcf_file, args.tumor_sample)
+  elif args.input_type == 'mutect_tcga':
+    variant_parser = MutectTcgaParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'muse':
-    variant_parser = MuseParser(args.vcf_file, args.muse_tier)
+    variant_parser = MuseParser(args.vcf_file, args.muse_tier, args.tumor_sample)
   elif args.input_type == 'dkfz':
-    variant_parser = DKFZParser(args.vcf_file)
+    variant_parser = DKFZParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'strelka':
     variant_parser = StrelkaParser(args.vcf_file, args.tumor_sample)
   elif args.input_type == 'vardict':

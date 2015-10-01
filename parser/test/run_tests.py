@@ -27,7 +27,7 @@ def compare(vcf_format, input_vcf, good_ssm_output):
 
 def main():
   #for vcf_format in ('dkfz', 'muse', 'mutect_pcawg', 'mutect_smchet', 'sanger', 'vardict'):
-  for vcf_format in ('vardict', 'strelka'):
+  for vcf_format in ('vardict', 'strelka', 'mutect_tcga'):
     compare(
       vcf_format,
       os.path.join('inputs', vcf_format, vcf_format + '.vcf'),
