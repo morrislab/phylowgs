@@ -2,6 +2,10 @@ Config = {
   font_size: 15
 };
 
+function mean(list) {
+  return list.reduce(function(a, b) { return a + b; }) / list.length;
+}
+
 function TreePlotter() {
 }
 
@@ -16,8 +20,8 @@ TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
     return 0;
 
   // This only works for monoclonal trees, but it's the desired behaviour according to Quaid.
-  var cellularity = tree.populations[1].phi;
-  var ccf = tree.populations[pop_id].phi / cellularity;
+  var cellularity = mean(tree.populations[1].cellular_prevalence);
+  var ccf = mean(tree.populations[pop_id].cellular_prevalence) / cellularity;
   return ccf;
 }
 
@@ -66,7 +70,7 @@ TreePlotter.prototype.render = function(dataset) {
       pop_ids.forEach(function(pop_id) {
         var pop = summary.trees[tidx].populations[pop_id];
         var ccf = tplotter._calc_ccf(summary.trees[tidx], pop_id);
-        var entries = [pop_id, pop.phi.toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
+        var entries = [pop_id, mean(pop.cellular_prevalence).toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
           return '<td>' + entry + '</td>';
         });
         $('<tr/>').html(entries.join('')).appendTo(summary_table);
@@ -261,15 +265,14 @@ TreeSummarizer.prototype._render_vafs = function(dataset) {
   });
 }
 
-
-
-TreeSummarizer.prototype._extract_pops_with_top_phis = function(populations, desired_pops) {
+TreeSummarizer.prototype._extract_pops_with_top_cell_prevs = function(populations, desired_pops) {
   var pops = [];
   for(var pop_idx in populations) {
     pops.push(populations[pop_idx]);
   }
   pops.sort(function(a, b) {
-    return parseInt(b.phi, 10) - parseInt(a.phi, 10);
+    // "b - a" means reverse sort.
+    return mean(b.cellular_prevalence) - mean(a.cellular_prevalence);
   });
 
   // Exclude clonal population.
@@ -279,16 +282,16 @@ TreeSummarizer.prototype._extract_pops_with_top_phis = function(populations, des
   return sliced;
 }
 
-TreeSummarizer.prototype._render_phis = function(phis) {
-  for(var i = 0; i < phis.length; i++) {
+TreeSummarizer.prototype._render_cell_prevs = function(cell_prevs) {
+  for(var i = 0; i < cell_prevs.length; i++) {
     var data = new google.visualization.DataTable();
     data.addColumn('number', 'Cellular prevalence');
-    data.addRows(phis[i]);
+    data.addRows(cell_prevs[i]);
 
     var x_min = 0;
     var x_max = 1.0;
     var options = {
-      title: 'Cellular prevalence (subclone ' + (i + 1) + ') (' + phis[i].length + ' values)',
+      title: 'Cellular prevalence (subclone ' + (i + 1) + ') (' + cell_prevs[i].length + ' values)',
       fontSize: Config.font_size,
       hAxis: {
         title: 'Cellular prevalence',
@@ -385,10 +388,10 @@ TreeSummarizer.prototype.render = function(dataset) {
   var min_ssms = 3;
 
   var pop_counts = [];
-  var phis = new Array(pops_to_examine);
+  var cell_prevs = new Array(pops_to_examine);
   var ssm_counts = new Array(pops_to_examine);
   for(var i = 0; i < pops_to_examine; i++) {
-    phis[i] = [];
+    cell_prevs[i] = [];
     ssm_counts[i] = [];
   }
 
@@ -406,16 +409,16 @@ TreeSummarizer.prototype.render = function(dataset) {
       }
       pop_counts.push(num_pops);
 
-      var pops = self._extract_pops_with_top_phis(populations, pops_to_examine);
+      var pops = self._extract_pops_with_top_cell_prevs(populations, pops_to_examine);
       for(var i = 0; i < pops.length; i++) {
         if(pops[i] !== null) {
-          phis[i].push([pops[i].phi]);
+          cell_prevs[i].push([mean(pops[i].cellular_prevalence)]);
           ssm_counts[i].push([pops[i].num_ssms]);
         }
       }
     }
 
-    self._render_phis(phis);
+    self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);
   });
