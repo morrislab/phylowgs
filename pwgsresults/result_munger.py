@@ -96,8 +96,8 @@ class ResultMunger(object):
       subclone = populations[subclone_idx]
       # Ensure this node's phi is <= the phi of its preceding sibling node, if any exists.
       if subclone_idx > 0 and last_idx in self._tree_summaries[tree_idx]['structure'][parent]:
-        assert subclone['cellular_prevalence'] <= last_phi
-      last_phi = subclone['cellular_prevalence']
+        assert np.mean(subclone['cellular_prevalence']) <= last_phi
+      last_phi = np.mean(subclone['cellular_prevalence'])
       last_idx = subclone_idx
 
       if subclone_idx == 0 or subclone['num_ssms'] >= min_ssms:
@@ -149,7 +149,7 @@ class ResultMunger(object):
         lowest_phi_delta = 1
         best_node = None
         for pidx, pop in populations.items():
-          phi_delta = abs(pop['cellular_prevalence'] - implied_phi)
+          phi_delta = abs(np.mean(pop['cellular_prevalence']) - implied_phi)
           # Don't allow assignments to the non-cancerous root node.
           if phi_delta < lowest_phi_delta and pidx != 0:
             lowest_phi_delta = phi_delta
