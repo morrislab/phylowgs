@@ -65,7 +65,7 @@ TreePlotter.prototype.render = function(dataset) {
       tplotter._draw_tree(root);
 
 
-      var summary_table = $('#tree-summary').show().find('tbody').empty();
+      var summary_table = $('#snippets .tree-summary').clone().appendTo('#container').find('tbody');
       var pop_ids = tplotter._sort_numeric(Object.keys(summary.trees[tidx].populations));
       pop_ids.forEach(function(pop_id) {
         var pop = summary.trees[tidx].populations[pop_id];
@@ -473,7 +473,6 @@ Interface.prototype._activate_navbar = function() {
 Interface.prototype._render = function() {
   if(this._renderer !== null && this._dataset !== null) {
     $('#container').empty();
-    $('#tree-summary').hide();
     this._available_renderers[this._renderer].render(this._dataset);
   }
 
@@ -502,6 +501,9 @@ Interface.prototype._load_samples = function() {
 
       iface._dataset = null;
       sample_container.empty();
+      // Remove any visible results from another run.
+      $('#container').empty();
+      $('.page-header').text(run_name);
 
       data_index[run_name].sort(function(a, b) {
         if(a.name > b.name) return 1;
