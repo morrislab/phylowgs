@@ -499,6 +499,7 @@ Interface.prototype._load_samples = function() {
       make_parent_active(self);
       var run_name = self.text();
 
+      var prev_dataset = iface._dataset;
       iface._dataset = null;
       sample_container.empty();
       // Remove any visible results from another run.
@@ -522,6 +523,12 @@ Interface.prototype._load_samples = function() {
         iface._dataset = self.data('dataset');
         $('.page-header').text(iface._dataset.name);
         iface._render();
+      });
+
+      sample_container.find('a').each(function() {
+        if(prev_dataset !== null && $(this).data('dataset').name === prev_dataset.name) {
+          $(this).click();
+        }
       });
     });
   });
