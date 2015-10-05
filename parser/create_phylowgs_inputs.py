@@ -173,7 +173,7 @@ class MuseParser(VariantParser):
     if variant.FILTER is None or len(variant.FILTER) == 0:
       return True
     if int(variant.FILTER[0][-1]) <= self._tier:
-      # Variant failed one or more filters.
+      # Variant failed one or more filters, but we still accept it.
       return True
     return False
     
