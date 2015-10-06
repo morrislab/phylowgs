@@ -89,8 +89,8 @@ class ResultGenerator(object):
           ssms[mut.id] = {
             'ref_reads': mut.a,
             'total_reads': mut.d,
-            'mu_r': mut.mu_r,
-            'mu_v': mut.mu_v
+            'expected_ref_in_ref': mut.mu_r,
+            'expected_ref_in_variant': mut.mu_v
           }
           if include_ssm_names:
             ssms[mut.id]['name'] = mut.name
