@@ -68,6 +68,7 @@ Running PhyloWGS
         g++ -o mh.o  mh.cpp  util.cpp `gsl-config --cflags --libs`
 
 3. Run PhyloWGS. Minimum invocation on sample data set:
+
         python2 evolve.py ssm_data.txt cnv_data.txt
 
   All options:
@@ -107,6 +108,7 @@ Running PhyloWGS
                                 None)
 
 4. Generate JSON results.
+
         mkdir test_results
         cd test_results
         # To work with viewer in Step 5, the naming conventions used here must be
@@ -138,6 +140,7 @@ Running PhyloWGS
                                (default: 0.01)
 
 5. View results.
+
         mv test_results /path/to/phylowgs/witness/data
         cd /path/to/phylowgs/witness
         gunzip data/*/*.gz
