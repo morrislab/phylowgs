@@ -62,9 +62,6 @@ Running PhyloWGS
   * Install Python 2 versions of NumPy (www.numpy.org) and SciPy (www.scipy.org).
   * Install Python 2 version of ETE2 (e.g.: `pip2 install --user ete2`).
   * Install GSL (http://www.gnu.org/software/gsl/).
-  * Install LaTeX (with `pdflatex` on your PATH), along with the TikZ/PGF
-    packages. The "medium scheme" install of TeX Live
-    (https://www.tug.org/texlive/quickinstall.html) includes all that you need.
 
 2. Compile the C++ file.
 
@@ -106,12 +103,49 @@ Running PhyloWGS
                                 Number of Metropolis-Hastings iterations (default:
                                 5000)
           -r RANDOM_SEED, --random-seed RANDOM_SEED
-                                Random seed for initializing MCMC sampler (default: 1)
+                                Random seed for initializing MCMC sampler (default:
+                                None)
 
-4. Generate the posterior trees in PDF & LaTeX formats. The LaTeX files and
-   resulting PDFs are saved in the directory `posterior_trees`.
+4. Generate JSON results.
+        mkdir test_results
+        cd test_results
+        # To work with viewer in Step 5, the naming conventions used here must be
+        # followed.
+        python2 /path/to/phylowgs/write_results.py example_data ../trees.zip example_data.summ.json.gz example_data.muts.json.gz example_data.mutass.zip
+        cd ..
 
-        python2 posterior_trees.py ssm_data.txt cnv_data.txt
+  All options:
+
+        usage: write_results.py [-h] [--include-ssm-names] [--min-ssms MIN_SSMS]
+                                dataset_name tree_file tree_summary_output
+                                mutlist_output mutass_output
+
+        Write JSON files describing trees
+
+        positional arguments:
+          dataset_name         Name identifying dataset
+          tree_file            File containing sampled trees
+          tree_summary_output  Output file for JSON-formatted tree summaries
+          mutlist_output       Output file for JSON-formatted list of mutations
+          mutass_output        Output file for JSON-formatted list of SSMs and CNVs
+                               assigned to each subclone
+
+        optional arguments:
+          -h, --help           show this help message and exit
+          --include-ssm-names  Include SSM names in output (which may be sensitive
+                               data) (default: False)
+          --min-ssms MIN_SSMS  Minimum number or percent of SSMs to retain a subclone
+                               (default: 0.01)
+
+5. View results.
+        mv test_results /path/to/phylowgs/witness/data
+        cd /path/to/phylowgs/witness
+        gunzip data/*/*.gz
+        python2 index_data.py
+        python2 -m SimpleHTTPServer
+        # Open http://127.0.0.1:8000 in your web browser. Note that, by
+        # default, the server listens for connections from any host.
+
 
 Resuming a previous PhyloWGS run
 --------------------------------
@@ -127,24 +161,6 @@ without any command-line params:
 
     # Resume run:
     python2 evolve.py
-
-Interpreting output
--------------------
-
-Two primary outputs result from running PhyloWGS:
-
-  * After running `evolve.py`, LaTeX and PDF depictions of the five trees with
-    the highest likelihoods are saved in the `top_trees` directory.
-
-  * After running `posterior_trees.py`, LaTeX and PDF depictions of all trees
-    are saved in the `posterior_trees` directory, ordered by posterior probability.
-    Likelihoods of the trees are ignored -- instead, posterior probabilities
-    represent the frequency with which trees bearing the same subclone structure
-    and same assignment of mutations to subclones were sampled.
-
-Trees in `posterior_trees` represent the method's consensus concerning
-phylogeny. This consensus will become clearer with future versions of our
-method, when we will cluster these trees.
 
 
 License
