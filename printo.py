@@ -15,36 +15,11 @@ def print_top_trees(tree_archive,fout,k=5):
 	fout = open(fout,'w')
 	tree_reader = TreeReader(tree_archive)
 
-	try:
-		os.mkdir('top_trees')
-	except OSError, e:
-		if e.errno == 17: # Directory exists
-			pass
-		else:
-			raise e
-
 	for idx, (tidx, llh, tree) in enumerate(tree_reader.load_trees_and_metadata(k)):
 			ctr=0
-			
 			remove_empty_nodes(tree.root, None)
 			# print top K trees in ascii
 			print_best_tree(tree,fout)
-			
-			# print top K trees in pdf format
-					
-			tex_fn = 'top_trees/tree_%s_%s.tex' % (idx, llh)
-			print_best_tree_pdf(tree, tex_fn) 
-			# Call pdflatex. To permit it to find standalone.* files,
-			# change into PhyloWGS directory to run the command, then
-			# change back to previous directory.
-			script_dir = os.path.dirname(os.path.realpath(__file__))
-			old_wd = os.getcwd()
-			os.chdir(script_dir)
-			try:
-                                call(['pdflatex', '-interaction=nonstopmode', '-output-directory=%s/top_trees/' % old_wd, '%s/%s' % (old_wd, tex_fn)])
-			except OSError:  # pdflatex not available, do not die
-				print >> sys.stderr, 'pdflatex not available'
-			os.chdir(old_wd)
 			
 	tree_reader.close()
 	fout.close()	
