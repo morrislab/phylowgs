@@ -10,6 +10,11 @@ from scipy.special import gammaln
 from math import exp, log
 
 import csv
+# Allow long lines in .cnv files, which can potentially list thousands of SSMs
+# in one CNV. According to http://stackoverflow.com/a/15063941, this value can
+# be as much as a C long. C longs are guaranteed to accommodate at least this
+# value, which is a signed 32-bit int.
+csv.field_size_limit(2147483647)
 
 from data import Datum
 
@@ -36,7 +41,7 @@ def load_data(fname1,fname2):
 	reader = csv.DictReader(open(fname1,'rU'), delimiter='\t')
 	data = dict()  
 	for row in reader:
-		name = row['gene'] 
+		name = row['gene']
 		id = row['id']
 		a = [int(x) for x in row['a'].split(',')]
 		d = [int(x) for x in row['d'].split(',')]
@@ -52,29 +57,24 @@ def load_data(fname1,fname2):
 	n_cnvs = 0
 	
 	# load cnv data
-	try:
-		reader = csv.DictReader(open(fname2,'rU'), delimiter='\t')
-		
-		
-		for row in reader:
-			name=row['cnv'] 
-			id = row['cnv'] 
-			a = [int(x) for x in row['a'].split(',')]
-			d = [int(x) for x in row['d'].split(',')]
-		
-			data[id] = Datum(name, id, a, d,0.999,0.5)
-				
-			ssms = row['ssms']
-			if ssms is None: continue
-			if len(ssms)>0:
-				for ssm in ssms.split(';'):
-					tok = ssm.split(',')
-					data[tok[0]].cnv.append((data[id],int(tok[1]),int(tok[2])))
-			
-		n_cnvs = len(data.keys())-n_ssms
+	reader = csv.DictReader(open(fname2,'rU'), delimiter='\t')
 
-	except Exception as e:
-		pass
+	for row in reader:
+		name=row['cnv']
+		id = row['cnv']
+		a = [int(x) for x in row['a'].split(',')]
+		d = [int(x) for x in row['d'].split(',')]
+
+		data[id] = Datum(name, id, a, d,0.999,0.5)
+
+		ssms = row['ssms']
+		if ssms is None: continue
+		if len(ssms)>0:
+			for ssm in ssms.split(';'):
+				tok = ssm.split(',')
+				data[tok[0]].cnv.append((data[id],int(tok[1]),int(tok[2])))
+
+	n_cnvs = len(data.keys())-n_ssms
 		
 	return [data[key] for key in data.keys()], n_ssms, n_cnvs
 	
