@@ -183,7 +183,13 @@ TreePlotter.prototype._generate_tree_struct = function(summary) {
   };
 
   var root = {};
-  _add_node(0, root);
+  var node_ids = Object.keys(pops).map(function(k) {
+      return parseInt(k, 10);
+  });
+  // Find smallest node ID.
+  var initial_node = Math.min.apply(Math, node_ids);
+
+  _add_node(initial_node, root);
   return root;
 }
 
