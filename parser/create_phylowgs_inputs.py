@@ -194,7 +194,7 @@ class StrelkaParser(VariantParser):
     alt = variant.ALT[0]
     tumor_i = self._get_tumor_index(variant, self._tumor_sample)
     total_reads = int(variant.samples[tumor_i]['DP'])
-	
+
     if alt is None:
       total_reads = 0
       variant_reads = 0
@@ -290,15 +290,14 @@ class CnvFormatter(object):
           overlapping.append(variant['ssm_id'])
     return overlapping
 
-  def _calc_ref_reads(self, pop_frac, total_reads):
-    tumor_cells_frac = self._cellularity * pop_frac
-    vaf = tumor_cells_frac / 2
+  def _calc_ref_reads(self, cellular_prev, total_reads):
+    vaf = cellular_prev / 2
     ref_reads = int((1 - vaf) * total_reads)
     return ref_reads
 
-  def _calc_total_reads(self, pop_frac, locus_start, locus_end, new_cn):
+  def _calc_total_reads(self, cellular_prev, locus_start, locus_end, new_cn):
     # Proportion of all cells carrying CNV.
-    p = self._cellularity * pop_frac
+    P = cellular_prev
     if new_cn == 2:
       # If no net change in copy number -- e.g., because (major, minor) went
       # from (1, 1) to (2, 0) -- force the delta_cn to be 1.
@@ -313,10 +312,10 @@ class CnvFormatter(object):
 
     # This is a hack to prevent division by zero (when delta_cn = -2). Its
     # effect will be to make d large.
-    if p == 1.0:
-      p = 0.999
+    if P == 1.0:
+      P = 0.999
 
-    d = (delta_cn**2 / 4) * (fn * p * (2 - p)) / (1 + (delta_cn  * p) / 2)
+    d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (delta_cn  * P) / 2)
 
     if no_net_change:
       # If no net change in CN occurred, the estimate was just based on BAFs,
@@ -339,7 +338,7 @@ class CnvFormatter(object):
       for cnv in chrom_cnvs:
         overlapping_variants = self._find_overlapping_variants(chrom, cnv, variants)
         total_reads = self._calc_total_reads(
-          cnv['clonal_frac'],
+          cnv['cellular_prevalence'],
           cnv['start'],
           cnv['end'],
           cnv['major_cn'] + cnv['minor_cn'],
@@ -350,8 +349,8 @@ class CnvFormatter(object):
           'end': cnv['end'],
           'major_cn': cnv['major_cn'],
           'minor_cn': cnv['minor_cn'],
-          'clonal_frac': cnv['clonal_frac'],
-          'ref_reads': self._calc_ref_reads(cnv['clonal_frac'], total_reads),
+          'cellular_prevalence': cnv['cellular_prevalence'],
+          'ref_reads': self._calc_ref_reads(cnv['cellular_prevalence'], total_reads),
           'total_reads': total_reads,
           'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['major_cn'], cnv['minor_cn']),
         }
@@ -374,7 +373,7 @@ class CnvFormatter(object):
   # do the same with SNVs bearing similar frequencies later on.
   def format_and_merge_cnvs(self, cnvs, variants):
     formatted = list(self._format_cnvs(cnvs, variants))
-    formatted.sort(key = lambda f: f['clonal_frac'])
+    formatted.sort(key = lambda f: f['cellular_prevalence'])
     if len(formatted) == 0:
       return []
 
@@ -382,16 +381,18 @@ class CnvFormatter(object):
     merged[0]['cnv_id'] = 'c0'
     counter = 1
 
+    cellularity = find_cellularity(cnvs)
+
     for current in formatted:
       last = merged[-1]
 
       # Only merge CNVs if they're clonal. If they're subclonal, leave them
       # free to move around the tree.
-      if current['clonal_frac'] == last['clonal_frac'] == 1.0:
+      if current['cellular_prevalence'] == last['cellular_prevalence'] == cellularity:
         # Merge the CNVs.
         log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
         last['total_reads'] = current['total_reads'] + last['total_reads']
-        last['ref_reads'] = self._calc_ref_reads(last['clonal_frac'], last['total_reads'])
+        last['ref_reads'] = self._calc_ref_reads(last['cellular_prevalence'], last['total_reads'])
         self._merge_variants(last, current)
       else:
         # Do not merge the CNVs.
@@ -479,9 +480,18 @@ def variant_key(var):
     chrom = int(chrom)
   return (chrom, var.POS)
 
+def find_cellularity(cnvs):
+  max_cellular_prev = 0
+  for chrom, chrom_regions in cnvs.items():
+    for cnr in chrom_regions:
+      if cnr['cellular_prevalence'] > max_cellular_prev:
+        max_cellular_prev = cnr['cellular_prevalence']
+  return max_cellular_prev
+
 class VariantAndCnvGroup(object):
   def __init__(self):
     self._cn_regions = None
+    self._cellularity = None
 
   def add_variants(self, variants_and_reads):
     self._variants_and_reads = variants_and_reads
@@ -491,6 +501,7 @@ class VariantAndCnvGroup(object):
 
   def add_cnvs(self, cn_regions):
     self._cn_regions = cn_regions
+    self._cellularity = find_cellularity(self._cn_regions)
 
   def has_cnvs(self):
     return self._cn_regions is not None
@@ -537,7 +548,7 @@ class VariantAndCnvGroup(object):
 
     for chrom, regions in self._cn_regions.items():
       for region in regions:
-        if self._is_region_normal_cn(region) and region['clonal_frac'] == 1:
+        if self._is_region_normal_cn(region) and region['cellular_prevalence'] == self._cellularity:
           normal_cn[chrom].append(region)
 
     filtered = self._filter_variants_outside_regions(self._variants_and_reads, normal_cn)
@@ -552,7 +563,7 @@ class VariantAndCnvGroup(object):
         region = reg[idx]
 
         # Accept clonal regions unconditonally, whether normal or abnormal CN.
-        if region['clonal_frac'] == 1.0:
+        if region['cellular_prevalence'] == self._cellularity:
           good_regions[chrom].append(region)
           idx += 1
 
@@ -650,7 +661,7 @@ class VariantAndCnvGroup(object):
       read_sum += total_reads
     return float(read_sum) / len(self._variants_and_reads)
 
-  def write_cnvs(self, variants, outfn, cnv_confidence, cellularity, read_length):
+  def write_cnvs(self, variants, outfn, cnv_confidence, read_length):
     abnormal_regions = {}
     filtered_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     for chrom, regions in filtered_regions.items():
@@ -658,7 +669,7 @@ class VariantAndCnvGroup(object):
 
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
-      formatter = CnvFormatter(cnv_confidence, cellularity, self._estimated_read_depth, read_length)
+      formatter = CnvFormatter(cnv_confidence, self._cellularity, self._estimated_read_depth, read_length)
       for cnv in formatter.format_and_merge_cnvs(abnormal_regions, variants):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
@@ -684,11 +695,11 @@ class CnvParser(object):
     with open(self._cn_filename) as cnf:
       reader = csv.DictReader(cnf, delimiter='\t')
       for record in reader:
-        chrom = record['chrom']
-        del record['chrom']
+        chrom = record['chromosome']
+        del record['chromosome']
         for key in ('start', 'end', 'major_cn', 'minor_cn'):
           record[key] = int(record[key])
-        record['clonal_frac'] = float(record['clonal_frac'])
+        record['cellular_prevalence'] = float(record['cellular_prevalence'])
         cn_regions[chrom].append(record)
 
     # Ensure CN regions are properly sorted, which we later rely on when
@@ -715,13 +726,11 @@ def main():
     help='Output destination for CNVs')
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
     help='Output destination for variants')
-  parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, default=1.0,
-    help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
   parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'),
     help='Type of VCF file')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
-  parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=1.0,
+  parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=0.5,
     help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
   parser.add_argument('--read-length', dest='read_length', type=int, default=100,
     help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
@@ -777,9 +786,9 @@ def main():
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
 
   if not args.only_normal_cn and grouper.has_cnvs():
-    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
+    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, args.read_length)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
-      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, args.cellularity, args.read_length)
+      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, args.read_length)
   else:
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):

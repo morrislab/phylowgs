@@ -17,9 +17,9 @@ def chrom_key(chrom):
 class CopyNumberWriter(object):
   def __init__(self, cn_output_fn):
     self._cn_output_fn = cn_output_fn
-    # clonal_frac represents fraction of tumor cells that are affected by CNVs,
-    # *not* fraction of overall sample.
-    self._keys = ('chrom', 'start', 'end', 'major_cn', 'minor_cn', 'clonal_frac')
+    # cellular_prevalence represents fraction of *all* cells that are affected
+    # by CNVs, *not* just tumor cells.
+    self._keys = ('chromosome', 'start', 'end', 'copy_number', 'minor_cn', 'major_cn', 'cellular_prevalence')
 
   def _write_header(self):
     self._cn_output.write('\t'.join(self._keys) + '\n')
@@ -37,7 +37,10 @@ class CopyNumberWriter(object):
       chrom_regions = cn_regions[chrom]
       chrom_regions.sort(key = lambda r: r['start'])
       for region in chrom_regions:
-        region['chrom'] = chrom
+        # Insert chromosome into record, as including it originally would have
+        # duplicated the dictionary key corresponding to per-chromosome CNVs.
+        region['chromosome'] = chrom
+        region['copy_number'] = region['major_cn'] + region['minor_cn']
         self._write_cn_record(region)
 
     self._cn_output.close()
@@ -47,8 +50,9 @@ class CnvParser(object):
     raise Exception('Not implemented')
 
 class TitanParser(CnvParser):
-  def __init__(self, titan_filename):
+  def __init__(self, titan_filename, cellularity):
     self._titan_filename = titan_filename
+    self._cellularity = cellularity
 
   def parse(self):
     cn_regions = defaultdict(list)
@@ -65,17 +69,18 @@ class TitanParser(CnvParser):
 
         clonal_freq = record['Clonal_Frequency']
         if clonal_freq == 'NA':
-          cnv['clonal_frac'] = 1.0
+          cnv['cellular_prevalence'] = self._cellularity
         else:
-          cnv['clonal_frac'] = float(clonal_freq)
+          cnv['cellular_prevalence'] = float(clonal_freq) * self._cellularity
 
         cn_regions[chrom].append(cnv)
 
     return cn_regions
 
 class BattenbergParser(CnvParser):
-  def __init__(self, bb_filename):
+  def __init__(self, bb_filename, cellularity):
     self._bb_filename = bb_filename
+    self._cellularity = cellularity
 
   def _compute_cn(self, cnv1, cnv2):
     '''
@@ -107,7 +112,7 @@ class BattenbergParser(CnvParser):
         cnv1['end'] = end
         cnv1['major_cn'] = int(fields[8])
         cnv1['minor_cn'] = int(fields[9])
-        cnv1['clonal_frac'] = float(fields[10])
+        cnv1['cellular_prevalence'] = float(fields[10]) * self._cellularity
 
         cnv2 = None
         # Stefan's comment on p values: The p-values correspond "to whether a
@@ -124,14 +129,20 @@ class BattenbergParser(CnvParser):
           cnv2['end'] = end
           cnv2['major_cn'] = int(fields[11])
           cnv2['minor_cn'] = int(fields[12])
-          cnv2['clonal_frac'] = float(fields[13])
+          cnv2['cellular_prevalence'] = float(fields[13]) * self._cellularity
         else:
-          cnv1['clonal_frac'] = 1.0
+          cnv1['cellular_prevalence'] = self._cellularity
 
         cn_regions[chrom].append(cnv1)
         if cnv2 is not None:
           cn_regions[chrom].append(cnv2)
     return cn_regions
+
+def restricted_float(x):
+  x = float(x)
+  if x < 0.0 or x > 1.0:
+    raise argparse.ArgumentTypeError('%r not in range [0.0, 1.0]' % x)
+  return x
 
 def main():
   parser = argparse.ArgumentParser(
@@ -140,15 +151,17 @@ def main():
   )
   parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'titan'),
     help='Type of CNV input')
+  parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, required=True,
+    help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
   parser.add_argument('--cnv-output', dest='cnv_output_filename', default='cnvs.txt',
     help='Output destination for parsed CNVs')
   parser.add_argument('cnv_file')
   args = parser.parse_args()
 
   if args.input_type == 'battenberg':
-    parser = BattenbergParser(args.cnv_file)
+    parser = BattenbergParser(args.cnv_file, args.cellularity)
   elif args.input_type == 'titan':
-    parser = TitanParser(args.cnv_file)
+    parser = TitanParser(args.cnv_file, args.cellularity)
   else:
     raise Exception('Unknown input type')
 

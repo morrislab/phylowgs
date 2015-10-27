@@ -15,12 +15,17 @@ examples).
 
 For `cnv_data.txt`, the parser requires CNV calls.
 [Battenberg](https://github.com/cancerit/cgpBattenberg) and
-[TITAN](http://compbio.bccrc.ca/software/titan/) are supported. As the process of going from CNV calls to PhyloWGS input is complex -- the `a` and `d` values used by PhyloWGS for each CNV depend on the size of the CNV, the read depth, the total copy-number change, and other factors -- we perform CNV parsing as a two-step process:
+[TITAN](http://compbio.bccrc.ca/software/titan/) are supported. As the process
+of going from CNV calls to PhyloWGS input is complex -- the `a` and `d` values
+used by PhyloWGS for each CNV depend on the size of the CNV, the read depth,
+the total copy-number change, and other factors -- we perform CNV parsing as a
+two-step process:
   
-  1. Run `parse_cnvs.py` to create the intermediate `cnvs.txt` file, which
-     will contain for each CNV its chromosome, start and end coordinates, major
-     and minor copy numbers, and clonal fraction (i.e., fraction of canceous
-     cells containing the CNV, *not* the fraction of sample containing the CNV).
+  1. Run `parse_cnvs.py` to create the intermediate `cnvs.txt` file, which will
+     contain for each CNV its chromosome, start and end coordinates, major and
+     minor copy numbers, and cellular prevalence (i.e., fraction of cells in
+     sample containing the CNV, *not* just the fraction of tumor cells containing
+     the CNV).
 
   2. Run `create_phylowgs_inputs.py` with the `--cnvs cnvs.txt` parameter.
 
@@ -38,10 +43,10 @@ copy-number changes for the SSMs in question.
 There are two modes of operation for the parser:
 
   1. You specify `--only-normal-cn`: Only variants falling in regions
-     explicitly listed as normal will be output. This means the region in question
-     must be listed in `cnvs.txt` with `major_cn=1`, `minor_cn=1`, and
-     `clonal_frac=1.0`. In this case, an empty `cnv_data.txt` will be output for
-     use with PhyloWGS' `evolve.py`.
+     explicitly listed as normal will be output. This means the region in
+     question must be listed in `cnvs.txt` with `major_cn=1`, `minor_cn=1`, and
+     `cellular_prevalence=<cellularity>`. In this case, an empty `cnv_data.txt`
+     will be output for use with PhyloWGS' `evolve.py`.
 
   2. You do not specify `--only-normal-cn`: All variants falling in regions
      listed in `cnvs.txt` will be output. Note, however, that variants falling in
@@ -81,26 +86,26 @@ Examples
 * Create ssm_data.txt and cnv_data.txt from Sanger's PCAWG variant-calling
   pipeline, including all mutations, assuming 0.72 cellularity (i.e., sample purity):
 
-        ./parse_cnvs.py -f battenberg cnv_calls_from_battenberg.txt 
-        ./create_phylowgs_inputs.py -v sanger --cnvs cnvs.txt -c 0.72 sample.vcf
+        ./parse_cnvs.py -f battenberg -c 0.72 cnv_calls_from_battenberg.txt
+        ./create_phylowgs_inputs.py -v sanger --cnvs cnvs.txt sample.vcf
 
 * Only use variants in copy-number-normal regions:
 
-        ./parse_cnvs.py -f battenberg cnv_calls_from_battenberg.txt 
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt -c 0.72 --only-normal-cn sample.vcf
+        ./parse_cnvs.py -f battenberg -c 0.72 cnv_calls_from_battenberg.txt 
+        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt --only-normal-cn sample.vcf
 
 * Run with SSMs from VarDict and CNVs from TITAN, using cellularity of 0.81
   (which may be estimated from [1 - "Normal contamination estimate"] in TITAN's
   `*params.txt` output):
 
-        ./parse_cnvs.py -f titan cnv_calls_segs.txt
-        ./create_phylowgs_inputs.py -v vardict --cnvs cnvs.txt -c 0.81 sample.vcf
+        ./parse_cnvs.py -f titan -c 0.81 cnv_calls_segs.txt
+        ./create_phylowgs_inputs.py -v vardict --cnvs cnvs.txt sample.vcf
 
 Usage
 -----
 ### CNV pre-parser
 
-    usage: parse_cnvs.py [-h] -f {battenberg,titan}
+    usage: parse_cnvs.py [-h] -f {battenberg,titan} -c CELLULARITY
                          [--cnv-output CNV_OUTPUT_FILENAME]
                          cnv_file
 
@@ -113,21 +118,26 @@ Usage
       -h, --help            show this help message and exit
       -f {battenberg,titan}, --cnv-format {battenberg,titan}
                             Type of CNV input (default: None)
+      -c CELLULARITY, --cellularity CELLULARITY
+                            Fraction of sample that is cancerous rather than
+                            somatic. Used only for estimating CNV confidence -- if
+                            no CNVs, need not specify argument. (default: None)
       --cnv-output CNV_OUTPUT_FILENAME
                             Output destination for parsed CNVs (default: cnvs.txt)
-
 ### Primary parser
 
     usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE] [-s SAMPLE_SIZE]
                                      [--cnvs CNV_FILE] [--only-normal-cn]
                                      [--output-cnvs OUTPUT_CNVS]
-                                     [--output-variants OUTPUT_VARIANTS]
-                                     [-c CELLULARITY] -v
-                                     {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}
+                                     [--output-variants OUTPUT_VARIANTS] -v
+                                     {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}
                                      [--tumor-sample TUMOR_SAMPLE]
                                      [--cnv-confidence CNV_CONFIDENCE]
-                                     [--read-length READ_LENGTH] [--verbose]
+                                     [--read-length READ_LENGTH]
                                      [--muse-tier MUSE_TIER]
+                                     [--nonsubsampled-variants OUTPUT_NONSUBSAMPLED_VARIANTS]
+                                     [--nonsubsampled-variants-cnvs OUTPUT_NONSUBSAMPLED_VARIANTS_CNVS]
+                                     [--verbose]
                                      vcf_file
 
     Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV
@@ -153,11 +163,7 @@ Usage
       --output-variants OUTPUT_VARIANTS
                             Output destination for variants (default:
                             ssm_data.txt)
-      -c CELLULARITY, --cellularity CELLULARITY
-                            Fraction of sample that is cancerous rather than
-                            somatic. Used only for estimating CNV confidence -- if
-                            no CNVs, need not specify argument. (default: 1.0)
-      -v {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}, --variant-type {sanger,mutect_pcawg,mutect_smchet,muse,dkfz,strelka,vardict}
+      -v {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}, --variant-type {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}
                             Type of VCF file (default: None)
       --tumor-sample TUMOR_SAMPLE
                             Name of the tumor sample in the input VCF file.
@@ -169,9 +175,17 @@ Usage
       --read-length READ_LENGTH
                             Approximate length of reads. Used to calculate
                             confidence in CNV frequencies (default: 100)
-      --verbose
       --muse-tier MUSE_TIER
                             Maximum MuSE tier to include (default: 0)
+      --nonsubsampled-variants OUTPUT_NONSUBSAMPLED_VARIANTS
+                            If subsampling, write nonsubsampled variants to
+                            separate file, in addition to subsampled variants
+                            (default: None)
+      --nonsubsampled-variants-cnvs OUTPUT_NONSUBSAMPLED_VARIANTS_CNVS
+                            If subsampling, write CNVs for nonsubsampled variants
+                            to separate file (default: None)
+      --verbose
+
 
 Notes
 -----
@@ -191,4 +205,4 @@ Notes
   and reducing the probability that a CNV will be assigned a population unto
   itself because of excessively high confidence in its population frequency. To
   date, we've achieved our best results leaving this value at its default of
-  1.0.
+  0.5.
