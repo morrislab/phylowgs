@@ -25,7 +25,7 @@ from datetime import datetime
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
 	state = {}
 
 	with open('random_seed.txt', 'w') as seedf:
@@ -57,7 +57,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['glist'] = [datum.name for datum in codes if len(datum.name)>0]
 
 	# MCMC settings
-	state['burnin'] = 1000
+	state['burnin'] = burnin_samples
 	state['num_samples'] = num_samples
 	state['dp_alpha'] = 25.0
 	state['dp_gamma'] = 1.0
@@ -231,6 +231,8 @@ def parse_args():
 		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
 		help='Output file to save clonal frequencies')
+	parser.add_argument('-B', '--burnin-samples', dest='burnin_samples', default=1000, type=int,
+		help='Number of burnin samples')
 	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
 		help='Number of MCMC samples')
 	parser.add_argument('-i', '--mh-iterations', dest='mh_iterations', default=5000, type=int,
@@ -272,6 +274,7 @@ def run(safe_to_exit, run_succeeded):
 			args.cnv_file,
 			top_k_trees_file=args.top_k_trees,
 			clonal_freqs_file=args.clonal_freqs,
+			burnin_samples=args.burnin_samples,
 			num_samples=args.mcmc_samples,
 			mh_itr=args.mh_iterations,
 			mh_std=100,
