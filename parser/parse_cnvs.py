@@ -81,6 +81,8 @@ class BattenbergParser(CnvParser):
   def __init__(self, bb_filename, cellularity):
     self._bb_filename = bb_filename
     self._cellularity = cellularity
+    # Used by SMC-Het parser, which has fields shifted by 1.
+    self._field_offset = 0
 
   def _compute_cn(self, cnv1, cnv2):
     '''
@@ -102,17 +104,17 @@ class BattenbergParser(CnvParser):
       header = bbf.next()
       for line in bbf:
         fields = line.strip().split()
-        chrom = fields[1].lower()
-        start = int(fields[2])
-        end = int(fields[3])
-        pval = float(fields[5])
+        chrom = fields[1 + self._field_offset].lower()
+        start = int(fields[2 + self._field_offset])
+        end = int(fields[3 + self._field_offset])
+        pval = float(fields[5 + self._field_offset])
 
         cnv1 = {}
         cnv1['start'] = start
         cnv1['end'] = end
-        cnv1['major_cn'] = int(fields[8])
-        cnv1['minor_cn'] = int(fields[9])
-        cnv1['cellular_prevalence'] = float(fields[10]) * self._cellularity
+        cnv1['major_cn'] = int(fields[8 + self._field_offset])
+        cnv1['minor_cn'] = int(fields[9 + self._field_offset])
+        cnv1['cellular_prevalence'] = float(fields[10 + self._field_offset]) * self._cellularity
 
         cnv2 = None
         # Stefan's comment on p values: The p-values correspond "to whether a
@@ -127,9 +129,9 @@ class BattenbergParser(CnvParser):
           cnv2 = {}
           cnv2['start'] = start
           cnv2['end'] = end
-          cnv2['major_cn'] = int(fields[11])
-          cnv2['minor_cn'] = int(fields[12])
-          cnv2['cellular_prevalence'] = float(fields[13]) * self._cellularity
+          cnv2['major_cn'] = int(fields[11 + self._field_offset])
+          cnv2['minor_cn'] = int(fields[12 + self._field_offset])
+          cnv2['cellular_prevalence'] = float(fields[13 + self._field_offset]) * self._cellularity
         else:
           cnv1['cellular_prevalence'] = self._cellularity
 
@@ -137,6 +139,12 @@ class BattenbergParser(CnvParser):
         if cnv2 is not None:
           cn_regions[chrom].append(cnv2)
     return cn_regions
+
+class BattenbergSmchetParser(BattenbergParser):
+  def __init__(self, bb_filename, cellularity):
+    super(BattenbergSmchetParser, self).__init__(bb_filename, cellularity)
+    # SMC-Het Battenberg files lack the initial index column.
+    self._field_offset = -1
 
 def restricted_float(x):
   x = float(x)
@@ -149,7 +157,7 @@ def main():
     description='Create CNV input file for parser from Battenberg or TITAN data',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'titan'),
+  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'battenberg-smchet', 'titan'),
     help='Type of CNV input')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, required=True,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
@@ -160,6 +168,8 @@ def main():
 
   if args.input_type == 'battenberg':
     parser = BattenbergParser(args.cnv_file, args.cellularity)
+  elif args.input_type == 'battenberg-smchet':
+    parser = BattenbergSmchetParser(args.cnv_file, args.cellularity)
   elif args.input_type == 'titan':
     parser = TitanParser(args.cnv_file, args.cellularity)
   else:
