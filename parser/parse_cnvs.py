@@ -102,17 +102,17 @@ class BattenbergParser(CnvParser):
       header = bbf.next()
       for line in bbf:
         fields = line.strip().split()
-        chrom = fields[1].lower()
-        start = int(fields[2])
-        end = int(fields[3])
-        pval = float(fields[5])
+        chrom = fields[0].lower()
+        start = int(fields[1])
+        end = int(fields[2])
+        pval = float(fields[4])
 
         cnv1 = {}
         cnv1['start'] = start
         cnv1['end'] = end
-        cnv1['major_cn'] = int(fields[8])
-        cnv1['minor_cn'] = int(fields[9])
-        cnv1['cellular_prevalence'] = float(fields[10]) * self._cellularity
+        cnv1['major_cn'] = int(fields[7])
+        cnv1['minor_cn'] = int(fields[8])
+        cnv1['cellular_prevalence'] = float(fields[9]) * self._cellularity
 
         cnv2 = None
         # Stefan's comment on p values: The p-values correspond "to whether a
@@ -127,9 +127,9 @@ class BattenbergParser(CnvParser):
           cnv2 = {}
           cnv2['start'] = start
           cnv2['end'] = end
-          cnv2['major_cn'] = int(fields[11])
-          cnv2['minor_cn'] = int(fields[12])
-          cnv2['cellular_prevalence'] = float(fields[13]) * self._cellularity
+          cnv2['major_cn'] = int(fields[10])
+          cnv2['minor_cn'] = int(fields[11])
+          cnv2['cellular_prevalence'] = float(fields[12]) * self._cellularity
         else:
           cnv1['cellular_prevalence'] = self._cellularity
 
