@@ -102,6 +102,67 @@ class BattenbergParser(CnvParser):
       header = bbf.next()
       for line in bbf:
         fields = line.strip().split()
+        chrom = fields[1].lower()
+        start = int(fields[2])
+        end = int(fields[3])
+        pval = float(fields[5])
+
+        cnv1 = {}
+        cnv1['start'] = start
+        cnv1['end'] = end
+        cnv1['major_cn'] = int(fields[8])
+        cnv1['minor_cn'] = int(fields[9])
+        cnv1['cellular_prevalence'] = float(fields[10]) * self._cellularity
+
+        cnv2 = None
+        # Stefan's comment on p values: The p-values correspond "to whether a
+        # segment should be clonal or subclonal copynumber. We first fit a
+        # clonal copynumber profile for the whole sample and then perform a
+        # simple two-sided t-test twhere the null hypothesis is: A particular
+        # segment is clonal. And the alternative: It is subclonal."
+        #
+        # Thus: if t-test falls below significance threshold, we push cnv1 to
+        # clonal frequency.
+        if pval <= pval_threshold:
+          cnv2 = {}
+          cnv2['start'] = start
+          cnv2['end'] = end
+          cnv2['major_cn'] = int(fields[11])
+          cnv2['minor_cn'] = int(fields[12])
+          cnv2['cellular_prevalence'] = float(fields[13]) * self._cellularity
+        else:
+          cnv1['cellular_prevalence'] = self._cellularity
+
+        cn_regions[chrom].append(cnv1)
+        if cnv2 is not None:
+          cn_regions[chrom].append(cnv2)
+    return cn_regions
+
+class BattenbergSMCHetParser(CnvParser):
+  def __init__(self, bb_filename, cellularity):
+    self._bb_filename = bb_filename
+    self._cellularity = cellularity
+
+  def _compute_cn(self, cnv1, cnv2):
+    '''
+    This code isn't used, but is retained for reference.
+    '''
+    cn1 = (cnv1['nmaj'] + cnv1['nmin']) * cnv1['frac']
+    if cnv2:
+      cn2 = (cnv2['nmaj'] + cnv2['nmin']) * cnv2['frac']
+    else:
+      cn2 = 0
+    total_cn = cn1 + cn2
+    return total_cn
+
+  def parse(self):
+    cn_regions = defaultdict(list)
+    pval_threshold = 0.05
+
+    with open(self._bb_filename) as bbf:
+      header = bbf.next()
+      for line in bbf:
+        fields = line.strip().split()
         chrom = fields[0].lower()
         start = int(fields[1])
         end = int(fields[2])
@@ -149,7 +210,7 @@ def main():
     description='Create CNV input file for parser from Battenberg or TITAN data',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'titan'),
+  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'titan', 'battenberg-smchet'),
     help='Type of CNV input')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, required=True,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
@@ -162,6 +223,8 @@ def main():
     parser = BattenbergParser(args.cnv_file, args.cellularity)
   elif args.input_type == 'titan':
     parser = TitanParser(args.cnv_file, args.cellularity)
+  elif args.input_type == 'battenberg-smchet':
+    parser = BattenbergSMCHetParser(args.cnv_file, args.cellularity)
   else:
     raise Exception('Unknown input type')
 
