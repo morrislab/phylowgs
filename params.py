@@ -14,20 +14,27 @@ import subprocess as sp
 import util2 as u2
 import os
 
-# done for multi-sample
-def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2='',rseed=1, ntps=5):
+def get_c_fnames(tmp_dir):
+	def _make_c_fname(name):
+		fname = 'c_%s.txt' % (name)
+		return os.path.join(tmp_dir, fname)
 
+	FNAME_C_TREE = _make_c_fname('tree')
+	FNAME_C_DATA_STATES = _make_c_fname('data_states')
+	FNAME_C_PARAMS = _make_c_fname('params')
+	FNAME_C_MH_ARATIO = _make_c_fname('mh_ar')
+
+	return (FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO)
+
+# done for multi-sample
+def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2='',rseed=1, ntps=5, tmp_dir='.'):
 	wts, nodes = tssb.get_mixture()
 
 	# file names
 	FNAME_SSM_DATA = fin1
 	FNAME_CNV_DATA = fin2
-	basename = os.path.basename(fin1).split('.')[0]
-	FNAME_C_TREE = 'c_tree_' + basename + '_' + str(rseed) + '.txt'
-	FNAME_C_DATA_STATES = 'c_data_states_' + basename + '_' + str(rseed) + '.txt'
-	FNAME_C_PARAMS = 'c_params_' + basename + '_' + str(rseed) + '.txt' ;
-	FNAME_C_MH_ARATIO = 'c_mh_ar_' + basename + '_' + str(rseed) + '.txt' ;
 	NTPS = str(ntps)
+	FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO = get_c_fnames(tmp_dir)
 
 	## initialize the MH sampler###########
 	#for tp in arange(ntps): 

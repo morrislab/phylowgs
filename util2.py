@@ -184,6 +184,10 @@ class StateManager(object):
 	with open(self._last_state_fn) as state_file:
 	    return pickle.load(state_file)
 
+    def load_initial_state(self):
+	with open(self._initial_state_fn) as state_file:
+	    return pickle.load(state_file)
+
     def write_initial_state(self, state):
 	self._write_state(state, self._initial_state_fn)
 

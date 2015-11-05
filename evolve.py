@@ -25,7 +25,7 @@ from datetime import datetime
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_backups_every, rand_seed):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_backups_every, rand_seed, tmp_dir):
 	state = {}
 
 	with open('random_seed.txt', 'w') as seedf:
@@ -45,6 +45,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 
 	state['ssm_file'] = ssm_file
 	state['cnv_file'] = cnv_file
+	state['tmp_dir'] = tmp_dir
 	state['top_k_trees_file'] = top_k_trees_file
 	state['clonal_freqs_file'] = clonal_freqs_file
 	state['write_backups_every'] = write_backups_every
@@ -98,7 +99,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	logmsg("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
 
-	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, tmp_dir)
 
 def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeeded):
 	# If error occurs, restore the backups and try again. Never try more than two
@@ -121,9 +122,9 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
 
-	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS)
+	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, state['tmp_dir'])
 
-def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
+def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, tmp_dir):
 	start_iter = state['last_iteration'] + 1
 
 	last_mcmc_sample_time = time.time()
@@ -164,6 +165,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 			state['cnv_file'],
 			state['rand_seed'],
 			NTPS,
+			tmp_dir
 		)
 		if float(state['mh_acc']) < 0.08 and state['mh_std'] < 10000:
 			state['mh_std'] = state['mh_std']*2.0
@@ -252,6 +254,8 @@ def parse_args():
 		help='Number of Metropolis-Hastings iterations')
 	parser.add_argument('-r', '--random-seed', dest='random_seed', type=int,
 		help='Random seed for initializing MCMC sampler')
+	parser.add_argument('-t', '--tmp-dir', dest='tmp_dir', default='.',
+		help='Path to directory for temporary files')
 	parser.add_argument('ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
 	parser.add_argument('cnv_file',
@@ -292,8 +296,19 @@ def run(safe_to_exit, run_succeeded):
 			mh_itr=args.mh_iterations,
 			mh_std=100,
 			write_backups_every=args.write_backups_every,
-			rand_seed=args.random_seed
+			rand_seed=args.random_seed,
+			tmp_dir=args.tmp_dir
 		)
+
+def remove_tmp_files():
+	initial_state = StateManager().load_initial_state()
+	tmp_dir = initial_state['tmp_dir']
+	tmp_filenames = get_c_fnames(tmp_dir)
+	for tmpfn in tmp_filenames:
+		try:
+			os.remove(tmpfn)
+		except OSError:
+			pass
 
 def main():
 	# Introducing threading is necessary to allow write operations to complete
@@ -344,6 +359,8 @@ def main():
 		# *immediately* when the signal is sent -- i.e., even before the timeout
 		# has expired.
 		run_thread.join(10)
+
+	remove_tmp_files()
 
 	if run_succeeded.is_set():
 		sys.exit(0)
