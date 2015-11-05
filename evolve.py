@@ -72,6 +72,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['cd_llh_traces'] = zeros((state['num_samples'], 1))
 	state['burnin_cd_llh_traces'] = zeros((state['burnin'], 1))
 	state['working_directory'] = os.getcwd()
+	state['mcmc_sample_times'] = []
 
 	root = alleles(conc=0.1, ntps=NTPS)
 	state['tssb'] = TSSB(dp_alpha=state['dp_alpha'], dp_gamma=state['dp_gamma'], alpha_decay=state['alpha_decay'], root_node=root, data=codes)
@@ -124,6 +125,8 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 
 def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS):
 	start_iter = state['last_iteration'] + 1
+
+	last_mcmc_sample_time = time.time()
 
 	for iteration in range(start_iter, state['num_samples']):
 		safe_to_exit.set()
@@ -195,6 +198,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 		state['tssb'] = tssb
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
+
+		new_mcmc_sample_time = time.time()
+		state['mcmc_sample_times'].append(new_mcmc_sample_time - last_mcmc_sample_time)
+		last_mcmc_sample_time = new_mcmc_sample_time
+
 		state_manager.write_state(state)
 
 		if iteration % state['write_backups_every'] == 0 and iteration != start_iter:
@@ -210,6 +218,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 	glist.shape=(1,len(glist))
 	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 	state_manager.delete_state_file()
+
+	mcmc_trace = vstack((state['burnin_cd_llh_traces'], state['cd_llh_traces']))
+	mcmc_sample_times = array(state['mcmc_sample_times']).reshape(len(state['mcmc_sample_times']), 1)
+	mcmc_trace = hstack((mcmc_trace, mcmc_sample_times))
+	savetxt('mcmc_trace.txt', mcmc_trace, header='llh_trace mcmc_times')
 
 	safe_to_exit.set()
 	run_succeeded.set()
