@@ -25,7 +25,7 @@ from datetime import datetime
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_backups_every, rand_seed, tmp_dir):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
 	state = {}
 
 	with open('random_seed.txt', 'w') as seedf:
@@ -48,6 +48,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['tmp_dir'] = tmp_dir
 	state['top_k_trees_file'] = top_k_trees_file
 	state['clonal_freqs_file'] = clonal_freqs_file
+	state['write_state_every'] = write_state_every
 	state['write_backups_every'] = write_backups_every
 
 	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
@@ -126,7 +127,7 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 
 def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, tmp_dir):
 	start_iter = state['last_iteration'] + 1
-
+	trees_to_write = []
 	last_mcmc_sample_time = time.time()
 
 	for iteration in range(start_iter, state['num_samples']):
@@ -188,15 +189,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 		else:
 			state['burnin_cd_llh_traces'][iteration + state['burnin']] = tssb.complete_data_log_likelihood()
 
-		# It's not safe to exit while performing file IO, as we don't want
-		# trees.zip or the computation state file to become corrupted from an
-		# interrupted write.
-		safe_to_exit.clear()
-		if iteration >= 0:
-			tree_writer.write_tree(tssb, state['cd_llh_traces'][iteration][0], iteration)
-		else:
-			tree_writer.write_burnin_tree(tssb, iteration)
-
+		trees_to_write.append((iteration, tssb))
 		state['tssb'] = tssb
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
@@ -205,10 +198,26 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 		state['mcmc_sample_times'].append(new_mcmc_sample_time - last_mcmc_sample_time)
 		last_mcmc_sample_time = new_mcmc_sample_time
 
-		state_manager.write_state(state)
+		# It's not safe to exit while performing file IO, as we don't want
+		# trees.zip or the computation state file to become corrupted from an
+		# interrupted write.
+		safe_to_exit.clear()
+		should_write_backup = iteration % state['write_backups_every'] == 0 and iteration != start_iter
+		should_write_state = iteration % state['write_state_every'] == 0
+		# If backup is scheduled to be written, write both it and full program
+		# state regardless of whether we're scheduled to write state this
+		# iteration.
+		if should_write_backup or should_write_state:
+			for itr, tree in trees_to_write:
+				if itr >= 0:
+					tree_writer.write_tree(tree, state['cd_llh_traces'][itr][0], itr)
+				else:
+					tree_writer.write_burnin_tree(tree, itr)
+			trees_to_write = []
+			state_manager.write_state(state)
 
-		if iteration % state['write_backups_every'] == 0 and iteration != start_iter:
-			backup_manager.save_backup()
+			if should_write_backup:
+				backup_manager.save_backup()
 
 	safe_to_exit.clear()
 	#save the best tree
@@ -242,6 +251,8 @@ def parse_args():
 	)
 	parser.add_argument('-b', '--write-backups-every', dest='write_backups_every', default=100, type=int,
 		help='Number of iterations to go between writing backups of program state')
+	parser.add_argument('-S', '--write-state-every', dest='write_state_every', default=10, type=int,
+		help='Number of iterations between writing program state to disk. Higher values reduce IO burden at the cost of losing progress made if program is interrupted.')
 	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
 		help='Output file to save top-k trees in text format')
 	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
@@ -295,6 +306,7 @@ def run(safe_to_exit, run_succeeded):
 			num_samples=args.mcmc_samples,
 			mh_itr=args.mh_iterations,
 			mh_std=100,
+			write_state_every=args.write_state_every,
 			write_backups_every=args.write_backups_every,
 			rand_seed=args.random_seed,
 			tmp_dir=args.tmp_dir
