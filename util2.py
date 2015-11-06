@@ -225,17 +225,15 @@ class TreeWriter(object):
     def _close_archive(self):
 	self._archive.close()
 
-    def _write_tree(self, tree, tree_fn):
-	serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
+    def write_trees(self, trees):
 	self._open_archive()
-	self._archive.writestr(tree_fn, serialized)
+	for tree, idx, llh in trees:
+	    is_burnin = idx < 0
+	    prefix = is_burnin and 'burnin' or 'tree'
+	    treefn = '%s_%s_%s' % (prefix, idx, llh)
+	    serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
+	    self._archive.writestr(treefn, serialized)
 	self._close_archive()
-
-    def write_tree(self, tree, llh, idx):
-	self._write_tree(tree, 'tree_%s_%s' % (idx, llh))
-
-    def write_burnin_tree(self, burnin_tree, idx):
-	self._write_tree(burnin_tree, 'burnin_%s' % idx)
 
 class TreeReader(object):
     def __init__(self, archive_fn):

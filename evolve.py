@@ -74,7 +74,6 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state['cd_llh_traces'] = zeros((state['num_samples'], 1))
 	state['burnin_cd_llh_traces'] = zeros((state['burnin'], 1))
 	state['working_directory'] = os.getcwd()
-	state['mcmc_sample_times'] = []
 
 	root = alleles(conc=0.1, ntps=NTPS)
 	state['tssb'] = TSSB(dp_alpha=state['dp_alpha'], dp_gamma=state['dp_gamma'], alpha_decay=state['alpha_decay'], root_node=root, data=codes)
@@ -99,6 +98,11 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, ss
 	state_manager.write_initial_state(state)
 	logmsg("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
+
+	# This will overwrite file if it already exists, which is the desired
+	# behaviour for a fresh run.
+	with open('mcmc_samples.txt', 'w') as mcmcf:
+		mcmcf.write('Iteration\tLLH\tTime\n')
 
 	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, tmp_dir)
 
@@ -127,7 +131,8 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 
 def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, tmp_dir):
 	start_iter = state['last_iteration'] + 1
-	trees_to_write = []
+	unwritten_trees = []
+	mcmc_sample_times = []
 	last_mcmc_sample_time = time.time()
 
 	for iteration in range(start_iter, state['num_samples']):
@@ -179,23 +184,24 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 		tssb.resample_stick_orders()
 		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
  
+		last_llh = tssb.complete_data_log_likelihood()
 		if iteration >= 0:
-			state['cd_llh_traces'][iteration] = tssb.complete_data_log_likelihood()
+			state['cd_llh_traces'][iteration] = last_llh
 			if True or mod(iteration, 10) == 0:
 				weights, nodes = tssb.get_mixture()
 				logmsg(' '.join([str(v) for v in (iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay)]))
 			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
 				logmsg("%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration]))
 		else:
-			state['burnin_cd_llh_traces'][iteration + state['burnin']] = tssb.complete_data_log_likelihood()
+			state['burnin_cd_llh_traces'][iteration + state['burnin']] = last_llh
 
-		trees_to_write.append((iteration, tssb))
+		unwritten_trees.append((tssb, iteration, last_llh))
 		state['tssb'] = tssb
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
 
 		new_mcmc_sample_time = time.time()
-		state['mcmc_sample_times'].append(new_mcmc_sample_time - last_mcmc_sample_time)
+		mcmc_sample_times.append(new_mcmc_sample_time - last_mcmc_sample_time)
 		last_mcmc_sample_time = new_mcmc_sample_time
 
 		# It's not safe to exit while performing file IO, as we don't want
@@ -204,18 +210,20 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 		safe_to_exit.clear()
 		should_write_backup = iteration % state['write_backups_every'] == 0 and iteration != start_iter
 		should_write_state = iteration % state['write_state_every'] == 0
+		is_last_iteration = (iteration == state['num_samples'] - 1)
+
 		# If backup is scheduled to be written, write both it and full program
 		# state regardless of whether we're scheduled to write state this
 		# iteration.
-		if should_write_backup or should_write_state:
-			for itr, tree in trees_to_write:
-				if itr >= 0:
-					tree_writer.write_tree(tree, state['cd_llh_traces'][itr][0], itr)
-				else:
-					tree_writer.write_burnin_tree(tree, itr)
-			trees_to_write = []
+		if should_write_backup or should_write_state or is_last_iteration:
+			with open('mcmc_samples.txt', 'a') as mcmcf:
+				llhs_and_times = [(itr, llh, itr_time) for (tssb, itr, llh), itr_time in zip(unwritten_trees, mcmc_sample_times)]
+				llhs_and_times = '\n'.join(['%s\t%s\t%s' % (itr, llh, itr_time) for itr, llh, itr_time in llhs_and_times])
+				mcmcf.write(llhs_and_times + '\n')
+			tree_writer.write_trees(unwritten_trees)
 			state_manager.write_state(state)
-
+			unwritten_trees = []
+			mcmc_sample_times = []
 			if should_write_backup:
 				backup_manager.save_backup()
 
@@ -229,11 +237,6 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, state, t
 	glist.shape=(1,len(glist))
 	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 	state_manager.delete_state_file()
-
-	mcmc_trace = vstack((state['burnin_cd_llh_traces'], state['cd_llh_traces']))
-	mcmc_sample_times = array(state['mcmc_sample_times']).reshape(len(state['mcmc_sample_times']), 1)
-	mcmc_trace = hstack((mcmc_trace, mcmc_sample_times))
-	savetxt('mcmc_trace.txt', mcmc_trace, header='llh_trace mcmc_times')
 
 	safe_to_exit.set()
 	run_succeeded.set()
