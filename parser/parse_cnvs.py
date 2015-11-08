@@ -1,6 +1,8 @@
+from __future__ import print_function
 import argparse
-from collections import defaultdict
 import csv
+import sys
+from collections import defaultdict
 
 def chrom_key(chrom):
   chrom = chrom.lower()
@@ -159,19 +161,26 @@ def main():
   )
   parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'battenberg-smchet', 'titan'),
     help='Type of CNV input')
-  parser.add_argument('-c', '--cellularity', dest='cellularity', type=restricted_float, required=True,
+  parser.add_argument('-c', '--cellularity', dest='cellularity', type=float, required=True,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
   parser.add_argument('--cnv-output', dest='cnv_output_filename', default='cnvs.txt',
     help='Output destination for parsed CNVs')
   parser.add_argument('cnv_file')
   args = parser.parse_args()
 
+  if args.cellularity > 1.0:
+    print('Cellularity for %s is %s. Setting to 1.0.' % (args.cnv_file, args.cellularity), file=sys.stderr)
+    cellularity = 1.0
+  else:
+    cellularity = args.cellularity
+
+
   if args.input_type == 'battenberg':
-    parser = BattenbergParser(args.cnv_file, args.cellularity)
+    parser = BattenbergParser(args.cnv_file, cellularity)
   elif args.input_type == 'battenberg-smchet':
-    parser = BattenbergSmchetParser(args.cnv_file, args.cellularity)
+    parser = BattenbergSmchetParser(args.cnv_file, cellularity)
   elif args.input_type == 'titan':
-    parser = TitanParser(args.cnv_file, args.cellularity)
+    parser = TitanParser(args.cnv_file, cellularity)
   else:
     raise Exception('Unknown input type')
 
