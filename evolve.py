@@ -316,7 +316,12 @@ def run(safe_to_exit, run_succeeded):
 		)
 
 def remove_tmp_files():
-	initial_state = StateManager().load_initial_state()
+	try:
+		initial_state = StateManager().load_initial_state()
+	except IOError:
+		# If user runs with -h to get help on first run, then initial state file
+		# won't exist.
+		return
 	tmp_dir = initial_state['tmp_dir']
 	tmp_filenames = get_c_fnames(tmp_dir)
 	for tmpfn in tmp_filenames:
