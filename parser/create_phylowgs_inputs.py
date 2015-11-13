@@ -431,7 +431,10 @@ class VariantFormatter(object):
 
     for variant, ref_reads, total_reads in variant_list:
       ssm_id = 's%s' % self._counter
-      variant_name = '%s_%s' % (variant.CHROM, variant.POS)
+      if variant.ID is not None:
+        variant_name = variant.ID
+      else:
+        variant_name = '%s_%s' % (variant.CHROM, variant.POS)
 
       # TODO: switch back to using calc_ref_freq() when we no longer want mu_r
       # and mu_v fixed.

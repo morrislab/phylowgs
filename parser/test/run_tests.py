@@ -21,7 +21,7 @@ def compare(vcf_format, input_vcf, good_ssm_output):
   cnv_output_matches = os.path.getsize(cnv_output_path) == 0
   shutil.rmtree(output_dir)
   if variant_output_matches and cnv_output_matches:
-    print('%s passed' % vcf_format)
+    print('%s passed (%s)' % (vcf_format, input_vcf))
   else:
     raise Exception('Outputs do not match for %s' % vcf_format)
 
@@ -33,5 +33,14 @@ def main():
       os.path.join('inputs', vcf_format, vcf_format + '.vcf'),
       os.path.join('outputs', vcf_format, vcf_format + '.ssm')
     )
+
+  # test for ID parsing
+  vcf_format = 'mutect_tcga'
+  compare(
+    vcf_format,
+    os.path.join('inputs', vcf_format, vcf_format + '_with_ids.vcf'),
+    os.path.join('outputs', vcf_format, vcf_format + '_with_ids.ssm')
+  )
+
 
 main()
