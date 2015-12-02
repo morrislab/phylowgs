@@ -1,7 +1,6 @@
 #!/usr/bin/env python2
 import os
 import sys
-import time
 import cPickle
 
 from numpy		import *
@@ -21,6 +20,7 @@ import signal
 import tempfile
 import threading
 import traceback
+import time
 from datetime import datetime
 
 # num_samples: number of MCMC samples
