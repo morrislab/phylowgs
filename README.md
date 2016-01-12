@@ -113,6 +113,7 @@ Running PhyloWGS
         cd test_results
         # To work with viewer in Step 5, the naming conventions used here must be
         # followed.
+        # "example_data" is simply the name by which you want your results to be identified.
         python2 /path/to/phylowgs/write_results.py example_data ../trees.zip example_data.summ.json.gz example_data.muts.json.gz example_data.mutass.zip
         cd ..
 
