@@ -50,5 +50,4 @@ class ResultLoader(object):
       tree_indices = [int(i.filename.split('.')[0]) for i in mutf.infolist()]
       tree_indices.sort()
       for tree_idx in tree_indices:
-        print(tree_idx)
         yield (tree_idx, self._load_assignments(mutf, tree_idx))
