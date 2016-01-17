@@ -201,10 +201,11 @@ function ClusterPlotter() {
 }
 
 ClusterPlotter.prototype.render = function(dataset) {
-  this._empty_plot_container();
+  if(typeof dataset.clusters_path === 'undefined')
+    return;
 
   var cplotter = this;
-  d3.json('data/formatted_clusters.json', function(formatted_clusters) {
+  d3.json(dataset.clusters_path, function(formatted_clusters) {
     var cluster_indices = Object.keys(formatted_clusters);
 
     $('#cluster-list').show();
@@ -271,7 +272,12 @@ ClusterPlotter.prototype._draw_pop_plots = function(pop) {
     this._draw_histogram(pop.jaccard_scores, 'Jaccard scores (population ' + pop.name + ')', 'Jaccard scores', 0, 1);
   }
   this._draw_histogram(pop.num_ssms, 'Number of SSMs (population ' + pop.name + ')', 'Number of SSMs');
-  this._draw_histogram(pop.cellular_prevalences, 'Cellular prevalences (population ' + pop.name + ')', 'Cellular prevalence', 0, 1);
+
+  var mean_cell_prevs = [];
+  pop.cellular_prevalences.forEach(function(cp) {
+    mean_cell_prevs.push(Util.mean(cp));
+  });
+  this._draw_histogram(mean_cell_prevs, 'Cellular prevalences (population ' + pop.name + ')', 'Cellular prevalence', 0, 1);
 }
 
 ClusterPlotter.prototype._draw_histogram = function(vals, title, xlabel, xmin, xmax) {
