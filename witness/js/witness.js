@@ -253,32 +253,65 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
   }
 
   var pops = [];
-  var links = [];
-  // Convert from object to array.
   for(var popidx in cluster.populations) {
     popidx = parseInt(popidx, 10);
-    pops[popidx] = cluster.populations[popidx];
+    if(popidx !== pops.length) {
+      throw "Expected " + popidx + " populations, but have " + pops.length;
+    }
 
-    var trees_with_pop = pops[popidx].trees_with_pop;
-    var mean_ssms = Util.mean(pops[popidx].num_ssms);
-    pops[popidx].name = popidx;
-    pops[popidx].radius = TreeUtil.calc_radius(mean_ssms / max_ssms);
-    pops[popidx].opacity = trees_with_pop / trees_in_cluster;
+    var popdata = cluster.populations[popidx];
+    var trees_with_pop = popdata.trees_with_pop;
+    var mean_ssms = Util.mean(popdata.num_ssms);
 
-    if(typeof pops[popidx].children !== 'undefined') {
-      Object.keys(pops[popidx].children).forEach(function(child) {
-        child = parseInt(child, 10);
-        var trees_with_edge = pops[popidx].children[child];
+    var pop = {
+      name: popidx,
+      radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
+      opacity: trees_with_pop / trees_in_cluster,
+      is_bastard: false,
+      children: popdata.children || [],
+      bastards: popdata.bastard_subtrees || null
+    };
+    pops.push(pop);
+  }
 
-        links.push({
-          source: popidx,
-          target: child,
-          width: Util.calc_in_range(2, 15, trees_with_edge / trees_in_cluster),
-          name: popidx + '_' + child
-        });
+  var links = [];
+  pops.forEach(function(pop) {
+    // Add edges from pops to pops.
+    Object.keys(pop.children).forEach(function(childidx) {
+      childidx = parseInt(childidx, 10);
+      var child = pops[childidx];
+      var trees_with_edge = pop.children[childidx];
+
+      links.push({
+        source: pop,
+        target: child,
+        width: Util.calc_in_range(2, 15, trees_with_edge / trees_in_cluster),
+        name: pop.name + '_' + child.name
+      });
+    });
+
+    // Add bastards.
+    if(pop.bastards) {
+      var mean_ssms = Util.mean(pop.bastards.num_ssms);
+      var trees_with_bastard = pop.bastards.num_ssms.length;
+
+      var bastard = {
+        // Assign numerical index following all populations.
+        name: pops.length,
+        radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
+        opacity: trees_with_bastard / trees_in_cluster,
+        is_bastard: true
+      };
+      pops.push(bastard);
+
+      links.push({
+        source: pop,
+        target: bastard,
+        width: Util.calc_in_range(2, 15, trees_with_bastard / trees_in_cluster),
+        name: pop.name + '_' + bastard.name
       });
     }
-  }
+  });
 
   this._draw(pops, links);
 }
@@ -348,7 +381,9 @@ ClusterPlotter.prototype._draw = function(pops, links) {
       .data(pops, function(d) { return d.name; });
   // Enter any new nodes at the parent's previous position.
   var nodeEnter = node.enter().append('svg:g')
-      .attr('class', 'node')
+      .classed('node', true)
+      .classed('bastard-subtree', function(d) { return d.is_bastard; })
+      .classed('population', function(d) { return !d.is_bastard; })
       .attr('opacity', function(d) { return d.opacity; })
       .call(force.drag);
   nodeEnter.append('svg:circle')

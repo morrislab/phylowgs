@@ -1,4 +1,4 @@
-.node circle {
+.node circle, .population circle {
   cursor: pointer;
   fill: #428bca;
   stroke-width: 1.5px;
@@ -11,4 +11,8 @@
 
 .link {
   fill: none;
+}
+
+.bastard-subtree circle {
+  fill: #ca4242;
 }

@@ -137,13 +137,13 @@ body {
   display: none;
 }
 
-#trees .active, #trees .active td {
-  background-color: #428bca;
-  color: #fff;
+.secondary-sidebar .active, .secondary-sidebar .active td {
+  background-color: #428bca !important;
+  color: #fff !important;
 }
 
-#trees tr:hover {
-  background-color: white;
+.secondary-sidebar tr:hover {
+  background-color: white !important;
 }
 
 .secondary-sidebar td, .secondary-sidebar th {
