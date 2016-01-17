@@ -201,6 +201,8 @@ function ClusterPlotter() {
 }
 
 ClusterPlotter.prototype.render = function(dataset) {
+  this._empty_plot_container();
+
   var cplotter = this;
   d3.json('data/formatted_clusters.json', function(formatted_clusters) {
     var cluster_indices = Object.keys(formatted_clusters);
@@ -242,6 +244,70 @@ ClusterPlotter.prototype.render = function(dataset) {
   });
 }
 
+ClusterPlotter.prototype._empty_plot_container = function() {
+  if($('#container #plots').length === 0) {
+    $('<div/>').attr('id', 'plots').appendTo('#container');
+  } else {
+    $('#plots').empty();
+  }
+}
+
+ClusterPlotter.prototype._draw_cluster_plots = function(cluster) {
+  this._empty_plot_container();
+
+  var simils = [];
+  cluster.members.forEach(function(member) {
+    var simil = member[1];
+    simils.push(simil);
+  });
+
+  this._draw_histogram(simils, 'Tree similarities', 'Similarity', 0, 1);
+}
+
+ClusterPlotter.prototype._draw_pop_plots = function(pop) {
+  this._empty_plot_container();
+
+  if(!pop.is_bastard) {
+    this._draw_histogram(pop.jaccard_scores, 'Jaccard scores (population ' + pop.name + ')', 'Jaccard scores', 0, 1);
+  }
+  this._draw_histogram(pop.num_ssms, 'Number of SSMs (population ' + pop.name + ')', 'Number of SSMs');
+  this._draw_histogram(pop.cellular_prevalences, 'Cellular prevalences (population ' + pop.name + ')', 'Cellular prevalence', 0, 1);
+}
+
+ClusterPlotter.prototype._draw_histogram = function(vals, title, xlabel, xmin, xmax) {
+  var formatted = [];
+  vals.forEach(function(val) {
+    formatted.push([val]);
+  });
+
+  var data = new google.visualization.DataTable();
+  data.addColumn('number', xlabel);
+  data.addRows(formatted);
+
+  var view_window = {};
+  if(typeof xmin !== 'undefined')
+    view_window.min = xmin;
+  if(typeof xmax !== 'undefined')
+    view_window.max = xmax;
+
+  var options = {
+    title: title + ' (' + vals.length + ' values)',
+    fontSize: Config.font_size,
+    hAxis: {
+      title: title,
+      viewWindow: view_window,
+    },
+    vAxis: {
+      title: 'Trees',
+    },
+    width: '100%',
+    height: 450,
+  };
+
+  var chart = new google.visualization.Histogram($('<div/>').appendTo('#plots').get(0));
+  chart.draw(data, options);
+}
+
 ClusterPlotter.prototype._show_cluster = function(cluster) {
   var trees_in_cluster = cluster.members.length;
 
@@ -268,6 +334,9 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
       radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
       opacity: trees_with_pop / trees_in_cluster,
       is_bastard: false,
+      jaccard_scores: popdata.jaccard_scores,
+      num_ssms: popdata.num_ssms,
+      cellular_prevalences: popdata.cellular_prevalences,
       children: popdata.children || [],
       bastards: popdata.bastard_subtrees || null
     };
@@ -300,6 +369,8 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
         name: pops.length,
         radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
         opacity: trees_with_bastard / trees_in_cluster,
+        num_ssms: pop.bastards.num_ssms,
+        cellular_prevalences: pop.bastards.cellular_prevalences,
         is_bastard: true
       };
       pops.push(bastard);
@@ -314,6 +385,7 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
   });
 
   this._draw(pops, links);
+  this._draw_cluster_plots(cluster);
 }
 
 ClusterPlotter.prototype._tick = function(link, node) {
@@ -376,6 +448,7 @@ ClusterPlotter.prototype._draw = function(pops, links) {
     .links(links)
     .start();
 
+  var self = this;
   // Update the nodes
   var node = vis.selectAll('.node')
       .data(pops, function(d) { return d.name; });
@@ -385,7 +458,10 @@ ClusterPlotter.prototype._draw = function(pops, links) {
       .classed('bastard-subtree', function(d) { return d.is_bastard; })
       .classed('population', function(d) { return !d.is_bastard; })
       .attr('opacity', function(d) { return d.opacity; })
-      .call(force.drag);
+      .call(force.drag)
+      .on('click', function(pop) {
+        self._draw_pop_plots(pop);
+      });
   nodeEnter.append('svg:circle')
       .attr('r', function(d) { return d.radius; });
   nodeEnter.append('svg:text')
