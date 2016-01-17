@@ -66,7 +66,6 @@ TreePlotter.prototype.render = function(dataset) {
       var root = tplotter._generate_tree_struct(summary.trees[tidx].structure, summary.trees[tidx].populations);
       tplotter._draw_tree(root);
 
-
       var summary_table = $('#snippets .tree-summary').clone().appendTo('#container').find('tbody');
       var pop_ids = tplotter._sort_numeric(Object.keys(summary.trees[tidx].populations));
       pop_ids.forEach(function(pop_id) {
@@ -202,48 +201,86 @@ function ClusterPlotter() {
 }
 
 ClusterPlotter.prototype.render = function(dataset) {
-  var self = this;
+  var cplotter = this;
   d3.json('data/formatted_clusters.json', function(formatted_clusters) {
-    var cluster = formatted_clusters['0'];
-    var trees_in_cluster = cluster.members.length;
+    var cluster_indices = Object.keys(formatted_clusters);
 
-    var max_ssms = 0;
-    for(var popidx in cluster.populations) {
-      var mean_ssms = Util.mean(cluster.populations[popidx].num_ssms);
-      if(mean_ssms > max_ssms)
-        max_ssms = mean_ssms;
-    }
+    $('#cluster-list').show();
+    var cluster_table = $('#clusters tbody');
+    cluster_table.empty();
 
-    var pops = [];
-    var links = [];
-    // Convert from object to array.
-    for(var popidx in cluster.populations) {
-      popidx = parseInt(popidx, 10);
-      pops[popidx] = cluster.populations[popidx];
+    cluster_indices.forEach(function(cidx) {
+      var row = '<td class="cluster-index">' + cidx + '</td>'
+        + '<td class="cluster-size">' + formatted_clusters[cidx].members.length + '</td>';
+      $('<tr/>').html(row).appendTo(cluster_table);
+    });
 
-      var trees_with_pop = pops[popidx].trees_with_pop;
-      var mean_ssms = Util.mean(pops[popidx].num_ssms);
-      pops[popidx].name = popidx;
-      pops[popidx].radius = TreeUtil.calc_radius(mean_ssms / max_ssms);
-      pops[popidx].opacity = trees_with_pop / trees_in_cluster;
+    $('#clusters').stupidtable();
 
-      if(typeof pops[popidx].children !== 'undefined') {
-        Object.keys(pops[popidx].children).forEach(function(child) {
-          child = parseInt(child, 10);
-          var trees_with_edge = pops[popidx].children[child];
+    var already_autosorted = false;
+    $('#clusters').bind('aftertablesort', function() {
+      if(already_autosorted)
+        return;
+      cluster_table.find('tr:first').click();
+      already_autosorted = true;
+    });
 
-          links.push({
-            source: popidx,
-            target: child,
-            width: Util.calc_in_range(2, 15, trees_with_edge / trees_in_cluster),
-            name: popidx + '_' + child
-          });
-        });
-      }
-    }
+    // If direction not specified, this can end up being ascending or
+    // descending sort, depending on prior sort state of table.
+    $('#cluster-idx').stupidsort('asc');
 
-    self._draw(pops, links);
+    cluster_table.find('tr').click(function(evt) {
+      evt.preventDefault();
+      var self = $(this);
+      self.siblings().removeClass('active');
+      self.addClass('active');
+
+      var cidx = self.find('.cluster-index').text();
+      cplotter._show_cluster(formatted_clusters[cidx]);
+    });
+    $('#cluster-list').scrollTop(0);
   });
+}
+
+ClusterPlotter.prototype._show_cluster = function(cluster) {
+  var trees_in_cluster = cluster.members.length;
+
+  var max_ssms = 0;
+  for(var popidx in cluster.populations) {
+    var mean_ssms = Util.mean(cluster.populations[popidx].num_ssms);
+    if(mean_ssms > max_ssms)
+      max_ssms = mean_ssms;
+  }
+
+  var pops = [];
+  var links = [];
+  // Convert from object to array.
+  for(var popidx in cluster.populations) {
+    popidx = parseInt(popidx, 10);
+    pops[popidx] = cluster.populations[popidx];
+
+    var trees_with_pop = pops[popidx].trees_with_pop;
+    var mean_ssms = Util.mean(pops[popidx].num_ssms);
+    pops[popidx].name = popidx;
+    pops[popidx].radius = TreeUtil.calc_radius(mean_ssms / max_ssms);
+    pops[popidx].opacity = trees_with_pop / trees_in_cluster;
+
+    if(typeof pops[popidx].children !== 'undefined') {
+      Object.keys(pops[popidx].children).forEach(function(child) {
+        child = parseInt(child, 10);
+        var trees_with_edge = pops[popidx].children[child];
+
+        links.push({
+          source: popidx,
+          target: child,
+          width: Util.calc_in_range(2, 15, trees_with_edge / trees_in_cluster),
+          name: popidx + '_' + child
+        });
+      });
+    }
+  }
+
+  this._draw(pops, links);
 }
 
 ClusterPlotter.prototype._tick = function(link, node) {
@@ -538,7 +575,6 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
 
 TreeSummarizer.prototype.render = function(dataset) {
   this._render_vafs(dataset);
-  $('#tree-list').hide();
 
   var pops_to_examine = 3;
   var min_ssms = 3;
@@ -631,6 +667,7 @@ Interface.prototype._activate_navbar = function() {
 Interface.prototype._render = function() {
   if(this._renderer !== null && this._dataset !== null) {
     $('#container').empty();
+    $('.secondary-sidebar').hide();
     this._available_renderers[this._renderer].render(this._dataset);
   }
 }
@@ -688,6 +725,9 @@ Interface.prototype._load_samples = function() {
         }
       });
     });
+    /*$('.nav-clustered-trees').click();
+    $('#run-list').find('li:first').find('a').click();
+    $('#sample-list').find('li:first').find('a').click();*/
   });
 }
 

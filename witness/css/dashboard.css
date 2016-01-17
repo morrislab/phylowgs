@@ -35,6 +35,7 @@ body {
 }
 .secondary-sidebar {
   display: none;
+  min-height: 100%;
 }
 @media (min-width: 768px) {
   .main-sidebar {
@@ -145,6 +146,6 @@ body {
   background-color: white;
 }
 
-#trees td, #trees th {
+.secondary-sidebar td, .secondary-sidebar th {
   cursor: pointer;
 }
