@@ -372,6 +372,10 @@ ClusterPlotter.prototype._draw = function(pops, links) {
       .attr('stroke-width', function(d) { return d.width + 'px'; })
       .attr('marker-end', 'url(#head)');
 
+  // Advance the simulation to achieve a near-stable solution before rendering graph.
+  for(var i = 0; i < 200 && force.alpha() > 0.03; i++) {
+    force.tick();
+  }
   force.on('tick', function() { self._tick(link, node); });
   this._tick(link, node);
 }
@@ -725,9 +729,6 @@ Interface.prototype._load_samples = function() {
         }
       });
     });
-    /*$('.nav-clustered-trees').click();
-    $('#run-list').find('li:first').find('a').click();
-    $('#sample-list').find('li:first').find('a').click();*/
   });
 }
 
