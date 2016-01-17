@@ -2,6 +2,8 @@ Config = {
   font_size: 15
 };
 
+var MARKER = '<defs><marker id="head" orient="auto" markerWidth="2" markerHeight="4" refX="0" refY="2"><path d="M0,0 V4 L2,2 Z" fill="#000" /></marker></defs>';
+
 function mean(list) {
   return list.reduce(function(a, b) { return a + b; }) / list.length;
 }
@@ -61,7 +63,7 @@ TreePlotter.prototype.render = function(dataset) {
       self.addClass('active');
 
       var tidx = self.find('.tree-index').text();
-      var root = tplotter._generate_tree_struct(summary.trees[tidx]);
+      var root = tplotter._generate_tree_struct(summary.trees[tidx].structure, summary.trees[tidx].populations);
       tplotter._draw_tree(root);
 
 
@@ -131,11 +133,13 @@ TreePlotter.prototype._draw_tree = function(root) {
 
   // Update the links…
   var link = vis.selectAll('path.link')
-      .data(tree.links(nodes), function(d) { return d.target.name; });
+      .data(tree.links(nodes), function(d) { return d.target.name; })
+      .attr('stroke-width', '1.5px');
 
   // Enter any new links at the parent's previous position.
   link.enter().insert('svg:path', 'g')
-      .attr('class', 'link');
+      .attr('class', 'link')
+      .attr('stroke', '#aaa');
 
   // Transition links to their new position.
   link.attr('d', diagonal);
@@ -154,22 +158,14 @@ TreePlotter.prototype._find_max_ssms = function(populations) {
   return max_ssms;
 }
 
-TreePlotter.prototype._generate_tree_struct = function(summary) {
-  var adjlist = summary.structure;
-  var pops = summary.populations;
-
-  var max_area = 8000;
-  var min_area = 700;
+TreePlotter.prototype._generate_tree_struct = function(adjlist, pops) {
   var max_ssms = this._find_max_ssms(pops);
 
   var _add_node = function(node_id, struct) {
     struct.name = node_id;
 
     var num_ssms = pops[node_id]['num_ssms'];
-    var area = min_area + (num_ssms / max_ssms)*(max_area - min_area);
-    if(area < min_area) area = min_area;
-    if(area > max_area) area = max_area;
-    struct.radius = Math.sqrt(area / Math.PI);
+    struct.radius = TreeUtil.calc_radius(num_ssms /  max_ssms);
 
     if(typeof adjlist[node_id] === 'undefined') {
       return;
@@ -193,9 +189,158 @@ TreePlotter.prototype._generate_tree_struct = function(summary) {
   return root;
 }
 
-function TreeSummarizer() {
+function TreeUtil() {
 }
 
+TreeUtil.calc_radius = function(scale) {
+  var min_area = 700, max_area = 8000;
+  var area = Util.calc_in_range(min_area, max_area, scale);
+  return Math.sqrt(area / Math.PI);
+}
+
+function ClusterPlotter() {
+}
+
+ClusterPlotter.prototype.render = function(dataset) {
+  var self = this;
+  d3.json('data/formatted_clusters.json', function(formatted_clusters) {
+    var cluster = formatted_clusters['0'];
+    var trees_in_cluster = cluster.members.length;
+
+    var max_ssms = 0;
+    for(var popidx in cluster.populations) {
+      var mean_ssms = Util.mean(cluster.populations[popidx].num_ssms);
+      if(mean_ssms > max_ssms)
+        max_ssms = mean_ssms;
+    }
+
+    var pops = [];
+    var links = [];
+    // Convert from object to array.
+    for(var popidx in cluster.populations) {
+      popidx = parseInt(popidx, 10);
+      pops[popidx] = cluster.populations[popidx];
+
+      var trees_with_pop = pops[popidx].trees_with_pop;
+      var mean_ssms = Util.mean(pops[popidx].num_ssms);
+      pops[popidx].name = popidx;
+      pops[popidx].radius = TreeUtil.calc_radius(mean_ssms / max_ssms);
+      pops[popidx].opacity = trees_with_pop / trees_in_cluster;
+
+      if(typeof pops[popidx].children !== 'undefined') {
+        Object.keys(pops[popidx].children).forEach(function(child) {
+          child = parseInt(child, 10);
+          var trees_with_edge = pops[popidx].children[child];
+
+          links.push({
+            source: popidx,
+            target: child,
+            width: Util.calc_in_range(2, 15, trees_with_edge / trees_in_cluster),
+            name: popidx + '_' + child
+          });
+        });
+      }
+    }
+
+    self._draw(pops, links);
+  });
+}
+
+ClusterPlotter.prototype._tick = function(link, node) {
+  node.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; })
+
+  var calc = function(d) {
+    var vec = [ d.target.x - d.source.x, d.target.y - d.source.y ];
+    var len = Math.sqrt(vec[0]*vec[0] + vec[1]*vec[1]);
+    // In early simulation stages, source and target may be at the same
+    // position, yielding 0 length.
+    if(len === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    var radius = d.target.radius;
+    // Take 2*d.width since markerWidth = 2.
+    var offset = radius + 2*d.width;
+    // Don't allow lengths < 2*radius.
+    var new_len = Math.max(2*radius, len - offset);
+
+    vec[0] *= (new_len / len);
+    vec[1] *= (new_len / len);
+
+    return {
+      x: d.source.x + vec[0],
+      y: d.source.y + vec[1]
+    };
+  };
+
+  link.attr('x1', function(d) { return d.source.x; })
+    .attr('y1', function(d) { return d.source.y; })
+    .attr('x2', function(d) { return calc(d).x; })
+    .attr('y2', function(d) { return calc(d).y; });
+}
+
+ClusterPlotter.prototype._draw = function(pops, links) {
+  // horiz_padding should be set to the maximum radius of a node, so a node
+  // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
+  // we have horiz_padding = sqrt(8000 / pi) =~ 51.
+  var horiz_padding = 51;
+  var m = [10, horiz_padding, 10, horiz_padding],
+      w = 800 - m[1] - m[3],
+      h = 600 - m[0] - m[2],
+      i = 0;
+
+  var self = this;
+  var force = d3.layout.force()
+      .size([w, h])
+      .charge(-2500)
+      .linkStrength(0.01);
+
+  var vis = d3.select('#container').html('').append('svg:svg')
+      .html(MARKER)
+      .attr('width', w + m[1] + m[3])
+      .attr('height', h + m[0] + m[2])
+      .append('svg:g')
+      .attr('transform', 'translate(' + m[3] + ',' + m[0] + ')');
+
+  force.nodes(pops)
+    .links(links)
+    .start();
+
+  // Update the nodes
+  var node = vis.selectAll('.node')
+      .data(pops, function(d) { return d.name; });
+  // Enter any new nodes at the parent's previous position.
+  var nodeEnter = node.enter().append('svg:g')
+      .attr('class', 'node')
+      .attr('opacity', function(d) { return d.opacity; })
+      .call(force.drag);
+  nodeEnter.append('svg:circle')
+      .attr('r', function(d) { return d.radius; });
+  nodeEnter.append('svg:text')
+      .attr('font-size', '30')
+      .attr('dominant-baseline', 'central')
+      .attr('text-anchor', 'middle')
+      .text(function(d) { return d.name; });
+  var nodeExit = node.exit().remove();
+
+  // Update the links
+  var link = vis.selectAll('.link')
+      .data(links, function(d) { return d.name; });
+  link.exit().remove();
+
+  link.enter().insert('svg:line', '.node')
+      .attr('class', 'link')
+      .attr('stroke', '#000')
+      .attr('opacity', 0.3)
+      .attr('stroke-width', function(d) { return d.width + 'px'; })
+      .attr('marker-end', 'url(#head)');
+
+  force.on('tick', function() { self._tick(link, node); });
+  this._tick(link, node);
+}
+
+function TreeSummarizer() {
+}
 
 function get_url_param(name) {
   name = name.replace(/[\[]/, "\\[").replace(/[\]]/, "\\]");
@@ -222,6 +367,11 @@ Util.mean = function(arr) {
 
 Util.array_max = function(arr) {
   return Math.max.apply(null, arr);
+}
+
+// scale must be in [0, 1].
+Util.calc_in_range = function(min, max, scale) {
+  return min + scale*(max - min);
 }
 
 TreeSummarizer.prototype._render_vafs = function(dataset) {
@@ -437,7 +587,8 @@ function Interface() {
 
   this._available_renderers = {
     'summarizer': new TreeSummarizer(),
-    'plotter': new TreePlotter()
+    'tree_plotter': new TreePlotter(),
+    'cluster_plotter': new ClusterPlotter()
   };
 }
 
@@ -462,7 +613,8 @@ Interface.prototype._activate_navbar = function() {
 
     var mapping = {
       'nav-tree-summaries': 'summarizer',
-      'nav-tree-viewer': 'plotter'
+      'nav-tree-viewer': 'tree_plotter',
+      'nav-clustered-trees': 'cluster_plotter'
     };
     iface._renderer = null;
     for(var nav_class in mapping) {
@@ -481,7 +633,6 @@ Interface.prototype._render = function() {
     $('#container').empty();
     this._available_renderers[this._renderer].render(this._dataset);
   }
-
 }
 
 Interface.prototype._load_samples = function() {
