@@ -624,11 +624,23 @@ class VariantAndCnvGroup(object):
     self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'outside_subclonal_cn')
     self._variants_and_reads = filtered
 
-  def format_variants(self, sample_size, error_rate):
+  def format_variants(self, sample_size, error_rate, priority_ssms):
     if sample_size is None:
       sample_size = len(self._variants_and_reads)
     random.shuffle(self._variants_and_reads)
-    subsampled, nonsubsampled = self._variants_and_reads[:sample_size], self._variants_and_reads[sample_size:]
+
+    subsampled, remaining = [], []
+
+    for variant, ref_reads, total_reads in self._variants_and_reads:
+      if len(subsampled) < sample_size and (variant.CHROM, variant.POS) in priority_ssms:
+        subsampled.append((variant, ref_reads, total_reads))
+      else:
+        remaining.append((variant, ref_reads, total_reads))
+
+    assert len(subsampled) <= sample_size
+    needed = sample_size - len(subsampled)
+    subsampled = subsampled + remaining[:needed]
+    nonsubsampled = remaining[needed:]
 
     formatter = VariantFormatter()
     subsampled = list(formatter.format_variants(subsampled, error_rate))
@@ -709,6 +721,18 @@ class CnvParser(object):
 
     return cn_regions
 
+def parse_priority_ssms(priority_ssm_filename):
+  if priority_ssm_filename is None:
+    return set()
+  with open(priority_ssm_filename) as priof:
+    lines = priof.readlines()
+
+  priority_ssms = set()
+  for line in lines:
+    chrom, pos = line.strip().split('_', 1)
+    priority_ssms.add((chrom.lower(), int(pos)))
+  return set(priority_ssms)
+
 def main():
   parser = argparse.ArgumentParser(
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
@@ -718,6 +742,8 @@ def main():
     help='Expected error rate of sequencing platform')
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,
     help='Subsample SSMs to reduce PhyloWGS runtime')
+  parser.add_argument('-P', '--priority-ssms', dest='priority_ssm_filename',
+    help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
   parser.add_argument('--cnvs', dest='cnv_file',
     help='Path to CNV list created with parse_cnvs.py')
   parser.add_argument('--only-normal-cn', dest='only_normal_cn', action='store_true', default=False,
@@ -780,7 +806,8 @@ def main():
   elif grouper.has_cnvs():
     grouper.exclude_variants_in_subclonal_cnvs()
 
-  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate)
+  priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms)
   grouper.write_variants(subsampled_vars, args.output_variants)
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
