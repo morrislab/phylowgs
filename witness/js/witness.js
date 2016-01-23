@@ -273,6 +273,10 @@ ClusterPlotter.prototype._draw_cluster_plots = function(cluster) {
 }
 
 ClusterPlotter.prototype._draw_pop_plots = function(pop) {
+  // Don't draw plots for root node, as its parameter values are always fixed.
+  if(pop.name === 0)
+    return;
+
   this._empty_plot_container();
 
   if(!pop.is_bastard) {
