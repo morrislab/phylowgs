@@ -383,25 +383,27 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
 
     // Add bastards.
     if(pop.bastards) {
-      var mean_ssms = Util.mean(pop.bastards.num_ssms);
-      var trees_with_bastard = pop.bastards.num_ssms.length;
+      pop.bastards.forEach(function(bastard) {
+        var mean_ssms = Util.mean(bastard.num_ssms);
+        var trees_with_bastard = bastard.num_ssms.length;
 
-      var bastard = {
-        // Assign numerical index following all populations.
-        name: pops.length,
-        radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
-        opacity: trees_with_bastard / trees_in_cluster,
-        num_ssms: pop.bastards.num_ssms,
-        cellular_prevalences: pop.bastards.cellular_prevalences,
-        is_bastard: true
-      };
-      pops.push(bastard);
+        var bastard_node = {
+          // Assign numerical index following all populations.
+          name: pops.length,
+          radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
+          opacity: trees_with_bastard / trees_in_cluster,
+          num_ssms: bastard.num_ssms,
+          cellular_prevalences: bastard.cellular_prevalences,
+          is_bastard: true
+        };
+        pops.push(bastard_node);
 
-      links.push({
-        source: pop,
-        target: bastard,
-        width: Util.calc_in_range(2, 15, trees_with_bastard / trees_in_cluster),
-        name: pop.name + '_' + bastard.name
+        links.push({
+          source: pop,
+          target: bastard_node,
+          width: Util.calc_in_range(2, 15, trees_with_bastard / trees_in_cluster),
+          name: pop.name + '_' + bastard_node.name
+        });
       });
     }
   });
@@ -415,8 +417,10 @@ ClusterPlotter.prototype._tick = function(link, node, alpha, redraw) {
     // Given each directed edge, push the parent up and the child down,
     // resulting in a more tree-like display.
     var K = 10 * alpha;
-    d.source.y -= K;
-    d.target.y += K;
+    // Effect disabled for the moment because it results in nodes overlapping
+    // their arrowheads.
+    //d.source.y -= K;
+    //d.target.y += K;
   });
 
   var _shorten_for_arrowhead = function(d) {
@@ -454,8 +458,8 @@ ClusterPlotter.prototype._draw = function(pops, links) {
   var self = this;
   var force = d3.layout.force()
       .size([this._width, this._height])
-      .charge(-800)
-      .gravity(0.1)
+      .charge(-3500)
+      .gravity(0.2)
       .linkStrength(0.01);
 
   var vis = d3.select('#container').html('').append('svg:svg')
@@ -481,6 +485,9 @@ ClusterPlotter.prototype._draw = function(pops, links) {
       .attr('opacity', function(d) { return d.opacity; })
       .call(force.drag)
       .on('click', function(pop) {
+        // Suppress event if it resulted from a drag-drop event, which is used
+        // to reposition the nodes on the canvas.
+        if (d3.event.defaultPrevented) return;
         self._draw_pop_plots(pop);
       });
   nodeEnter.append('svg:circle')
