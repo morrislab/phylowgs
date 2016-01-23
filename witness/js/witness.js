@@ -198,6 +198,13 @@ TreeUtil.calc_radius = function(scale) {
 }
 
 function ClusterPlotter() {
+  // horiz_padding should be set to the maximum radius of a node, so a node
+  // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
+  // we have horiz_padding = sqrt(8000 / pi) =~ 51.
+  var horiz_padding = 51;
+  this._M = [10, horiz_padding, 10, horiz_padding],
+      this._width = 800 - this._M[1] - this._M[3],
+      this._height = 600 - this._M[0] - this._M[2];
 }
 
 ClusterPlotter.prototype.render = function(dataset) {
@@ -325,7 +332,9 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
   }
 
   var pops = [];
-  for(var popidx in cluster.populations) {
+  var self = this;
+  var Y = 40;
+  Object.keys(cluster.populations).sort().forEach(function(popidx) {
     popidx = parseInt(popidx, 10);
     if(popidx !== pops.length) {
       throw "Expected " + popidx + " populations, but have " + pops.length;
@@ -335,9 +344,12 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
     var trees_with_pop = popdata.trees_with_pop;
     var mean_ssms = Util.mean(popdata.num_ssms);
 
+    var radius = TreeUtil.calc_radius(mean_ssms / max_ssms);
     var pop = {
+      x: self._width / 2 - radius,
+      y: Y,
       name: popidx,
-      radius: TreeUtil.calc_radius(mean_ssms / max_ssms),
+      radius: radius,
       opacity: trees_with_pop / trees_in_cluster,
       is_bastard: false,
       jaccard_scores: popdata.jaccard_scores,
@@ -346,8 +358,12 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
       children: popdata.children || [],
       bastards: popdata.bastard_subtrees || null
     };
+    if(popidx == 0) {
+      pop.fixed = true;
+    }
+    Y += 200;
     pops.push(pop);
-  }
+  });
 
   var links = [];
   pops.forEach(function(pop) {
@@ -394,10 +410,16 @@ ClusterPlotter.prototype._show_cluster = function(cluster) {
   this._draw_cluster_plots(cluster);
 }
 
-ClusterPlotter.prototype._tick = function(link, node) {
-  node.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; })
+ClusterPlotter.prototype._tick = function(link, node, alpha, redraw) {
+  link.each(function(d) {
+    // Given each directed edge, push the parent up and the child down,
+    // resulting in a more tree-like display.
+    var K = 10 * alpha;
+    d.source.y -= K;
+    d.target.y += K;
+  });
 
-  var calc = function(d) {
+  var _shorten_for_arrowhead = function(d) {
     var vec = [ d.target.x - d.source.x, d.target.y - d.source.y ];
     var len = Math.sqrt(vec[0]*vec[0] + vec[1]*vec[1]);
     // In early simulation stages, source and target may be at the same
@@ -421,34 +443,27 @@ ClusterPlotter.prototype._tick = function(link, node) {
     };
   };
 
+  node.attr('transform', function(d) { return 'translate(' + d.x + ',' + d.y + ')'; })
   link.attr('x1', function(d) { return d.source.x; })
     .attr('y1', function(d) { return d.source.y; })
-    .attr('x2', function(d) { return calc(d).x; })
-    .attr('y2', function(d) { return calc(d).y; });
+    .attr('x2', function(d) { return _shorten_for_arrowhead(d).x; })
+    .attr('y2', function(d) { return _shorten_for_arrowhead(d).y; });
 }
 
 ClusterPlotter.prototype._draw = function(pops, links) {
-  // horiz_padding should be set to the maximum radius of a node, so a node
-  // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
-  // we have horiz_padding = sqrt(8000 / pi) =~ 51.
-  var horiz_padding = 51;
-  var m = [10, horiz_padding, 10, horiz_padding],
-      w = 800 - m[1] - m[3],
-      h = 600 - m[0] - m[2],
-      i = 0;
-
   var self = this;
   var force = d3.layout.force()
-      .size([w, h])
-      .charge(-2500)
+      .size([this._width, this._height])
+      .charge(-800)
+      .gravity(0.1)
       .linkStrength(0.01);
 
   var vis = d3.select('#container').html('').append('svg:svg')
       .html(MARKER)
-      .attr('width', w + m[1] + m[3])
-      .attr('height', h + m[0] + m[2])
+      .attr('width', this._width + this._M[1] + this._M[3])
+      .attr('height', this._height + this._M[0] + this._M[2])
       .append('svg:g')
-      .attr('transform', 'translate(' + m[3] + ',' + m[0] + ')');
+      .attr('transform', 'translate(' + this._M[3] + ',' + this._M[0] + ')');
 
   force.nodes(pops)
     .links(links)
@@ -493,8 +508,7 @@ ClusterPlotter.prototype._draw = function(pops, links) {
   for(var i = 0; i < 200 && force.alpha() > 0.03; i++) {
     force.tick();
   }
-  force.on('tick', function() { self._tick(link, node); });
-  this._tick(link, node);
+  force.on('tick', function(evt) { self._tick(link, node, evt.alpha); });
 }
 
 function TreeSummarizer() {
