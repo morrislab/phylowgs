@@ -323,6 +323,8 @@ def run(safe_to_exit, run_succeeded, config):
 		)
 
 def remove_tmp_files(tmp_dir):
+	if tmp_dir is None:
+		return
 	tmp_filenames = get_c_fnames(tmp_dir)
 	for tmpfn in tmp_filenames:
 		try:
