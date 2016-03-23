@@ -6,6 +6,14 @@ function ClusterPlotter() {
   this._M = [10, horiz_padding, 10, horiz_padding],
       this._width = 800 - this._M[1] - this._M[3],
       this._height = 600 - this._M[0] - this._M[2];
+
+  $('#cluster-mode-chooser button').click(function() {
+      var self = $(this);
+      self.siblings('button').removeClass('active');
+      self.addClass('active');
+      // Trigger redraw.
+      $('#clusters tr.active').click();
+  });
 }
 
 ClusterPlotter.prototype.render = function(dataset) {
@@ -47,7 +55,15 @@ ClusterPlotter.prototype.render = function(dataset) {
       self.addClass('active');
 
       var cidx = self.find('.cluster-index').text();
-      cplotter._show_cluster(formatted_clusters[cidx]);
+
+      var active_cluster_mode = $('#cluster-mode-chooser .active');
+      if(active_cluster_mode.hasClass('centroid-chooser')) {
+        cplotter._show_centroid(formatted_clusters[cidx]);
+      } else if(active_cluster_mode.hasClass('average-chooser')) {
+        cplotter._show_average(formatted_clusters[cidx]);
+      } else {
+        throw 'No cluster mode chosen';
+      }
     });
     $('#cluster-list').scrollTop(0);
   });
@@ -126,7 +142,84 @@ ClusterPlotter.prototype._draw_histogram = function(vals, title, xlabel, xmin, x
   chart.draw(data, options);
 }
 
-ClusterPlotter.prototype._show_cluster = function(cluster) {
+ClusterPlotter.prototype._calc_max_spanning_tree = function(cluster) {
+  // Use Kruskal's algorithm to get max spanning tree.
+  var edges = [];
+  var vertex_sets = [];
+  var mst = {};
+
+  Object.keys(cluster.populations).forEach(function(popidx) {
+    var popidx = parseInt(popidx, 10);
+    var pop = cluster.populations[popidx];
+    vertex_sets.push([popidx]);
+
+    Object.keys(pop.children).forEach(function(childidx) {
+      var childidx = parseInt(childidx, 10);
+      var weight = pop.children[childidx];
+      edges.push({weight: weight, from: popidx, to: childidx});
+    });
+  });
+
+  edges.sort(function(a, b) {
+    // Sort in descending order.
+    return b.weight - a.weight;
+  });
+
+  var _get_set_idx = function(vert) {
+    for(var i = 0; i < vertex_sets.length; i++) {
+      if(typeof vertex_sets[i] !== 'undefined' && vertex_sets[i].indexOf(vert) > -1) {
+        return i;
+      }
+    }
+    return -1;
+  };
+
+  edges.forEach(function(edge) {
+    var from_set_idx = _get_set_idx(edge.from);
+    var to_set_idx = _get_set_idx(edge.to);
+    if(from_set_idx === to_set_idx) {
+      return;
+    }
+
+    vertex_sets[from_set_idx] = vertex_sets[from_set_idx].concat(vertex_sets[to_set_idx]);
+    delete vertex_sets[to_set_idx];
+
+    if(!mst.hasOwnProperty(edge.from)) {
+      mst[edge.from] = [];
+    }
+    mst[edge.from].push(edge.to);
+  });
+
+  return mst;
+}
+
+ClusterPlotter.prototype._create_pops = function(cluster) {
+  var pops = {};
+
+  Object.keys(cluster.populations).forEach(function(popidx) {
+    var pop = cluster.populations[popidx];
+    var cell_prevs = Util.transpose(pop.cellular_prevalences).map(function(cp_estimates) {
+      return Util.mean(cp_estimates);
+    });
+    pops[popidx] = {
+      num_ssms: Math.round(Util.mean(pop.num_ssms)),
+      // TODO: actually provide CNV counts rather than dummy 0 values.
+      num_cnvs: 0,
+      cellular_prevalence: cell_prevs,
+    };
+  });
+  return pops;
+}
+
+ClusterPlotter.prototype._show_centroid = function(cluster) {
+  var exemplar_structure = this._calc_max_spanning_tree(cluster);
+  var exemplar_pops = this._create_pops(cluster);
+
+  var tplotter = new TreePlotter();
+  tplotter.draw(exemplar_pops, exemplar_structure);
+}
+
+ClusterPlotter.prototype._show_average = function(cluster) {
   var trees_in_cluster = cluster.members.length;
 
   var max_ssms = 0;

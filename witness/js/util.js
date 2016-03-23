@@ -19,3 +19,12 @@ Util.sort_ints = function(arr) {
     return parseInt(a, 10) - parseInt(b, 10);
   });
 }
+
+Util.transpose = function(arr) {
+  // Taken from http://stackoverflow.com/a/17428705
+  return arr[0].map(function(_, i) {
+    return arr.map(function(row) {
+      return row[i];
+    });
+  });
+}

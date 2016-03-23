@@ -20,4 +20,9 @@ google.setOnLoadCallback(main);
 
 function main() {
   new Interface();
+  /*setTimeout(function() {
+    $('#runs a:contains("steph")').click();
+    $('#sample-list a:contains("SJBALL022609")').click();
+    $('.nav-clustered-trees').click();
+  }, 1000);*/
 }
