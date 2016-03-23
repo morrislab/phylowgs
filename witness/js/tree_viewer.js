@@ -1,13 +1,13 @@
-function TreePlotter() {
+function TreeViewer() {
 }
 
-TreePlotter.prototype._sort_numeric = function(arr) {
+TreeViewer.prototype._sort_numeric = function(arr) {
   return arr.sort(function(a, b) {
     return parseInt(a, 10) - parseInt(b, 10);
   });
 }
 
-TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
+TreeViewer.prototype._calc_ccf = function(tree, pop_id) {
   var cp = tree.populations[pop_id].cellular_prevalence;
   if(parseInt(pop_id, 10) === 0)
     return cp.map(function(E) { return 0; });
@@ -22,7 +22,7 @@ TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
   return ccf;
 }
 
-TreePlotter.prototype.render = function(dataset) {
+TreeViewer.prototype.render = function(dataset) {
   $('#tree-list').show();
   var tree_container = $('#trees tbody');
 
@@ -84,7 +84,7 @@ TreePlotter.prototype.render = function(dataset) {
   });
 }
 
-TreePlotter.prototype._draw_tree = function(root) {
+TreeViewer.prototype._draw_tree = function(root) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -150,7 +150,7 @@ TreePlotter.prototype._draw_tree = function(root) {
   link.exit().remove();
 }
 
-TreePlotter.prototype._find_max_ssms = function(populations) {
+TreeViewer.prototype._find_max_ssms = function(populations) {
   var max_ssms = 0;
   for(var pop_id in populations) {
     var pop = populations[pop_id];
@@ -160,7 +160,7 @@ TreePlotter.prototype._find_max_ssms = function(populations) {
   return max_ssms;
 }
 
-TreePlotter.prototype._generate_tree_struct = function(adjlist, pops) {
+TreeViewer.prototype._generate_tree_struct = function(adjlist, pops) {
   var max_ssms = this._find_max_ssms(pops);
 
   var _add_node = function(node_id, struct) {

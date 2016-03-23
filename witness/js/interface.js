@@ -11,7 +11,7 @@ function Interface() {
 
   this._available_renderers = {
     'summarizer': new TreeSummarizer(),
-    'tree_plotter': new TreePlotter(),
+    'tree_viewer': new TreeViewer(),
     'cluster_plotter': new ClusterPlotter()
   };
 }
@@ -37,7 +37,7 @@ Interface.prototype._activate_navbar = function() {
 
     var mapping = {
       'nav-tree-summaries': 'summarizer',
-      'nav-tree-viewer': 'tree_plotter',
+      'nav-tree-viewer': 'tree_viewer',
       'nav-clustered-trees': 'cluster_plotter'
     };
     iface._renderer = null;
