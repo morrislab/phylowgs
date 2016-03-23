@@ -72,7 +72,7 @@ body {
     bottom: 0;
   }
 
-  #tree-list {
+  #tree-list, #cluster-list {
     top: 51px;
     bottom: 0;
   }
