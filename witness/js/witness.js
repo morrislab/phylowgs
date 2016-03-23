@@ -18,12 +18,17 @@ TreePlotter.prototype._sort_numeric = function(arr) {
 }
 
 TreePlotter.prototype._calc_ccf = function(tree, pop_id) {
+  var cp = tree.populations[pop_id].cellular_prevalence;
   if(parseInt(pop_id, 10) === 0)
-    return 0;
+    return cp.map(function(E) { return 0; });
 
+  var ccf = [];
   // This only works for monoclonal trees, but it's the desired behaviour according to Quaid.
-  var cellularity = mean(tree.populations[1].cellular_prevalence);
-  var ccf = mean(tree.populations[pop_id].cellular_prevalence) / cellularity;
+  var cellularity = tree.populations[1].cellular_prevalence;
+  for(var i = 0; i < cellularity.length; i++) {
+    ccf.push(cp[i] / cellularity[i]);
+  }
+
   return ccf;
 }
 
@@ -63,15 +68,23 @@ TreePlotter.prototype.render = function(dataset) {
       self.addClass('active');
 
       var tidx = self.find('.tree-index').text();
+      var pop_ids = tplotter._sort_numeric(Object.keys(summary.trees[tidx].populations));
       var root = tplotter._generate_tree_struct(summary.trees[tidx].structure, summary.trees[tidx].populations);
       tplotter._draw_tree(root);
 
-      var summary_table = $('#snippets .tree-summary').clone().appendTo('#container').find('tbody');
-      var pop_ids = tplotter._sort_numeric(Object.keys(summary.trees[tidx].populations));
+      var summary_table = $('#snippets .tree-summary').clone().appendTo('#container');
+      var num_pops = summary.trees[tidx].populations[pop_ids[0]].cellular_prevalence.length;
+      summary_table.find('.cellprev').attr('colspan', num_pops);
+      summary_table.find('.ccf').attr('colspan', num_pops);
+      summary_table = summary_table.find('tbody');
+
       pop_ids.forEach(function(pop_id) {
         var pop = summary.trees[tidx].populations[pop_id];
+        var cp = pop.cellular_prevalence.map(function(E) { return E.toFixed(3); });
         var ccf = tplotter._calc_ccf(summary.trees[tidx], pop_id);
-        var entries = [pop_id, mean(pop.cellular_prevalence).toFixed(3), ccf.toFixed(3), pop.num_ssms, pop.num_cnvs].map(function(entry) {
+        ccf = ccf.map(function(E) { return E.toFixed(3); });
+
+        var entries = [pop_id].concat(cp).concat(ccf).concat([pop.num_ssms, pop.num_cnvs]).map(function(entry) {
           return '<td>' + entry + '</td>';
         });
         $('<tr/>').html(entries.join('')).appendTo(summary_table);
