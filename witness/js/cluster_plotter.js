@@ -46,7 +46,7 @@ ClusterPlotter.prototype.render = function(dataset) {
 
     // If direction not specified, this can end up being ascending or
     // descending sort, depending on prior sort state of table.
-    $('#cluster-idx').stupidsort('asc');
+    $('#cluster-size').stupidsort('desc');
 
     cluster_table.find('tr').click(function(evt) {
       evt.preventDefault();
