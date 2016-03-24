@@ -5,6 +5,12 @@ Util.mean = function(list) {
   return list.reduce(function(a, b) { return a + b; }) / list.length;
 }
 
+Util.stdev = function(list) {
+  var mean = Util.mean(list);
+  var diffs = list.map(function(E) { return Math.pow(E - mean, 2); });
+  return Math.sqrt(Util.mean(diffs));
+}
+
 Util.array_max = function(arr) {
   return Math.max.apply(null, arr);
 }
