@@ -74,7 +74,7 @@ TreeSummarizer.prototype._render_cell_prevs = function(cell_prevs) {
     var x_min = 0;
     var x_max = 1.0;
     var options = {
-      title: 'Cellular prevalence (subclone ' + (i + 1) + ') (' + cell_prevs[i].length + ' values)',
+      title: 'Cellular prevalence (cancerous population ' + (i + 1) + ') (' + cell_prevs[i].length + ' values)',
       fontSize: Config.font_size,
       hAxis: {
         title: 'Cellular prevalence',
@@ -99,7 +99,7 @@ TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
     data.addRows(ssm_counts[i]);
 
     var options = {
-      title: 'Number of SSMs (subclone ' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
+      title: 'Number of SSMs (cancerous population ' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
       fontSize: Config.font_size,
       hAxis: {
         title: 'SSMs',
