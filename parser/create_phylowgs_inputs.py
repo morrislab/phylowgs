@@ -509,7 +509,7 @@ class VariantAndCnvGroup(object):
   def has_cnvs(self):
     return self._cn_regions is not None
 
-  def _filter_variants_outside_regions(self, variants_and_reads, regions):
+  def _filter_variants_outside_regions(self, regions):
     filtered = []
 
     for variant, ref_reads, total_reads in self._variants_and_reads:
@@ -527,7 +527,6 @@ class VariantAndCnvGroup(object):
     before = set([var for (var, _, _) in before])
     after = set([var for (var, _, _) in after])
     log('%s=%s %s=%s delta=%s' % (before_label, len(before), after_label, len(after), len(before) - len(after)))
-
 
     assert after.issubset(before)
     removed = list(before - after)
@@ -554,7 +553,7 @@ class VariantAndCnvGroup(object):
         if self._is_region_normal_cn(region) and region['cellular_prevalence'] == self._cellularity:
           normal_cn[chrom].append(region)
 
-    filtered = self._filter_variants_outside_regions(self._variants_and_reads, normal_cn)
+    filtered = self._filter_variants_outside_regions(normal_cn)
     self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'only_normal_cn')
     self._variants_and_reads = filtered
 
@@ -623,7 +622,7 @@ class VariantAndCnvGroup(object):
     good_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     # If variant isn't listed in *any* region: exclude (as we suspect CNV
     # caller didn't know what to do with the region).
-    filtered = self._filter_variants_outside_regions(self._variants_and_reads, good_regions)
+    filtered = self._filter_variants_outside_regions(good_regions)
     self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'outside_subclonal_cn')
     self._variants_and_reads = filtered
 
