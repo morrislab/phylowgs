@@ -97,23 +97,8 @@ class SangerParser(VariantParser):
   def _find_ref_and_variant_nt(self, variant):
     # Try most probable genotype called by CaVEMan. If can't find variant nt in
     # it, try the second most probable genotype.
-    genotypes = [variant.INFO['TG'][0], variant.INFO['SG'][0]]
-    variant_set = set()
-
-    while len(variant_set) == 0:
-      if len(genotypes) == 0:
-        raise Exception('No more genotypes to find variant_nt in for %s' % variant)
-      genotype = genotypes.pop(0)
-      normal_genotype, tumor_genotype = genotype.split('/')
-      # TODO: We throw out hetero germline. Deal with this later.
-      # BUG: we don't actually ignore hetero germline calls. Fix this later.
-      if normal_genotype[0] != normal_genotype[1]:
-        log('Ignoring heterozygous normal genotype %s' % normal_genotype, file=sys.stderr)
-      reference_nt = normal_genotype[0]
-      variant_set = set(tumor_genotype) - set(reference_nt)
-
-    variant_nt = variant_set.pop()
-    return (reference_nt, variant_nt)
+    assert len(variant.REF) == len(variant.ALT) == 1
+    return (str(variant.REF[0]), str(variant.ALT[0]))
 
   def _calc_read_counts(self, variant):
     normal = variant.genotype('NORMAL')
