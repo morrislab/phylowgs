@@ -68,8 +68,9 @@ weird, and so are ignored by the parser.)
 
 Installation
 ------------
-The parser requires Python 2 and [PyVCF](https://pypi.python.org/pypi/PyVCF).
-The latter can be installed via pip:
+The parser requires Python 2, NumPy, SciPy, and
+[PyVCF](https://pypi.python.org/pypi/PyVCF). The last of these can be installed
+via pip:
 
     pip2 install --user pyvcf
 
@@ -78,7 +79,7 @@ Examples
 * Create ssm_data.txt from Sanger's PCAWG variant-calling
   pipeline, subsampling to 5000 mutations:
 
-        ./create_phylowgs_inputs.py -s 5000 -v sanger sample.vcf
+        ./create_phylowgs_inputs.py -s 5000 sanger=sample.vcf
 
     * Note that an empty cnv_data.txt is created in this scenario, as no CNV
       data was provided.
@@ -87,19 +88,19 @@ Examples
   pipeline, including all mutations, assuming 0.72 cellularity (i.e., sample purity):
 
         ./parse_cnvs.py -f battenberg -c 0.72 cnv_calls_from_battenberg.txt
-        ./create_phylowgs_inputs.py -v sanger --cnvs cnvs.txt sample.vcf
+        ./create_phylowgs_inputs.py --cnvs cnvs.txt sanger=sample.vcf
 
 * Only use variants in copy-number-normal regions:
 
         ./parse_cnvs.py -f battenberg -c 0.72 cnv_calls_from_battenberg.txt 
-        ./create_phylowgs_inputs.py -v sanger -b cnv_calls_from_battenberg.txt --only-normal-cn sample.vcf
+        ./create_phylowgs_inputs.py -b cnv_calls_from_battenberg.txt --only-normal-cn sanger=sample.vcf
 
 * Run with SSMs from VarDict and CNVs from TITAN, using cellularity of 0.81
   (which may be estimated from [1 - "Normal contamination estimate"] in TITAN's
   `*params.txt` output):
 
         ./parse_cnvs.py -f titan -c 0.81 cnv_calls_segs.txt
-        ./create_phylowgs_inputs.py -v vardict --cnvs cnvs.txt sample.vcf
+        ./create_phylowgs_inputs.py --cnvs cnvs.txt vardict=sample.vcf
 
 Usage
 -----
@@ -126,11 +127,12 @@ Usage
                             Output destination for parsed CNVs (default: cnvs.txt)
 ### Primary parser
 
-    usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE] [-s SAMPLE_SIZE]
+    usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE]
+                                     [--missing-variant-confidence MISSING_VARIANT_CONFIDENCE]
+                                     [-s SAMPLE_SIZE] [-P PRIORITY_SSM_FILENAME]
                                      [--cnvs CNV_FILE] [--only-normal-cn]
                                      [--output-cnvs OUTPUT_CNVS]
-                                     [--output-variants OUTPUT_VARIANTS] -v
-                                     {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}
+                                     [--output-variants OUTPUT_VARIANTS]
                                      [--tumor-sample TUMOR_SAMPLE]
                                      [--cnv-confidence CNV_CONFIDENCE]
                                      [--read-length READ_LENGTH]
@@ -138,22 +140,34 @@ Usage
                                      [--nonsubsampled-variants OUTPUT_NONSUBSAMPLED_VARIANTS]
                                      [--nonsubsampled-variants-cnvs OUTPUT_NONSUBSAMPLED_VARIANTS_CNVS]
                                      [--verbose]
-                                     vcf_file
+                                     vcf_files [vcf_files ...]
 
     Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV
     data.
 
     positional arguments:
-      vcf_file
+      vcf_files             One or more space-separated occurrences of
+                            <vcf_type>=<path>. E.g., sanger=variants1.vcf
+                            muse=variants2.vcf. Valid vcf_type values: strelka,
+                            mutect_pcawg, dkfz, muse, vardict, mutect_smchet,
+                            mutect_tcga, sanger
 
     optional arguments:
       -h, --help            show this help message and exit
       -e ERROR_RATE, --error-rate ERROR_RATE
                             Expected error rate of sequencing platform (default:
                             0.001)
+      --missing-variant-confidence MISSING_VARIANT_CONFIDENCE
+                            Confidence in range [0, 1] that SSMs missing from a
+                            sample are indeed not present in that sample (default:
+                            1.0)
       -s SAMPLE_SIZE, --sample-size SAMPLE_SIZE
                             Subsample SSMs to reduce PhyloWGS runtime (default:
                             None)
+      -P PRIORITY_SSM_FILENAME, --priority-ssms PRIORITY_SSM_FILENAME
+                            File containing newline-separated list of SSMs in
+                            "<chr>_<locus>" format to prioritize for inclusion
+                            (default: None)
       --cnvs CNV_FILE       Path to CNV list created with parse_cnvs.py (default:
                             None)
       --only-normal-cn      Only output variants lying in normal CN regions. Do
@@ -163,15 +177,13 @@ Usage
       --output-variants OUTPUT_VARIANTS
                             Output destination for variants (default:
                             ssm_data.txt)
-      -v {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}, --variant-type {sanger,mutect_pcawg,mutect_smchet,mutect_tcga,muse,dkfz,strelka,vardict}
-                            Type of VCF file (default: None)
       --tumor-sample TUMOR_SAMPLE
                             Name of the tumor sample in the input VCF file.
                             Defaults to last sample if not specified. (default:
                             None)
       --cnv-confidence CNV_CONFIDENCE
                             Confidence in CNVs. Set to < 1 to scale "d" values
-                            used in CNV output file (default: 1.0)
+                            used in CNV output file (default: 0.5)
       --read-length READ_LENGTH
                             Approximate length of reads. Used to calculate
                             confidence in CNV frequencies (default: 100)

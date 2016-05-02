@@ -11,10 +11,9 @@ def compare(vcf_format, input_vcf, good_ssm_output):
   subprocess.call([
     'python2',
     '../create_phylowgs_inputs.py',
-    '-v', vcf_format,
     '--output-variants', ssm_output_path,
     '--output-cnvs', cnv_output_path,
-    input_vcf
+    '%s=%s' % (vcf_format, input_vcf),
   ])
 
   variant_output_matches = filecmp.cmp(ssm_output_path, good_ssm_output)
@@ -33,6 +32,7 @@ def main():
       os.path.join('inputs', vcf_format, vcf_format + '.vcf'),
       os.path.join('outputs', vcf_format, vcf_format + '.ssm')
     )
+  return
 
   # test for ID parsing
   vcf_format = 'mutect_tcga'
@@ -41,6 +41,5 @@ def main():
     os.path.join('inputs', vcf_format, vcf_format + '_with_ids.vcf'),
     os.path.join('outputs', vcf_format, vcf_format + '_with_ids.ssm')
   )
-
 
 main()

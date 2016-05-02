@@ -5,9 +5,12 @@ from __future__ import print_function
 import vcf
 import argparse
 import csv
-from collections import defaultdict
+from collections import defaultdict, namedtuple
 import random
 import sys
+import numpy as np
+import numpy.ma as ma
+from scipy.stats.mstats import gmean
 
 class VariantParser(object):
   def __init__(self):
@@ -411,12 +414,13 @@ class VariantFormatter(object):
       raise Exception('Nonsensical frequency: %s' % freq)
     return freq
 
-  def format_variants(self, variant_list, error_rate):
-    variant_list.sort(key = lambda v: variant_key(v[0]))
-
-    for variant, ref_reads, total_reads in variant_list:
+  def format_variants(self, variants, ref_read_counts, total_read_counts, error_rate):
+    for variant_idx, variant in enumerate(variants):
       ssm_id = 's%s' % self._counter
-      if variant.ID is not None:
+      if hasattr(variant, 'ID') and variant.ID is not None:
+        # This field will be defined by PyVCF, but not by our VariantId named
+        # tuple that we have switched to, so this code will never actually run.
+        # TODO: fix that.
         variant_name = variant.ID
       else:
         variant_name = '%s_%s' % (variant.CHROM, variant.POS)
@@ -445,8 +449,8 @@ class VariantFormatter(object):
         'chrom': variant.CHROM,
         'pos': variant.POS,
         'variant_name': variant_name,
-        'ref_reads': ref_reads,
-        'total_reads': total_reads,
+        'ref_reads': list(ref_read_counts[variant_idx,:]),
+        'total_reads': list(total_read_counts[variant_idx,:]),
         'expected_ref_freq': expected_ref_freq,
         'expected_var_freq': expected_var_freq,
       }
@@ -481,8 +485,11 @@ class VariantAndCnvGroup(object):
     self._cn_regions = None
     self._cellularity = None
 
-  def add_variants(self, variants_and_reads):
-    self._variants_and_reads = variants_and_reads
+  def add_variants(self, variants, ref_read_counts, total_read_counts):
+    self._variants = variants
+    self._variant_idxs = list(range(len(variants)))
+    self._ref_read_counts = ref_read_counts
+    self._total_read_counts = total_read_counts
     # Estimate read depth before any filtering of variants is performed, in
     # case no SSMs remain afterward.
     self._estimated_read_depth = self._estimate_read_depth()
@@ -494,23 +501,30 @@ class VariantAndCnvGroup(object):
   def has_cnvs(self):
     return self._cn_regions is not None
 
-  def _filter_variants_outside_regions(self, regions):
+  def _filter_variants_outside_regions(self, regions, before_label, after_label):
     filtered = []
 
-    for variant, ref_reads, total_reads in self._variants_and_reads:
+    for vidx in self._variant_idxs:
+      variant = self._variants[vidx]
       for region in regions[variant.CHROM]:
         if region['start'] <= variant.POS <= region['end']:
-          filtered.append((variant, ref_reads, total_reads))
+          filtered.append(vidx)
           break
 
-    return filtered
+    self._print_variant_differences(
+      [self._variants[idx] for idx in self._variant_idxs],
+      [self._variants[idx] for idx in filtered],
+      before_label,
+      after_label
+    )
+    self._variant_idxs = filtered
 
   def _is_region_normal_cn(self, region):
     return region['major_cn'] == region['minor_cn'] == 1
 
   def _print_variant_differences(self, before, after, before_label, after_label):
-    before = set([var for (var, _, _) in before])
-    after = set([var for (var, _, _) in after])
+    before = set(before)
+    after = set(after)
     log('%s=%s %s=%s delta=%s' % (before_label, len(before), after_label, len(after), len(before) - len(after)))
 
     assert after.issubset(before)
@@ -538,9 +552,7 @@ class VariantAndCnvGroup(object):
         if self._is_region_normal_cn(region) and region['cellular_prevalence'] == self._cellularity:
           normal_cn[chrom].append(region)
 
-    filtered = self._filter_variants_outside_regions(normal_cn)
-    self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'only_normal_cn')
-    self._variants_and_reads = filtered
+    filtered = self._filter_variants_outside_regions(normal_cn, 'all_variants', 'only_normal_cn')
 
   def _filter_multiple_abnormal_cn_regions(self, regions):
     good_regions = defaultdict(list)
@@ -607,38 +619,49 @@ class VariantAndCnvGroup(object):
     good_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     # If variant isn't listed in *any* region: exclude (as we suspect CNV
     # caller didn't know what to do with the region).
-    filtered = self._filter_variants_outside_regions(good_regions)
-    self._print_variant_differences(self._variants_and_reads, filtered, 'all_variants', 'outside_subclonal_cn')
-    self._variants_and_reads = filtered
+    self._filter_variants_outside_regions(good_regions, 'all_variants', 'outside_subclonal_cn')
 
   def format_variants(self, sample_size, error_rate, priority_ssms):
     if sample_size is None:
-      sample_size = len(self._variants_and_reads)
-    random.shuffle(self._variants_and_reads)
+      sample_size = len(self._variant_idxs)
+    random.shuffle(self._variant_idxs)
 
     subsampled, remaining = [], []
 
-    for variant, ref_reads, total_reads in self._variants_and_reads:
+    for variant_idx in self._variant_idxs:
+      variant = self._variants[variant_idx]
       if len(subsampled) < sample_size and (variant.CHROM, variant.POS) in priority_ssms:
-        subsampled.append((variant, ref_reads, total_reads))
+        subsampled.append(variant_idx)
       else:
-        remaining.append((variant, ref_reads, total_reads))
+        remaining.append(variant_idx)
 
     assert len(subsampled) <= sample_size
     needed = sample_size - len(subsampled)
     subsampled = subsampled + remaining[:needed]
     nonsubsampled = remaining[needed:]
 
-    formatter = VariantFormatter()
-    subsampled = list(formatter.format_variants(subsampled, error_rate))
-    nonsubsampled = list(formatter.format_variants(nonsubsampled, error_rate))
+    subsampled.sort(key = lambda idx: variant_key(self._variants[idx]))
+    subsampled_variants = get_elements_at_indices(self._variants, subsampled)
+    subsampled_ref_counts = self._ref_read_counts[subsampled,:]
+    subsampled_total_counts = self._total_read_counts[subsampled,:]
 
-    return (subsampled, nonsubsampled)
+    nonsubsampled.sort(key = lambda idx: variant_key(self._variants[idx]))
+    nonsubsampled_variants = get_elements_at_indices(self._variants, nonsubsampled)
+    nonsubsampled_ref_counts = self._ref_read_counts[nonsubsampled,:]
+    nonsubsampled_total_counts = self._total_read_counts[nonsubsampled,:]
+
+    formatter = VariantFormatter()
+    subsampled_formatted = list(formatter.format_variants(subsampled_variants, subsampled_ref_counts, subsampled_total_counts, error_rate))
+    nonsubsampled_formatted = list(formatter.format_variants(nonsubsampled_variants, nonsubsampled_ref_counts, nonsubsampled_total_counts, error_rate))
+
+    return (subsampled_formatted, nonsubsampled_formatted)
 
   def write_variants(self, variants, outfn):
     with open(outfn, 'w') as outf:
       print('\t'.join(('id', 'gene', 'a', 'd', 'mu_r', 'mu_v')), file=outf)
       for variant in variants:
+        variant['ref_reads'] = ','.join([str(v) for v in variant['ref_reads']])
+        variant['total_reads'] = ','.join([str(v) for v in variant['total_reads']])
         vals = (
           'ssm_id',
           'variant_name',
@@ -652,13 +675,12 @@ class VariantAndCnvGroup(object):
 
   def _estimate_read_depth(self):
     read_sum = 0
-    if len(self._variants_and_reads) == 0:
+    if len(self._variants) == 0:
       default_read_depth = 50
       log('No variants available, so fixing read depth at %s.' % default_read_depth)
       return default_read_depth
-    for variant, ref_reads, total_reads in self._variants_and_reads:
-      read_sum += total_reads
-    return float(read_sum) / len(self._variants_and_reads)
+    else:
+      return np.nanmean(self._total_read_counts)
 
   def write_cnvs(self, variants, outfn, cnv_confidence, read_length):
     abnormal_regions = {}
@@ -708,6 +730,12 @@ class CnvParser(object):
 
     return cn_regions
 
+def get_elements_at_indices(L, indices):
+  elem = []
+  for idx in indices:
+    elem.append(L[idx])
+  return elem
+
 def parse_priority_ssms(priority_ssm_filename):
   if priority_ssm_filename is None:
     return set()
@@ -720,13 +748,107 @@ def parse_priority_ssms(priority_ssm_filename):
     priority_ssms.add((chrom.lower(), int(pos)))
   return set(priority_ssms)
 
+def impute_missing_total_reads(total_reads, missing_variant_confidence):
+  # Change NaNs to masked values via SciPy.
+  masked_total_reads = ma.fix_invalid(total_reads)
+
+  # Going forward, suppose you have v variants and s samples in a v*s matrix of
+  # read counts. Missing values are masked.
+
+  # Calculate geometric mean of variant read depth in each sample. Result: s*1
+  sample_means = gmean(masked_total_reads, axis=0)
+  assert np.sum(sample_means <= 0) == np.sum(np.isnan(sample_means)) == 0
+  # Divide every variant's read count by its mean sample read depth to get read
+  # depth enrichment relative to other variants in sample. Result: v*s
+  normalized_to_sample = np.dot(masked_total_reads, np.diag(1./sample_means))
+  # For each variant, calculate geometric mean of its read depth enrichment
+  # across samples. Result: v*1
+  variant_mean_reads = gmean(normalized_to_sample, axis=1)
+  assert np.sum(variant_mean_reads <= 0) == np.sum(np.isnan(variant_mean_reads)) == 0
+
+  # Convert 1D arrays to vectors to permit matrix multiplication.
+  imputed_counts = np.dot(variant_mean_reads.reshape((-1, 1)), sample_means.reshape((1, -1)))
+  nan_coords = np.where(np.isnan(total_reads))
+  total_reads[nan_coords] = imputed_counts[nan_coords]
+  assert np.sum(total_reads <= 0) == np.sum(np.isnan(total_reads)) == 0
+
+  total_reads[nan_coords] *= missing_variant_confidence
+  return np.floor(total_reads).astype(np.int)
+
+def impute_missing_ref_reads(ref_reads, total_reads):
+  ref_reads = np.copy(ref_reads)
+
+  assert np.sum(np.isnan(total_reads)) == 0
+  nan_coords = np.where(np.isnan(ref_reads))
+  ref_reads[nan_coords] = total_reads[nan_coords]
+  assert np.sum(np.isnan(ref_reads)) == 0
+
+  return ref_reads.astype(np.int)
+
+def parse_variants(args, vcf_types):
+  num_samples = len(args.vcf_files)
+  parsed_variants = []
+  all_variant_ids = []
+
+  VariantId = namedtuple('VariantId', ['CHROM', 'POS'])
+
+  for vcf_file in args.vcf_files:
+    vcf_type, vcf_fn = vcf_file.split('=', 1)
+
+    if vcf_type == 'sanger':
+      variant_parser = SangerParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'mutect_pcawg':
+      variant_parser = MutectPcawgParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'mutect_smchet':
+      variant_parser = MutectSmchetParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'mutect_tcga':
+      variant_parser = MutectTcgaParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'muse':
+      variant_parser = MuseParser(vcf_fn, args.muse_tier, args.tumor_sample)
+    elif vcf_type == 'dkfz':
+      variant_parser = DKFZParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'strelka':
+      variant_parser = StrelkaParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'vardict':
+      variant_parser = VarDictParser(vcf_fn, args.tumor_sample)
+    else:
+      raise Exception('Unknowon variant type: %s' % vcf_type)
+
+    parsed_variants.append(variant_parser.list_variants())
+    variant_ids = [VariantId(str(v[0].CHROM), int(v[0].POS)) for v in parsed_variants[-1]]
+    all_variant_ids += variant_ids
+
+  all_variant_ids = list(set(all_variant_ids)) # Eliminate duplicates.
+  all_variant_ids.sort(key = variant_key)
+  num_variants = len(all_variant_ids)
+  variant_positions = dict(zip(all_variant_ids, range(num_variants)))
+
+  total_read_counts = np.zeros((num_variants, num_samples))
+  total_read_counts.fill(np.nan)
+  ref_read_counts = np.copy(total_read_counts)
+
+  for sample_idx, parsed in enumerate(parsed_variants):
+    for variant, ref_reads, total_reads in parsed:
+      variant_id = VariantId(str(variant.CHROM), int(variant.POS))
+      variant_idx = variant_positions[variant_id]
+      ref_read_counts[variant_idx, sample_idx] = ref_reads
+      total_read_counts[variant_idx, sample_idx] = total_reads
+
+  total_read_counts = impute_missing_total_reads(total_read_counts, args.missing_variant_confidence)
+  ref_read_counts = impute_missing_ref_reads(ref_read_counts, total_read_counts)
+  return (all_variant_ids, ref_read_counts, total_read_counts)
+
 def main():
+  vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'))
+
   parser = argparse.ArgumentParser(
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('-e', '--error-rate', dest='error_rate', type=restricted_float, default=0.001,
     help='Expected error rate of sequencing platform')
+  parser.add_argument('--missing-variant-confidence', dest='missing_variant_confidence', type=restricted_float, default=1.,
+    help='Confidence in range [0, 1] that SSMs missing from a sample are indeed not present in that sample')
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,
     help='Subsample SSMs to reduce PhyloWGS runtime')
   parser.add_argument('-P', '--priority-ssms', dest='priority_ssm_filename',
@@ -739,8 +861,6 @@ def main():
     help='Output destination for CNVs')
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
     help='Output destination for variants')
-  parser.add_argument('-v', '--variant-type', dest='input_type', required=True, choices=('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'),
-    help='Type of VCF file')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=0.5,
@@ -754,34 +874,19 @@ def main():
   parser.add_argument('--nonsubsampled-variants-cnvs', dest='output_nonsubsampled_variants_cnvs',
     help='If subsampling, write CNVs for nonsubsampled variants to separate file')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
-  parser.add_argument('vcf_file')
+  parser.add_argument('vcf_files', nargs='+', help='One or more space-separated occurrences of <vcf_type>=<path>. E.g., sanger=variants1.vcf muse=variants2.vcf. Valid vcf_type values: %s' % ', '.join(vcf_types))
   args = parser.parse_args()
 
   log.verbose = args.verbose
+
+  variant_ids, ref_read_counts, total_read_counts = parse_variants(args, vcf_types)
 
   # Fix random seed to ensure same set of SSMs chosen when subsampling on each
   # invocation.
   random.seed(1)
 
   grouper = VariantAndCnvGroup()
-  if args.input_type == 'sanger':
-    variant_parser = SangerParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'mutect_pcawg':
-    variant_parser = MutectPcawgParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'mutect_smchet':
-    variant_parser = MutectSmchetParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'mutect_tcga':
-    variant_parser = MutectTcgaParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'muse':
-    variant_parser = MuseParser(args.vcf_file, args.muse_tier, args.tumor_sample)
-  elif args.input_type == 'dkfz':
-    variant_parser = DKFZParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'strelka':
-    variant_parser = StrelkaParser(args.vcf_file, args.tumor_sample)
-  elif args.input_type == 'vardict':
-    variant_parser = VarDictParser(args.vcf_file, args.tumor_sample)
-  variants_and_reads = variant_parser.list_variants()
-  grouper.add_variants(variants_and_reads)
+  grouper.add_variants(variant_ids, ref_read_counts, total_read_counts)
 
   if args.cnv_file:
     cnv_parser = CnvParser(args.cnv_file)
