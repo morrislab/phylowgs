@@ -33,7 +33,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
     return;
 
   var data = new google.visualization.DataTable();
-  data.addColumn('number', 'Sample');
+  data.addColumn('string', 'Sample');
   for(var popidx = 1; popidx <= num_cancer_pops; popidx++) {
     data.addColumn('number', 'Population ' + popidx);
   }
@@ -46,7 +46,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
   ccf.shift();
 
   var samp_ids = (new Array(num_samples)).fill(0).map(function(val, idx) {
-    return idx + 1;
+    return 'Sample ' + (idx + 1);
   });
 
   var data_vals_T = [samp_ids].concat(ccf);
@@ -58,7 +58,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
   // sacrifice.
   var options = {
     chart: {
-      title: 'Population cancer cell fraction trajectories'
+      title: 'Cancer cell fraction trajectories'
     },
     width: container.width(),
     height: 650,
