@@ -38,35 +38,43 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
     data.addColumn('number', 'Population ' + popidx);
   }
 
-  var cp = pop_ids.map(function(pop_id) {
-    return populations[pop_id].cellular_prevalence;
+  var self = this;
+  var ccf = pop_ids.map(function(pop_id) {
+    return self._calc_ccf(populations, pop_id);
   });
-  // Remove CPs for non-cancerous first element, which will always be 1.
-  cp.shift();
+  // Remove CCFs for non-cancerous first element, which will always be 1.
+  ccf.shift();
 
   var samp_ids = (new Array(num_samples)).fill(0).map(function(val, idx) {
     return idx + 1;
   });
 
-  var data_vals_T = [samp_ids].concat(cp);
+  var data_vals_T = [samp_ids].concat(ccf);
   data.addRows(Util.transpose(data_vals_T));
 
+  var container = $('<div/>').appendTo('#container');
+  // hAxis.minValue and vAxis.title attributes don't work with Material charts.
+  // But the Material charts look so darn sexy, I'm willing to make this
+  // sacrifice.
   var options = {
     chart: {
-      title: 'Population cellular prevalence trajectories'
+      title: 'Population cancer cell fraction trajectories'
     },
-    width: 1000,
+    width: container.width(),
     height: 650,
     hAxis: {
       minValue: 1,
     },
     vAxis: {
-      title: 'Cellular prevalence',
+      title: 'Cancer cell fraction',
     },
   };
 
-  var container = $('<div/>').appendTo('#container').get(0);
-  var chart = new google.charts.Line(container);
+  var chart = new google.charts.Line(container.get(0));
+  // Uncomment this to switch to using pre-Material charts, which have more
+  // options (like, oh, you know, titling the axes) but are less pretty and
+  // don't have the hover-over-legend-to-highlight-line function.
+  //var chart = new google.visualization.LineChart(container.get(0));
   chart.draw(data, options);
 }
 
