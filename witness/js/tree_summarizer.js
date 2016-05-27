@@ -23,6 +23,7 @@ TreeSummarizer.prototype._render_vafs = function(dataset) {
 
     var x_min = 0;
     var x_max = Math.max(1.0, Util.array_max(vafs));
+    var container = $('<div/>').prependTo('#container');
     var options = {
       title: 'VAFs (' + vafs.length + ' variants)',
       histogram: { bucketSize: 0.03 },
@@ -37,13 +38,12 @@ TreeSummarizer.prototype._render_vafs = function(dataset) {
       vAxis: {
         title: 'Number of variants',
       },
-      width: 1000,
+      width: container.width(),
       height: 450,
     };
 
     // Use prependTo() to ensure VAFs are always first plot displayed.
-    var container = $('<div/>').prependTo('#container').get(0);
-    var chart = new google.visualization.Histogram(container);
+    var chart = new google.visualization.Histogram(container.get(0));
     chart.draw(data, options);
   });
 }
@@ -73,6 +73,7 @@ TreeSummarizer.prototype._render_cell_prevs = function(cell_prevs) {
 
     var x_min = 0;
     var x_max = 1.0;
+    var container = $('<div/>').appendTo('#container');
     var options = {
       title: 'Cellular prevalence (cancerous population ' + (i + 1) + ') (' + cell_prevs[i].length + ' values)',
       fontSize: Config.font_size,
@@ -82,12 +83,11 @@ TreeSummarizer.prototype._render_cell_prevs = function(cell_prevs) {
       vAxis: {
         title: 'Trees',
       },
-      width: 1000,
+      width: container.width(),
       height: 450,
     };
 
-    var container = $('<div/>').appendTo('#container').get(0);
-    var chart = new google.visualization.Histogram(container);
+    var chart = new google.visualization.Histogram(container.get(0));
     chart.draw(data, options);
   }
 }
@@ -98,6 +98,7 @@ TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
     data.addColumn('number', 'SSMs');
     data.addRows(ssm_counts[i]);
 
+    var container = $('<div/>').appendTo('#container');
     var options = {
       title: 'Number of SSMs (cancerous population ' + (i + 1) + ') (' + ssm_counts[i].length + ' values)',
       fontSize: Config.font_size,
@@ -107,12 +108,11 @@ TreeSummarizer.prototype._render_ssm_counts = function(ssm_counts) {
       vAxis: {
         title: 'Trees',
       },
-      width: 1000,
+      width: container.width(),
       height: 450,
     };
 
-    var container = $('<div/>').appendTo('#container').get(0);
-    var chart = new google.visualization.Histogram(container);
+    var chart = new google.visualization.Histogram(container.get(0));
     chart.draw(data, options);
   }
 }
@@ -145,6 +145,7 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   data.addColumn('number', 'Count');
   data.addRows(rows);
 
+  var container = $('<div/>').appendTo('#container');
   var options = {
     title: 'Distribution of cancerous populations (' + pop_counts.length + ' values)',
     fontSize: Config.font_size,
@@ -154,12 +155,11 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
     vAxis: {
       title: 'Trees',
     },
-    width: 1000,
+    width: container.width(),
     height: 450,
   };
 
-  var container = $('<div/>').appendTo('#container').get(0);
-  var chart = new google.visualization.ColumnChart(container);
+  var chart = new google.visualization.ColumnChart(container.get(0));
   chart.draw(data, options);
 }
 
