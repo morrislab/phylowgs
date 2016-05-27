@@ -21,8 +21,8 @@ google.charts.setOnLoadCallback(main);
 function main() {
   new Interface();
   /*setTimeout(function() {
-    $('#runs a:contains("steph")').click();
-    $('#sample-list a:contains("SJBALL022609")').click();
-    $('.nav-clustered-trees').click();
+    $('#runs a:contains("multi_together")').click();
+    $('#sample-list a:contains("DO51953")').click();
+    $('.nav-tree-viewer').click();
   }, 1000);*/
 }

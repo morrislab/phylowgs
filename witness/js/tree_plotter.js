@@ -49,7 +49,6 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
   });
 
   var data_vals_T = [samp_ids].concat(cp);
-  console.log(data_vals_T);
   data.addRows(Util.transpose(data_vals_T));
 
   var options = {
@@ -79,15 +78,35 @@ TreePlotter.prototype.draw = function(populations, structure) {
 }
 
 TreePlotter.prototype._calc_ccf = function(populations, pop_id) {
-  var cp = populations[pop_id].cellular_prevalence;
-  if(parseInt(pop_id, 10) === 0)
-    return cp.map(function(E) { return 0; });
+  var pop_ids = Util.sort_ints(Object.keys(populations));
+  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
 
+  // CCF of non-cancerous population should be zero.
+  if(parseInt(pop_id, 10) === 0)
+    return (new Array(num_samples)).fill(0);
+
+  var max_cps = new Array(num_samples.length);
+
+  // Don't assume that populations[1] will have the maximum cellular
+  // prevalence, as this may not be true for polyclonal tumors.
+  for(var sampidx = 0; sampidx < num_samples; sampidx++) {
+    var max_sample_cp = 0;
+    pop_ids.forEach(function(pid) {
+      pid = parseInt(pid, 10);
+      // Ignore the non-cancerous root node, as its CP will always be 1.
+      if(pid === 0)
+        return;
+      if(populations[pid].cellular_prevalence[sampidx] > max_sample_cp) {
+        max_sample_cp = populations[pid].cellular_prevalence[sampidx];
+      }
+    });
+    max_cps[sampidx] = max_sample_cp;
+  }
+
+  var cps = populations[pop_id].cellular_prevalence;
   var ccf = [];
-  // This only works for monoclonal trees, but it's the desired behaviour according to Quaid.
-  var cellularity = populations[1].cellular_prevalence;
-  for(var i = 0; i < cellularity.length; i++) {
-    ccf.push(cp[i] / cellularity[i]);
+  for(var i = 0; i < num_samples; i++) {
+    ccf.push(cps[i] / max_cps[i]);
   }
 
   return ccf;
