@@ -49,14 +49,15 @@ There are two modes of operation for the parser:
      will be output for use with PhyloWGS' `evolve.py`.
 
   2. You do not specify `--only-normal-cn`: All variants falling in regions
-     listed in `cnvs.txt` will be output. Note, however, that variants falling in
-     regions for which multiple overlapping subclonal-copy-number-change calls
-     exist will be ignored, as we don't know what order the CNVs occurred in, and
-     thus cannot properly correct the variant allele frequency for contained
-     variants. (Variants falling in regions for which a single
-     subclonal-coy-number-change call exists, alongside an overlapping demarcation
-     of normal copy number for the same region in the remaining cells, are
-     perfectly fine, however.) In this case, both `ssm_data.txt` and
+     listed in `cnvs.txt` will be output, along with variants in normal regions
+     listed in `cnvs.txt`. Note, however, that variants falling in regions for
+     which multiple overlapping subclonal-copy-number-change calls exist will
+     be ignored, as we don't know what order the CNVs occurred in, and thus
+     cannot properly correct the variant allele frequency for contained
+     variants.  (Variants falling in regions for which a single
+     subclonal-coy-number-change call exists, alongside an overlapping
+     demarcation of normal copy number for the same region in the remaining
+     cells, are perfectly fine, however.) In this case, both `ssm_data.txt` and
      `cnv_data.txt` will be output with appropriate information for use with
      PhyloWGS.
 
