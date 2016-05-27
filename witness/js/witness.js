@@ -15,8 +15,8 @@ function get_url_param(name) {
   return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
-google.load('visualization', '1.1', {packages: ['corechart', 'bar']});
-google.setOnLoadCallback(main);
+google.charts.load('44', {packages: ['corechart', 'bar', 'line']});
+google.charts.setOnLoadCallback(main);
 
 function main() {
   new Interface();

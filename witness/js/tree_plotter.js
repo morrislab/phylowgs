@@ -1,15 +1,12 @@
 function TreePlotter() {
 }
 
-TreePlotter.prototype.draw = function(populations, structure) {
-  var root = this._generate_tree_struct(structure, populations);
-  this._draw_tree(root);
-
+TreePlotter.prototype._render_summary_table = function(populations) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
-  var num_pops = populations[pop_ids[0]].cellular_prevalence.length;
+  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
   var summary_table = $('#snippets .tree-summary').clone().appendTo('#container');
-  summary_table.find('.cellprev').attr('colspan', num_pops);
-  summary_table.find('.ccf').attr('colspan', num_pops);
+  summary_table.find('.cellprev').attr('colspan', num_samples);
+  summary_table.find('.ccf').attr('colspan', num_samples);
   summary_table = summary_table.find('tbody');
 
   var self = this;
@@ -24,6 +21,61 @@ TreePlotter.prototype.draw = function(populations, structure) {
     });
     $('<tr/>').html(entries.join('')).appendTo(summary_table);
   });
+}
+
+TreePlotter.prototype._plot_pop_trajectories = function(populations) {
+  var pop_ids = Util.sort_ints(Object.keys(populations));
+  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
+  var num_cancer_pops = pop_ids.length - 1;
+
+  // Don't plot for single-sample data.
+  if(num_samples <= 1)
+    return;
+
+  var data = new google.visualization.DataTable();
+  data.addColumn('number', 'Sample');
+  for(var popidx = 1; popidx <= num_cancer_pops; popidx++) {
+    data.addColumn('number', 'Population ' + popidx);
+  }
+
+  var cp = pop_ids.map(function(pop_id) {
+    return populations[pop_id].cellular_prevalence;
+  });
+  // Remove CPs for non-cancerous first element, which will always be 1.
+  cp.shift();
+
+  var samp_ids = (new Array(num_samples)).fill(0).map(function(val, idx) {
+    return idx + 1;
+  });
+
+  var data_vals_T = [samp_ids].concat(cp);
+  console.log(data_vals_T);
+  data.addRows(Util.transpose(data_vals_T));
+
+  var options = {
+    chart: {
+      title: 'Population cellular prevalence trajectories'
+    },
+    width: 1000,
+    height: 650,
+    hAxis: {
+      minValue: 1,
+    },
+    vAxis: {
+      title: 'Cellular prevalence',
+    },
+  };
+
+  var container = $('<div/>').appendTo('#container').get(0);
+  var chart = new google.charts.Line(container);
+  chart.draw(data, options);
+}
+
+TreePlotter.prototype.draw = function(populations, structure) {
+  var root = this._generate_tree_struct(structure, populations);
+  this._draw_tree(root);
+  this._plot_pop_trajectories(populations);
+  this._render_summary_table(populations);
 }
 
 TreePlotter.prototype._calc_ccf = function(populations, pop_id) {
