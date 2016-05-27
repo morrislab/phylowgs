@@ -16,7 +16,7 @@ TreePlotter.prototype._render_summary_table = function(populations) {
     var ccf = self._calc_ccf(populations, pop_id);
     ccf = ccf.map(function(E) { return E.toFixed(3); });
 
-    var entries = [pop_id].concat(cp).concat(ccf).concat([pop.num_ssms, pop.num_cnvs]).map(function(entry) {
+    var entries = [pop_id].concat([pop.num_ssms, pop.num_cnvs]).concat(cp).concat(ccf).map(function(entry) {
       return '<td>' + entry + '</td>';
     });
     $('<tr/>').html(entries.join('')).appendTo(summary_table);
