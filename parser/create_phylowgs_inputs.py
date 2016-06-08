@@ -246,11 +246,12 @@ class DKFZParser(VariantParser):
     self._tumor_sample = tumor_sample
 
   def _calc_read_counts(self, variant):
-    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
-    for_ref_reads = int(variant.samples[tumor_i]['DP4'][0])
-    back_ref_reads = int(variant.samples[tumor_i]['DP4'][1])
-    for_variant_reads = int(variant.samples[tumor_i]['DP4'][2])
-    back_variant_reads = int(variant.samples[tumor_i]['DP4'][3])
+    # This doesn't handle multisample correctly, as I don't know how to get the
+    # DP4 attribute on multiple DKFZ samples currently.
+    for_ref_reads = int(variant.INFO['DP4'][0])
+    back_ref_reads = int(variant.INFO['DP4'][1])
+    for_variant_reads = int(variant.INFO['DP4'][2])
+    back_variant_reads = int(variant.INFO['DP4'][3])
     ref_reads = for_ref_reads + back_ref_reads
     var_reads = for_variant_reads + back_variant_reads
     total_reads = ref_reads + var_reads
