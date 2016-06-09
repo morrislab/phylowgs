@@ -50,7 +50,8 @@ PopVafPlotter.prototype._plot_histogram = function(popidx, trace_data) {
   var layout = {
     title: 'VAFs for population ' + popidx,
     barmode: 'overlay',
-    xaxis: { title: 'VAFs'}
+    xaxis: { title: 'VAFs'},
+    yaxis: { title: 'Number of SSMs'}
   };
 
   var container = document.querySelector('#container');
@@ -60,7 +61,6 @@ PopVafPlotter.prototype._plot_histogram = function(popidx, trace_data) {
 }
 
 PopVafPlotter.prototype.plot = function(muts, mutass) {
-  console.log(muts, mutass);
   var mut_vafs = this._compile_mut_vafs(muts, mutass['mut_assignments']);
 
   var popidxs = Object.keys(mut_vafs).sort(function(a, b) {
