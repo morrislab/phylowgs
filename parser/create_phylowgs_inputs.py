@@ -12,6 +12,9 @@ import numpy as np
 import numpy.ma as ma
 from scipy.stats.mstats import gmean
 
+class ReadCountsUnavailableError(Exception):
+  pass
+
 class VariantParser(object):
   def __init__(self):
     # Child classes must give the following variables sensible values in
@@ -23,7 +26,10 @@ class VariantParser(object):
     variants = self._filter(self._vcf_filename)
     variants_and_reads = []
     for variant in variants:
-      ref_reads, total_reads = self._calc_read_counts(variant)
+      try:
+        ref_reads, total_reads = self._calc_read_counts(variant)
+      except ReadCountsUnavailableError as exc:
+        continue
       variants_and_reads.append((variant, ref_reads, total_reads))
     return variants_and_reads
 
@@ -98,8 +104,6 @@ class SangerParser(VariantParser):
     self._tumor_sample = tumor_sample
 
   def _find_ref_and_variant_nt(self, variant):
-    # Try most probable genotype called by CaVEMan. If can't find variant nt in
-    # it, try the second most probable genotype.
     assert len(variant.REF) == len(variant.ALT) == 1
     return (str(variant.REF[0]), str(variant.ALT[0]))
 
@@ -129,6 +133,28 @@ class SangerParser(VariantParser):
     variant_reads = tumor_reads['forward'][variant_nt] + tumor_reads['reverse'][variant_nt]
     total_reads = ref_reads + variant_reads
 
+    return (ref_reads, total_reads)
+
+class PcawgConsensusParser(VariantParser):
+  def __init__(self, vcf_filename, tumor_sample=None):
+    self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
+
+  def _find_ref_and_variant_nt(self, variant):
+    assert len(variant.REF) == len(variant.ALT) == 1
+    return (str(variant.REF[0]), str(variant.ALT[0]))
+
+  def _calc_read_counts(self, variant):
+    if not ('t_alt_count' in variant.INFO and 't_ref_count' in variant.INFO):
+      raise ReadCountsUnavailableError()
+    assert len(variant.INFO['t_alt_count']) == len(variant.INFO['t_ref_count']) == 1
+
+    alt_reads = int(variant.INFO['t_alt_count'][0])
+    ref_reads = int(variant.INFO['t_ref_count'][0])
+    total_reads = alt_reads + ref_reads
+    # Some variants havezero alt and ref reads.
+    if total_reads == 0:
+      raise ReadCountsUnavailableError()
     return (ref_reads, total_reads)
 
 class MuseParser(VariantParser):
@@ -812,6 +838,8 @@ def parse_variants(args, vcf_types):
       variant_parser = StrelkaParser(vcf_fn, args.tumor_sample)
     elif vcf_type == 'vardict':
       variant_parser = VarDictParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'pcawg_consensus':
+      variant_parser = PcawgConsensusParser(vcf_fn, args.tumor_sample)
     else:
       raise Exception('Unknowon variant type: %s' % vcf_type)
 
@@ -840,7 +868,7 @@ def parse_variants(args, vcf_types):
   return (all_variant_ids, ref_read_counts, total_read_counts)
 
 def main():
-  vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict'))
+  vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict', 'pcawg_consensus'))
 
   parser = argparse.ArgumentParser(
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
