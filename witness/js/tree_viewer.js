@@ -1,6 +1,17 @@
 function TreeViewer() {
 }
 
+TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
+  if(!(dataset.hasOwnProperty('muts_path') && dataset.hasOwnProperty('mutass_path')))
+    return;
+
+  var pop_vaf_plotter = new PopVafPlotter();
+  d3.json(dataset.muts_path, function(muts) {
+    d3.json(dataset.mutass_path + '/' + tidx + '.json', function(mutass) {
+      pop_vaf_plotter.plot(muts, mutass);
+    });
+  });
+}
 
 TreeViewer.prototype.render = function(dataset) {
   $('#tree-list').show();
@@ -40,6 +51,7 @@ TreeViewer.prototype.render = function(dataset) {
       var tidx = self.find('.tree-index').text();
       var tree_plotter = new TreePlotter();
       tree_plotter.draw(summary.trees[tidx].populations, summary.trees[tidx].structure);
+      tplotter._plot_pop_vafs(dataset, tidx);
     });
     $('#tree-list').scrollTop(0);
   });
