@@ -20,9 +20,12 @@ google.charts.setOnLoadCallback(main);
 
 function main() {
   new Interface();
-  /*setTimeout(function() {
-    $('#runs a:contains("multi_together")').click();
-    $('#sample-list a:contains("DO51953")').click();
-    $('.nav-tree-viewer').click();
-  }, 1000);*/
+
+  if(window.location.href.indexOf('debug=1') !== -1) {
+    setTimeout(function() {
+      $('#runs a:contains("cnvint")').click();
+      $('#sample-list a:contains("0e7ac212")').click();
+      $('.nav-tree-viewer').click();
+    }, 1000);
+  }
 }

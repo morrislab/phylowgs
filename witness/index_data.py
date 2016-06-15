@@ -17,9 +17,15 @@ def main():
         'muts_path': os.path.join(base_dir, run_name, dataset_name + '.muts.json'),
         'name': dataset_name,
       }
+
       clusters_path = os.path.join(base_dir, run_name, dataset_name + '.clusters.json')
-      if os.path.exists(clusters_path):
+      if os.path.isfile(clusters_path):
         run['clusters_path'] = clusters_path
+
+      mutass_path = os.path.join(base_dir, run_name, dataset_name + '.mutass')
+      if os.path.isdir(mutass_path):
+        run['mutass_path'] = mutass_path
+
       datasets[run_name].append(run)
 
   out_path = os.path.join(os.path.dirname(os.path.realpath(__file__)), 'data', 'index.json')
