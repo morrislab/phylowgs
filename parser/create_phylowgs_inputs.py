@@ -934,9 +934,9 @@ class VariantAndCnvGroup(object):
 def is_region_normal_cn(major, minor):
   return major == minor == 1
 
-def log(msg):
+def log(*msgs):
   if log.verbose:
-    print(msg, file=sys.stderr)
+    print(*msgs, file=sys.stderr)
 log.verbose = False
 
 class CnvParser(object):
