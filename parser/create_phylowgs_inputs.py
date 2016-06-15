@@ -192,6 +192,21 @@ class StrelkaParser(VariantParser):
     ref_reads = total_reads - variant_reads
     return (ref_reads, total_reads)
 
+class SomSnipParser(VariantParser):
+  def __init__(self, vcf_filename, tumor_sample=None):
+    self._vcf_filename = vcf_filename
+    self._tumor_sample = tumor_sample
+
+  def _calc_read_counts(self, variant):
+    tumor_i = self._get_tumor_index(variant, self._tumor_sample)
+    highqual_reads = (variant.samples[tumor_i]['DP4'])
+    assert len(highqual_reads) == 4
+
+    ref_reads = int(highqual_reads[0]) + int(highqual_reads[1])
+    variant_reads = int(highqual_reads[2]) + int(highqual_reads[3])
+
+    return (ref_reads, ref_reads + variant_reads)
+
 class MutectTcgaParser(VariantParser):
   def __init__(self, vcf_filename, tumor_sample=None):
     self._vcf_filename = vcf_filename
@@ -811,6 +826,8 @@ def parse_variants(args, vcf_types):
       variant_parser = StrelkaParser(vcf_fn, args.tumor_sample)
     elif vcf_type == 'vardict':
       variant_parser = VarDictParser(vcf_fn, args.tumor_sample)
+    elif vcf_type == 'somsnip':
+      variant_parser = SomSnipParser(vcf_fn, args.tumor_sample)
     else:
       raise Exception('Unknowon variant type: %s' % vcf_type)
 
