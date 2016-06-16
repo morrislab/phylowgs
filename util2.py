@@ -225,14 +225,13 @@ class TreeWriter(object):
     def _close_archive(self):
 	self._archive.close()
 
-    def write_trees(self, trees):
+    def write_trees(self, serialized_trees):
 	self._open_archive()
-	for tree, idx, llh in trees:
+	for serialized_tree, idx, llh in serialized_trees:
 	    is_burnin = idx < 0
 	    prefix = is_burnin and 'burnin' or 'tree'
 	    treefn = '%s_%s_%s' % (prefix, idx, llh)
-	    serialized = pickle.dumps(tree, protocol=pickle.HIGHEST_PROTOCOL)
-	    self._archive.writestr(treefn, serialized)
+	    self._archive.writestr(treefn, serialized_tree)
 	self._close_archive()
 
 class TreeReader(object):

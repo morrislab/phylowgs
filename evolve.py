@@ -1,7 +1,7 @@
 #!/usr/bin/env python2
 import os
 import sys
-import cPickle
+import cPickle as pickle
 
 from numpy		import *
 from numpy.random import *
@@ -201,7 +201,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 		else:
 			state['burnin_cd_llh_traces'][iteration + state['burnin']] = last_llh
 
-		unwritten_trees.append((tssb, iteration, last_llh))
+		# Can't just put tssb in unwritten_trees, as this object will be modified
+		# on subsequent iterations, meaning any stored references in
+		# unwritten_trees will all point to the same sample.
+		serialized = pickle.dumps(tssb, protocol=pickle.HIGHEST_PROTOCOL)
+		unwritten_trees.append((serialized, iteration, last_llh))
 		state['tssb'] = tssb
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
@@ -248,7 +252,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 	run_succeeded.set()
 
 def test():
-	tssb=cPickle.load(open('ptree'))
+	tssb=pickle.load(open('ptree'))
 	wts,nodes=tssb.get_mixture()	
 	for dat in tssb.data:
 		print [dat.id, dat.__log_likelihood__(0.5)]
