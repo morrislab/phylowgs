@@ -43,7 +43,7 @@ class VariantParser(object):
       variant.CHROM = variant.CHROM.upper()
       # Some VCF dialects prepend "chr", some don't. Remove the prefix to
       # standardize.
-      if variant.CHROM.startswith('chr'):
+      if variant.CHROM.startswith('CHR'):
         variant.CHROM = variant.CHROM[3:]
       records.append(variant)
     return records
