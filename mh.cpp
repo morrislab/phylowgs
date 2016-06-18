@@ -263,7 +263,7 @@ void load_cnv_data(char fname[],struct datum *data, struct config conf){
 		if (id==-1){id+=1;continue;}
 		istringstream iss(line);
 		ctr=0;
-		while(getline(iss,token,'\t')){
+		while(getline(iss,token,'\t') && ctr <= 3){
 			if(ctr==0){
 				data[did].id=did;
 			}

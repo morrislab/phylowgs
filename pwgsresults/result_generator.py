@@ -5,13 +5,15 @@ import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
 import util2
+import json
 
 class ResultGenerator(object):
   def generate(self, tree_file, include_ssm_names):
     reader = util2.TreeReader(tree_file)
     first_tree = next(reader.load_trees())
+    cnv_logical_physical_mapping = json.loads(reader.read_extra_file('cnv_logical_physical_mapping.json'))
     reader.close()
-    mutlist = self._list_mutations(first_tree, include_ssm_names)
+    mutlist = self._list_mutations(first_tree, include_ssm_names, cnv_logical_physical_mapping)
 
     summaries = {}
     all_mutass = {}
@@ -78,7 +80,7 @@ class ResultGenerator(object):
     _traverse_r(tree.root['node'], None)
     return (pops, mut_assignments, structure)
 
-  def _list_mutations(self, tree, include_ssm_names):
+  def _list_mutations(self, tree, include_ssm_names, cnv_logical_physical_mapping):
     cnvs = {}
     ssms = {}
     ssms_in_cnvs = defaultdict(list)
@@ -104,7 +106,8 @@ class ResultGenerator(object):
         elif mut.id.startswith('c'):
           cnvs[mut.id] = {
             'ref_reads': mut.a,
-            'total_reads': mut.d
+            'total_reads': mut.d,
+            'physical_cnvs': cnv_logical_physical_mapping[mut.id]
           }
         else:
           raise Exception('Unknown mutation type: %s' % mut.id)

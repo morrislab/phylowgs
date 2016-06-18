@@ -21,6 +21,7 @@ import tempfile
 import threading
 import traceback
 import time
+import json
 from datetime import datetime
 
 # num_samples: number of MCMC samples
@@ -52,7 +53,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	state['write_state_every'] = write_state_every
 	state['write_backups_every'] = write_backups_every
 
-	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
+	codes, n_ssms, n_cnvs, cnv_logical_physical_mapping = load_data(state['ssm_file'], state['cnv_file'])
 	if len(codes) == 0:
 		logmsg('No SSMs or CNVs provided. Exiting.', sys.stderr)
 		return
@@ -96,6 +97,7 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 		datum.tssb = state['tssb']
 	
 	tree_writer = TreeWriter()
+	tree_writer.add_extra_file('cnv_logical_physical_mapping.json', json.dumps(cnv_logical_physical_mapping))
 	state_manager.write_initial_state(state)
 	logmsg("Starting MCMC run...")
 	state['last_iteration'] = -state['burnin'] - 1
@@ -125,7 +127,7 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 
 	set_state(state['rand_state']) # Restore NumPy's RNG state.
 	os.chdir(state['working_directory'])
-	codes, n_ssms, n_cnvs = load_data(state['ssm_file'], state['cnv_file'])
+	codes, n_ssms, n_cnvs, cnv_logical_physical_mapping = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
 
 	do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, state, tree_writer, codes, n_ssms, n_cnvs, NTPS, state['tmp_dir'])

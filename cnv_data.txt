@@ -1,2 +1,2 @@
-cnv	a	d	ssms
-c0	66023,50883,62757,36056,58777	126755,100469,121941,71263,115417	s2,1,2;s4,0,1
+cnv	a	d	ssms	physical_cnvs
+c0	66023,50883,62757,36056,58777	126755,100469,121941,71263,115417	s2,1,2;s4,0,1	chrom=1,start=1234,end=5678,major_cn=2,minor_cn=1,cell_prev=0.8;chrom=X,start=15,end=10000,major_cn=2,minor_cn=0,cell_prev=0.8;chrom=22,start=123,end=456,major_cn=1,minor_cn=0,cell_prev=0.8
