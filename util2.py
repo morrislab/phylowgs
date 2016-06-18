@@ -36,10 +36,10 @@ def logsumexp(X, axis=None):
     maxes = numpy.max(X, axis=axis)
     return numpy.log(numpy.sum(numpy.exp(X - maxes), axis=axis)) + maxes
 
-def parse_cnv_comment(comment):
+def parse_physical_cnvs(pcnvs):
     physical_cnvs = []
 
-    for physical_cnv in comment.split(';'):
+    for physical_cnv in pcnvs.split(';'):
 	fields = physical_cnv.split(',')
 	cnv = dict([F.split('=', 1) for F in fields])
 	for key in ('start', 'end', 'major_cn', 'minor_cn'):
@@ -75,7 +75,7 @@ def load_data(fname1,fname2):
 	for row in reader:
 		name=row['cnv']
 		id = row['cnv']
-		cnv_logical_physical_mapping[id] = parse_cnv_comment(row['comment'])
+		cnv_logical_physical_mapping[id] = parse_physical_cnvs(row['physical_cnvs'])
 		a = [int(x) for x in row['a'].split(',')]
 		d = [int(x) for x in row['d'].split(',')]
 
