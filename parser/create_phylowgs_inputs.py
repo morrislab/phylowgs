@@ -5,7 +5,7 @@ from __future__ import print_function
 import vcf
 import argparse
 import csv
-from collections import defaultdict, namedtuple
+from collections import defaultdict, namedtuple, OrderedDict
 import random
 import sys
 import numpy as np
@@ -400,6 +400,13 @@ class CnvFormatter(object):
     if len(formatted) == 0:
       return []
 
+    for cnv in formatted:
+      comment_data = OrderedDict()
+      for K in ('chrom', 'start', 'end', 'major_cn', 'minor_cn'):
+        comment_data[K] = cnv[K]
+      comment_data['cell_prev'] = '|'.join([str(C) for C in cnv['cellular_prevalence']])
+      cnv['comment'] = ','.join(['%s=%s' % (K, comment_data[K]) for K in comment_data.keys()])
+
     merged, formatted = formatted[:1], formatted[1:]
     merged[0]['cnv_id'] = 'c0'
     counter = 1
@@ -416,6 +423,7 @@ class CnvFormatter(object):
         log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
         last['total_reads'] = current['total_reads'] + last['total_reads']
         last['ref_reads'] = self._calc_ref_reads(last['cellular_prevalence'], last['total_reads'])
+        last['comment'] += ';' + current['comment']
         self._merge_variants(last, current)
       else:
         # Do not merge the CNVs.
@@ -918,7 +926,7 @@ class VariantAndCnvGroup(object):
     self._ensure_no_overlap(abnormal_regions)
 
     with open(outfn, 'w') as outf:
-      print('\t'.join(('cnv', 'a', 'd', 'ssms')), file=outf)
+      print('\t'.join(('cnv', 'a', 'd', 'ssms', 'comment')), file=outf)
       formatter = CnvFormatter(cnv_confidence, self._estimated_read_depth, read_length)
       # Last place I'm working is at this position
       for cnv in formatter.format_and_merge_cnvs(abnormal_regions, variants, cellularity):
@@ -928,6 +936,7 @@ class VariantAndCnvGroup(object):
           ','.join([str(V) for V in cnv['ref_reads']]),
           ','.join([str(V) for V in cnv['total_reads']]),
           ';'.join(overlapping),
+          cnv['comment']
         )
         print('\t'.join(vals), file=outf)
 
@@ -956,8 +965,7 @@ class CnvParser(object):
           # "1.0", so cast to float before int.
           assert float(record[key]) == int(float(record[key]))
           record[key] = int(float(record[key]))
-        record['cellular_prevalence'] = float(record['clonal_frequency'])
-        del record['clonal_frequency']
+        record['cellular_prevalence'] = float(record['cellular_prevalence'])
         cn_regions[chrom].append(record)
 
     # Ensure CN regions are properly sorted, which we later rely on when

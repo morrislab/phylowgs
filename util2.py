@@ -36,6 +36,19 @@ def logsumexp(X, axis=None):
     maxes = numpy.max(X, axis=axis)
     return numpy.log(numpy.sum(numpy.exp(X - maxes), axis=axis)) + maxes
 
+def parse_cnv_comment(comment):
+    physical_cnvs = []
+
+    for physical_cnv in comment.split(';'):
+	fields = physical_cnv.split(',')
+	cnv = dict([F.split('=', 1) for F in fields])
+	for key in ('start', 'end', 'major_cn', 'minor_cn'):
+	    cnv[key] = int(cnv[key])
+	cnv['cell_prev'] = [float(C) for C in cnv['cell_prev'].split('|')]
+	physical_cnvs.append(cnv)
+
+    return physical_cnvs
+
 def load_data(fname1,fname2):
 	# load ssm data
 	reader = csv.DictReader(open(fname1,'rU'), delimiter='\t')
@@ -58,10 +71,11 @@ def load_data(fname1,fname2):
 	
 	# load cnv data
 	reader = csv.DictReader(open(fname2,'rU'), delimiter='\t')
-
+	cnv_logical_physical_mapping = {}
 	for row in reader:
 		name=row['cnv']
 		id = row['cnv']
+		cnv_logical_physical_mapping[id] = parse_cnv_comment(row['comment'])
 		a = [int(x) for x in row['a'].split(',')]
 		d = [int(x) for x in row['d'].split(',')]
 
@@ -76,7 +90,7 @@ def load_data(fname1,fname2):
 
 	n_cnvs = len(data.keys())-n_ssms
 		
-	return [data[key] for key in data.keys()], n_ssms, n_cnvs
+	return [data[key] for key in data.keys()], n_ssms, n_cnvs, cnv_logical_physical_mapping
 	
 #################################################
 ## some useful functions to get some info about,
@@ -214,6 +228,11 @@ class TreeWriter(object):
 	    # something we want.
 	    rm_safely(self._archive_fn)
 
+    def add_extra_file(self, filename, data):
+	    self._open_archive()
+	    self._archive.writestr(filename, data)
+	    self._close_archive()
+
     def _ensure_archive_is_valid(self):
 	with zipfile.ZipFile(self._archive_fn) as zipf:
 	    if zipf.testzip() is not None:
@@ -256,6 +275,9 @@ class TreeReader(object):
 	    idx = self._extract_burnin_idx(info)
 	    assert len(burnin_info) + idx == len(self._burnin_trees)
 	    self._burnin_trees.append((idx, info))
+
+    def read_extra_file(self, filename):
+	return self._archive.read(filename)
 
     def num_trees(self):
 	return len(self._trees)
