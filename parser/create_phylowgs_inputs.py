@@ -1158,7 +1158,7 @@ def main():
     read_length = num_samples * [args.read_length]
     grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length, cellularity)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
-      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, args.read_length, cellularity)
+      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, read_length, cellularity)
   else:
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):
