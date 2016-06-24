@@ -48,18 +48,6 @@ class VariantParser(object):
       records.append(variant)
     return records
 
-  def _is_good_chrom(self, chrom):
-    # Ignore the following:
-    #   * Variants unmapped ('chrUn') or mapped to fragmented chromosome ('_random')
-    #   * Weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
-    #   * Mitochondrial ("mt" or "m"), which are weird
-    #   * Sex chromosomes difficult to deal with, as expected frequency depends on
-    #     whether patient is male or female, so ignore them for now. TODO: fix this.
-    if chrom in [str(i) for i in range(1, 23)]:
-      return True
-    else:
-      return False
-
   def _does_variant_pass_filters(self, variant):
     if variant.FILTER is None:
       return True
@@ -74,7 +62,7 @@ class VariantParser(object):
     all_variants = self._parse_vcf(vcf_filename)
 
     for variant in all_variants:
-      if not self._is_good_chrom(variant.CHROM):
+      if not is_good_chrom(variant.CHROM):
         continue
       if not self._does_variant_pass_filters(variant):
         continue
@@ -300,10 +288,11 @@ class DKFZParser(VariantParser):
     return (ref_reads, total_reads)
 
 class CnvFormatter(object):
-  def __init__(self, cnv_confidence, read_depth, read_length):
+  def __init__(self, cnv_confidence, read_depth, read_length, sampidxs):
     self._cnv_confidence = cnv_confidence
     self._read_depth = read_depth
     self._read_length = read_length
+    self._sampidxs = sampidxs
 
   def _max_reads(self, sampidx):
     return 1e6 * self._read_depth[sampidx]
@@ -320,26 +309,27 @@ class CnvFormatter(object):
     return overlapping
 
   def _calc_ref_reads(self, cellular_prev, total_reads):
-    sampidxs = range(len(cellular_prev))
-    ref_reads = np.zeros(len(sampidxs))
-    for sampidx in sampidxs:
+    ref_reads = np.zeros(len(self._sampidxs))
+    for sampidx in self._sampidxs:
       vaf = cellular_prev[sampidx] / 2
       ref_reads[sampidx] = int((1 - vaf) * total_reads[sampidx])
     return ref_reads
 
-  def _calc_total_reads(self, cellular_prev, locus_start, locus_end, new_cn):
-    sampidxs = range(len(cellular_prev))
-    total_reads = np.zeros(len(sampidxs))
-    for sampidx in sampidxs:
+  def _calc_total_reads(self, cellular_prev, locus_start, locus_end, major_cn, minor_cn):
+    total_reads = np.zeros(len(self._sampidxs))
+    assert len(set(major_cn)) == len(set(minor_cn)) == 1
+    total_cn = major_cn[0] + minor_cn[0]
+
+    for sampidx in self._sampidxs:
       # Proportion of all cells carrying CNV.
       P = cellular_prev[sampidx]
-      if new_cn == 2:
+      if total_cn == 2:
         # If no net change in copy number -- e.g., because (major, minor) went
         # from (1, 1) to (2, 0) -- force the delta_cn to be 1.
         delta_cn = 1.
         no_net_change = True
       else:
-        delta_cn = float(new_cn - 2)
+        delta_cn = float(total_cn - 2)
         no_net_change = False
 
       region_length = locus_end - locus_start + 1
@@ -347,8 +337,10 @@ class CnvFormatter(object):
 
       # This is a hack to prevent division by zero (when delta_cn = -2). Its
       # effect will be to make d large.
-      if P == 1.0:
-        P = 0.999
+      if P > 0.98:
+        P = 0.98
+      if P < 0.02:
+        P = 0.02
 
       d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (delta_cn  * P) / 2)
 
@@ -364,8 +356,9 @@ class CnvFormatter(object):
     return total_reads
 
   def _format_overlapping_variants(self, variants, maj_cn, min_cn):
-      variants = [(ssm_id, str(min_cn), str(maj_cn)) for ssm_id in variants]
-      return variants
+    assert len(set(maj_cn)) == len(set(min_cn)) == 1
+    variants = [(ssm_id, str(min_cn[0]), str(maj_cn[0])) for ssm_id in variants]
+    return variants
 
   def _format_cnvs(self, cnvs, variants):
     log('Estimated read depth: %s' % self._read_depth)
@@ -373,24 +366,24 @@ class CnvFormatter(object):
     for chrom, chrom_cnvs in cnvs.items():
       for cnv in chrom_cnvs:
         overlapping_variants = self._find_overlapping_variants(chrom, cnv, variants)
-        sampidxs = range(len(cnv['cell_prev']))
         total_reads = self._calc_total_reads(
           cnv['cell_prev'],
           cnv['start'],
           cnv['end'],
-          cnv['major'] + cnv['minor']
+          cnv['major_cn'],
+          cnv['minor_cn']
         )
         ref_reads = self._calc_ref_reads(cnv['cell_prev'], total_reads)
         yield {
           'chrom': chrom,
           'start': cnv['start'],
           'end': cnv['end'],
-          'major_cn': cnv['major'],
-          'minor_cn': cnv['minor'],
+          'major_cn': cnv['major_cn'],
+          'minor_cn': cnv['minor_cn'],
           'cellular_prevalence': cnv['cell_prev'],
           'ref_reads': ref_reads,
           'total_reads': total_reads,
-          'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['major'], cnv['minor'])
+          'overlapping_variants': self._format_overlapping_variants(overlapping_variants, cnv['major_cn'], cnv['minor_cn'])
         }
 
   def _merge_variants(self, cnv1, cnv2):
@@ -419,6 +412,11 @@ class CnvFormatter(object):
       physical_cnvs = OrderedDict()
       for K in ('chrom', 'start', 'end', 'major_cn', 'minor_cn'):
         physical_cnvs[K] = cnv[K]
+
+      assert len(set(physical_cnvs['major_cn'])) == len(set(physical_cnvs['major_cn'])) == 1
+      physical_cnvs['major_cn'] = physical_cnvs['major_cn'][0]
+      physical_cnvs['minor_cn'] = physical_cnvs['minor_cn'][0]
+
       physical_cnvs['cell_prev'] = '|'.join([str(C) for C in cnv['cellular_prevalence']])
       cnv['physical_cnvs'] = ','.join(['%s=%s' % (K, physical_cnvs[K]) for K in physical_cnvs.keys()])
 
@@ -534,17 +532,6 @@ def variant_key(var):
   chrom = chrom_key(var.CHROM)
   return (chrom, var.POS)
 
-def find_cellularity(cnvs):
-  max_cellular_prevs = np.zeros(len(cnvs))
-
-  for sampidx, sample_cnvs in enumerate(cnvs):
-    for chrom_regions in sample_cnvs.values():
-      for cnr in chrom_regions:
-        if cnr['cellular_prevalence'] > max_cellular_prevs[sampidx]:
-          max_cellular_prevs[sampidx] = cnr['cellular_prevalence']
-
-  return max_cellular_prevs
-
 class Segmenter(object):
   def _organize_cnvs(self, cnv_set):
     organized = defaultdict(list)
@@ -552,15 +539,16 @@ class Segmenter(object):
     for sampidx, cnvs in enumerate(cnv_set):
       for chrom, chrom_cnvs in cnvs.items():
         for cnv in chrom_cnvs:
-          key = (chrom, cnv['major_cn'], cnv['minor_cn'])
-          organized[key].append({
+          organized[chrom].append({
             'sample': sampidx,
             'start': cnv['start'],
             'end': cnv['end'],
+            'major_cn': cnv['major_cn'],
+            'minor_cn': cnv['minor_cn'],
             'cell_prev': cnv['cellular_prevalence']
           })
 
-    for (chrom, major, minor), cnvs in organized.items():
+    for chrom, cnvs in organized.items():
       # Intervals may not be sorted in input file.
       cnvs.sort(key = lambda c: c['start'])
 
@@ -568,12 +556,12 @@ class Segmenter(object):
 
   def _create_intervals(self, cnv_set):
     # intervals[chrom][(major, minor)]
-    intervals = defaultdict(lambda: defaultdict(list))
+    intervals = defaultdict(list)
     min_size_for_inclusion = 1
 
-    for (chrom, major, minor), cnvs in cnv_set.items():
-      start_pos = [(c['start'], 'start', c['sample'], c['cell_prev']) for c in cnvs]
-      end_pos   = [(c['end'], 'end', c['sample'], c['cell_prev'])     for c in cnvs]
+    for chrom, cnvs in cnv_set.items():
+      start_pos = [(c['start'], 'start', (c['sample'], c['cell_prev'], c['major_cn'], c['minor_cn'])) for c in cnvs]
+      end_pos   = [(c['end'],   'end',   (c['sample'], c['cell_prev'], c['major_cn'], c['minor_cn'])) for c in cnvs]
 
       # True > False, so this sorting will place start positions after end
       # positions if both have same coordinate.
@@ -593,6 +581,7 @@ class Segmenter(object):
 
         # Gather all interval breakpoints at this locus.
         while True:
+          assert positions[idx][0] >= locus
           idx += 1
           if idx == len(positions) or positions[idx][0] > locus:
             break
@@ -607,7 +596,7 @@ class Segmenter(object):
           assert locus > prev_pos
           interval = (prev_pos, locus)
           if interval[1] - interval[0] > min_size_for_inclusion:
-            intervals[chrom][(major, minor)].append((interval[0], interval[1], sorted(open_samples)))
+            intervals[chrom].append((interval[0], interval[1], sorted(open_samples)))
         else:
           # All points should be start points.
           assert set([i[1] for i in points_at_locus]) == set(['start'])
@@ -616,13 +605,13 @@ class Segmenter(object):
 
         # Update open_samples in accordance with whether each breakpoint at
         # this locus starts or ends an interval.
-        for pos, pt_type, sampidx, cell_prev in points_at_locus:
+        for pos, pt_type, (sampidx, cell_prev, major_cn, minor_cn) in points_at_locus:
           if pt_type == 'start':
-            log('Adding ', (pos, pt_type, sampidx, cell_prev))
-            open_samples.append((sampidx, cell_prev))
+            log('Adding ', (pos, pt_type, sampidx, cell_prev, major_cn, minor_cn))
+            open_samples.append((sampidx, cell_prev, major_cn, minor_cn))
           elif pt_type == 'end':
-            log('Removing ', (pos, pt_type, sampidx, cell_prev))
-            open_samples.remove((sampidx, cell_prev))
+            log('Removing ', (pos, pt_type, sampidx, cell_prev, major_cn, minor_cn))
+            open_samples.remove((sampidx, cell_prev, major_cn, minor_cn))
           else:
             raise Exception('Unknown point type: %s' % pt_type)
 
@@ -640,8 +629,8 @@ class Segmenter(object):
 
       while idx < len(cncalls) and \
       cncalls[idx]['chrom'] == adjacent[-1]['chrom'] and \
-      cncalls[idx]['major'] == adjacent[-1]['major'] and \
-      cncalls[idx]['minor'] == adjacent[-1]['minor'] and \
+      cncalls[idx]['major_cn'] == adjacent[-1]['major_cn'] and \
+      cncalls[idx]['minor_cn'] == adjacent[-1]['minor_cn'] and \
       0 <= cncalls[idx]['start'] - adjacent[-1]['end'] <= allowed_gap:
         adjacent.append(cncalls[idx])
         idx += 1
@@ -666,93 +655,180 @@ class Segmenter(object):
     return self._create_intervals(organized)
 
 class MultisampleCnvCombiner(object):
-  def load_cnvs(self, cn_regions, cellularity):
-    self._all_sampidxs = set(range(len(cn_regions)))
-    for sampidx, regions in enumerate(cn_regions):
-      cn_regions[sampidx] = self._filter_multiple_abnormal_cn_regions(regions, cellularity[sampidx])
-
+  def __init__(self, cn_regions, cellularity):
+    self.sampidxs = set(range(len(cn_regions)))
     segments = Segmenter().segment(cn_regions)
-    segments = self._retain_only_regions_in_all_samples(segments)
-    return self._reformat_segments_as_cnvs(segments)
+    self._cnvs = self._reformat_segments_as_cnvs(segments)
+    self._cellularity = cellularity
 
   def _reformat_segments_as_cnvs(self, segments):
-    reformatted = defaultdict(lambda: defaultdict(list))
+    reformatted = defaultdict(list)
+    _retrieve_val = lambda idx: np.array(zip(*open_samples)[idx])
 
     for chrom, chrom_cnvs in segments.items():
-      for (major, minor), cnvs in chrom_cnvs.items():
-        for start, end, open_samples in cnvs:
-          cell_prev = np.array(zip(*sorted(open_samples))[1])
+        for start, end, open_samples in chrom_cnvs:
+          sampidx = _retrieve_val(0)
+          cell_prev = _retrieve_val(1)
+          major_cn = _retrieve_val(2)
+          minor_cn = _retrieve_val(3)
           cnv = {
             'start': start,
             'end': end,
             'cell_prev': cell_prev,
+            'major_cn': major_cn,
+            'minor_cn': minor_cn,
+            'sampidx': sampidx,
           }
-          reformatted[chrom][(major, minor)].append(cnv)
+          reformatted[chrom].append(cnv)
 
     return reformatted
 
-  def _retain_only_regions_in_all_samples(self, segments):
-    # Structure: retained[chrom][(major, minor)]
-    retained = defaultdict(lambda: defaultdict(list))
-    size = 0
+  def _ensure_no_overlap(self, cnvs):
+    for chrom, chrom_cnvs in cnvs.items():
+      for idx in range(len(chrom_cnvs) - 1):
+        current, next = chrom_cnvs[idx], chrom_cnvs[idx + 1]
+        assert current['start'] < current['end'] <= next['start'] < next['end']
 
-    for chrom, chrom_cnvs in segments.items():
-      for (major, minor), cnvs in chrom_cnvs.items():
-        for cnv in cnvs:
-          start, end, open_samples = cnv
-          seg_sampidxs = set([s[0] for s in open_samples])
-          if seg_sampidxs == self._all_sampidxs:
-            retained[chrom][(major, minor)].append(cnv)
-            size += (end - start)
+  def _is_region_normal_cn(self, major, minor):
+    return major == minor == 1
 
-    return retained
+  def _is_multisample_region_normal_cn(self, major, minor):
+    return set(major) == set(minor) == set([1])
 
-  def _filter_multiple_abnormal_cn_regions(self, regions, cellularity):
-    good_regions = defaultdict(list)
-    for chrom, reg in regions.items():
-      idx = 0
-      while idx < len(reg):
-        region = reg[idx]
 
-        # Accept clonal regions unconditonally, whether normal or abnormal CN.
-        if region['cellular_prevalence'] == cellularity:
-          good_regions[chrom].append(region)
-          idx += 1
+  def _get_abnormal_state_for_all_samples(self, cnv):
+    # All samples must have at least one record for this region, or don't
+    # include it.
+    if set(cnv['sampidx']) != self.sampidxs:
+      return None
 
-        else:
-          regions_at_same_coords = [region]
+    abnormal_state = None
+    filtered = []
 
-          i = idx + 1
-          while i < len(reg) and reg[i]['start'] == region['start']:
-            # Battenerg either has entire regions at same coords, or they have
-            # no overlap whatsoever. Thus, this assertion maintains sanity for
-            # Battenberg, but may fail for other CN callers.
-            assert reg[i]['end'] == region['end']
-            regions_at_same_coords.append(reg[i])
-            i += 1
+    for sampidx, cell_prev, major, minor in zip(cnv['sampidx'], cnv['cell_prev'], cnv['major_cn'], cnv['minor_cn']):
+      # Region may be (clonal or subclonal) normal in a sample, so ignore such records.
+      if self._is_region_normal_cn(major, minor):
+        continue
 
-          abnormal_regions = [r for r in regions_at_same_coords if not is_region_normal_cn(r['major_cn'], r['minor_cn'])]
-          # In Battenberg, either one region is normal and the other abnormal,
-          # or both are abnormal.
-          # In TITAN, only one abnormal region will be listed, without a
-          # corresponding normal region.
-          # Ignore normal region(s) and add only one abnormal one. We do
-          # this so PWGS can recalculate the frequencies based on the
-          # major/minor CN of the region, according to the a & d values we will
-          # assign to the region.
-          if len(abnormal_regions) == 1:
-            good_regions[chrom].append(abnormal_regions[0])
-          else:
-            # Ignore CNV regions with multiple abnormal CN states, as we don't
-            # know what order the CN events occurred in.
-            log('Multiple abnormal regions: chrom=%s %s' % (chrom, abnormal_regions))
-          idx += len(regions_at_same_coords)
+      # Either we haven't observed an abnormal CN state in this region before,
+      # or the observed abnormal state matches what we've already seen.
+      if abnormal_state is None or abnormal_state == (major, minor):
+        abnormal_state = (major, minor)
+        filtered.append({'sampidx': sampidx, 'cell_prev': cell_prev, 'major_cn': major, 'minor_cn': minor})
+        continue
+      # The abnormal state (i.e., major & minor alleles) is *different* from
+      # what we've seen before. The PWGS model doesn't currently account for
+      # such cases, so ignore the region.
+      else:
+        return None
 
-    return good_regions
+    # None of the observed records were abnormal -- i.e., all samples report
+    # the region is normal. Reject the region.
+    if abnormal_state is None:
+      return None
+
+    retained_sampidxs = [F['sampidx'] for F in filtered]
+    # Sanity check: when we originally parsed the CNVs, the samples should have
+    # been added in order, and that ought not to have changed.
+    assert retained_sampidxs == sorted(retained_sampidxs)
+    # Sanity check: we should have no duplicate samples. While a given sample
+    # may report any number of records for a region, above we discarded normal
+    # regions, and ensured that only one abnormal state exists in all samples.
+    # Thus, we should have no more than one record per sample for this region.
+    assert len(retained_sampidxs) == len(set(retained_sampidxs))
+
+    # Add a record for all samples that reported this region as clonal normal.
+    cell_prev_when_absent = 0
+    for missing_sampidx in self.sampidxs - set(retained_sampidxs):
+      filtered.append({
+        'sampidx': missing_sampidx,
+        'cell_prev': cell_prev_when_absent,
+        'major_cn': abnormal_state[0],
+        'minor_cn': abnormal_state[1]
+      })
+    # Sort by sampidx.
+    filtered.sort(key = lambda F: F['sampidx'])
+    # Ensure all samples have one record.
+    assert len(filtered) == len(self.sampidxs)
+
+    return filtered
+
+  def load_single_abnormal_state_cnvs(self):
+    '''
+    Return all regions that possess at most one abnormal state across samples.
+    E.g., given three samples, S_1 and S_3 report the region as (2, 1) (with
+    potentially different cellular prevalences), while S_2 lists it as clonal
+    (1, 1). In such an instance, the record for S_2 will *not* indicate the
+    region is normal. Instead, the S_2 record will show a state of (2, 1) with
+    a cellular prevalence of zero. This is done so that we can calculate
+    sensible `a` and `d` values for cnv_data.txt.
+    '''
+    # In Battenberg, either one region is normal and the other abnormal,
+    # or both are abnormal.
+    # In TITAN, only one abnormal region will be listed, without a
+    # corresponding normal region.
+    abnormal_cnvs = defaultdict(list)
+
+    for chrom, chrom_cnvs in self._cnvs.items():
+      if not is_good_chrom(chrom):
+        continue
+      for cnv in chrom_cnvs:
+        states_for_all_samples = self._get_abnormal_state_for_all_samples(cnv)
+        if states_for_all_samples is None:
+          continue
+
+        combined_states = { K: np.array([S[K] for S in states_for_all_samples]) for K in states_for_all_samples[0].keys() }
+        cnv.update(combined_states)
+        abnormal_cnvs[chrom].append(cnv)
+      abnormal_cnvs[chrom].sort(key = lambda C: C['start'])
+
+    self._ensure_no_overlap(abnormal_cnvs)
+    return abnormal_cnvs
+
+  def load_normal_cnvs(self):
+    '''
+    Return all regions that are clonal normal across all samples.
+    '''
+    normal_cnvs = defaultdict(list)
+
+    for chrom, chrom_cnvs in self._cnvs.items():
+      if not is_good_chrom(chrom):
+        continue
+      for cnv in chrom_cnvs:
+        if not self._is_multisample_region_normal_cn(cnv['major_cn'], cnv['minor_cn']):
+          continue
+        if not set(cnv['sampidx']) == self.sampidxs:
+          continue
+        if not np.array_equal(cnv['cell_prev'], self._cellularity):
+          # The region must be clonal normal to be retained. This check
+          # shouldn't be necessary, as we've already ensured all calls have
+          # major = minor = 1, but we perform it just to be thorough.
+          continue
+        normal_cnvs[chrom].append(cnv)
+      normal_cnvs[chrom].sort(key = lambda C: C['start'])
+
+    self._ensure_no_overlap(normal_cnvs)
+    return normal_cnvs
+
+  def load_cnvs(self):
+    '''
+    Return all regions that are clonal normal across all samples, or possess at
+    most one (clonal or subclonal) abnormal state in each sample.
+    '''
+    combined = defaultdict(list)
+
+    normal_cnvs = self.load_normal_cnvs()
+    abnormal_cnvs = self.load_single_abnormal_state_cnvs()
+    for chrom in set(normal_cnvs.keys()) | set(abnormal_cnvs.keys()):
+      combined[chrom] = normal_cnvs[chrom] + abnormal_cnvs[chrom]
+      combined[chrom].sort(key = lambda C: C['start'])
+    self._ensure_no_overlap(combined)
+
+    return combined
 
 class VariantAndCnvGroup(object):
   def __init__(self):
-    self._cn_regions = None
+    self._multisamp_cnv = None
     self._cellularity = None
 
   def add_variants(self, variants, ref_read_counts, total_read_counts):
@@ -764,19 +840,30 @@ class VariantAndCnvGroup(object):
     # case no SSMs remain afterward.
     self._estimated_read_depth = self._estimate_read_depth()
 
-  def add_cnvs(self, cn_regions, cellularity):
-    self._cellularity = cellularity
-    self._cn_regions = cn_regions
+  def _find_cellularity(self, cnvs):
+    max_cellular_prevs = np.zeros(len(cnvs))
+
+    for sampidx, sample_cnvs in enumerate(cnvs):
+      for chrom_regions in sample_cnvs.values():
+        for cnr in chrom_regions:
+          if cnr['cellular_prevalence'] > max_cellular_prevs[sampidx]:
+            max_cellular_prevs[sampidx] = cnr['cellular_prevalence']
+
+    return max_cellular_prevs
+
+  def add_cnvs(self, cn_regions):
+    self._cellularity = self._find_cellularity(cn_regions)
+    self._multisamp_cnv = MultisampleCnvCombiner(cn_regions, self._cellularity)
+    self._sampidxs = self._multisamp_cnv.sampidxs
 
   def has_cnvs(self):
-    return self._cn_regions is not None
+    return self._multisamp_cnv is not None
 
   def _filter_variants_outside_regions(self, regions, before_label, after_label):
     def _is_pos_in_regions(chrom, pos):
-      for (major, minor), cnvs in regions[chrom].items():
-        for cnv in cnvs:
-          if cnv['start'] <= pos <= cnv['end']:
-            return True
+      for cnv in regions[chrom]:
+        if cnv['start'] <= pos <= cnv['end']:
+          return True
       return False
 
     filtered = []
@@ -805,13 +892,25 @@ class VariantAndCnvGroup(object):
 
     def _print_region(var):
       var_name = '%s_%s' % (var.CHROM, var.POS)
-      for (major, minor), cnvs in self._cn_regions[var.CHROM].items():
-        for cnv in cnvs:
-          if cnv['start'] <= var.POS <= cnv['end']:
-            region_type = (is_region_normal_cn(major, minor) and 'normal') or 'abnormal'
-            log('%s\t[in %s-CN region chr%s(%s, %s)]' % (var_name, region_type, var.CHROM, cnv['start'], cnv['end']))
-            return
-      log('%s\t[outside all regions]' % var_name)
+      region_type = None
+      containing_cnv = None
+
+      for cnv in self._multisamp_cnv.load_normal_cnvs()[var.CHROM]:
+        if cnv['start'] <= var.POS <= cnv['end']:
+          region_type = 'normal'
+          containing_cnv = cnv
+          break
+      for cnv in self._multisamp_cnv.load_single_abnormal_state_cnvs()[var.CHROM]:
+        if cnv['start'] <= var.POS <= cnv['end']:
+          assert region_type is None and containing_cnv is None
+          region_type = 'abnormal'
+          containing_cnv = cnv
+          break
+
+      if containing_cnv is not None:
+        log('%s\t[in %s-CN region chr%s(%s, %s)]' % (var_name, region_type, var.CHROM, containing_cnv['start'], containing_cnv['end']))
+      else:
+        log('%s\t[outside all regions]' % var_name)
 
     for var in removed:
       _print_region(var)
@@ -820,20 +919,10 @@ class VariantAndCnvGroup(object):
     if not self.has_cnvs():
       raise Exception('CN regions not yet provided')
 
-    normal_cn = defaultdict(lambda: defaultdict(list))
-
-    for chrom, chrom_cnvs in self._cn_regions.items():
-      for (major, minor), cnvs in chrom_cnvs.items():
-        for cnv in cnvs:
-          # Checking the cellular prevalence shouldn't be necessary, as normal
-          # regions should only be retained if there are no abnormal regions at
-          # the same position, but I check anyways to be thorough.
-          if is_region_normal_cn(major, minor) and np.array_equal(cnv['cell_prev'], self._cellularity):
-            normal_cn[chrom][(major, minor)].append(cnv)
-
+    normal_cn = self._multisamp_cnv.load_normal_cnvs()
     filtered = self._filter_variants_outside_regions(normal_cn, 'all_variants', 'only_normal_cn')
 
-  def exclude_variants_in_subclonal_cnvs(self):
+  def exclude_variants_in_multiple_abnormal_or_unlisted_regions(self):
     # Battenberg:
     #   Five possible placements for variant in Battenberg according to CN records:
     #   1 record:
@@ -852,10 +941,9 @@ class VariantAndCnvGroup(object):
     if not self.has_cnvs():
       raise Exception('CN regions not yet provided')
 
-    #good_regions = self._filter_multiple_abnormal_cn_regions(self._cn_regions)
     # If variant isn't listed in *any* region: exclude (as we suspect CNV
     # caller didn't know what to do with the region).
-    self._filter_variants_outside_regions(self._cn_regions, 'all_variants', 'outside_subclonal_cn')
+    self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'outside_subclonal_cn')
 
   def format_variants(self, sample_size, error_rate, priority_ssms):
     if sample_size is None:
@@ -918,33 +1006,12 @@ class VariantAndCnvGroup(object):
     else:
       return np.nanmean(self._total_read_counts, axis=0)
 
-  def _ensure_no_overlap(self, cnvs):
-    for chrom, chrom_cnvs in cnvs.items():
-      for idx in range(len(chrom_cnvs) - 1):
-        current, next = chrom_cnvs[idx], chrom_cnvs[idx + 1]
-        assert current['start'] < current['end'] <= next['start'] < next['end']
-
-  def write_cnvs(self, variants, outfn, cnv_confidence, read_length, cellularity):
-    abnormal_regions = defaultdict(list)
-
-    for chrom, chrom_cnvs in self._cn_regions.items():
-      for (major, minor), cnvs in chrom_cnvs.items():
-        for cnv in cnvs:
-          if is_region_normal_cn(major, minor):
-            continue
-          cnv = dict(cnv)
-          cnv['major'] = major
-          cnv['minor'] = minor
-          abnormal_regions[chrom].append(cnv)
-      abnormal_regions[chrom].sort(key = lambda C: C['start'])
-
-    self._ensure_no_overlap(abnormal_regions)
-
+  def write_cnvs(self, variants, outfn, cnv_confidence, read_length):
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms', 'physical_cnvs')), file=outf)
-      formatter = CnvFormatter(cnv_confidence, self._estimated_read_depth, read_length)
+      formatter = CnvFormatter(cnv_confidence, self._estimated_read_depth, read_length, self._sampidxs)
       # Last place I'm working is at this position
-      for cnv in formatter.format_and_merge_cnvs(abnormal_regions, variants, cellularity):
+      for cnv in formatter.format_and_merge_cnvs(self._multisamp_cnv.load_single_abnormal_state_cnvs(), variants, self._cellularity):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
           cnv['cnv_id'],
@@ -954,9 +1021,6 @@ class VariantAndCnvGroup(object):
           cnv['physical_cnvs']
         )
         print('\t'.join(vals), file=outf)
-
-def is_region_normal_cn(major, minor):
-  return major == minor == 1
 
 def log(*msgs):
   if log.verbose:
@@ -1044,6 +1108,18 @@ def impute_missing_ref_reads(ref_reads, total_reads):
   assert np.sum(np.isnan(ref_reads)) == 0
 
   return ref_reads.astype(np.int)
+
+def is_good_chrom(chrom):
+  # Ignore the following:
+  #   * Variants unmapped ('chrUn') or mapped to fragmented chromosome ('_random')
+  #   * Weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
+  #   * Mitochondrial ("mt" or "m"), which are weird
+  #   * Sex chromosomes difficult to deal with, as expected frequency depends on
+  #     whether patient is male or female, so ignore them for now. TODO: fix this.
+  if chrom in [str(i) for i in range(1, 23)]:
+    return True
+  else:
+    return False
 
 def parse_variants(args, vcf_types, num_samples):
   parsed_variants = []
@@ -1156,14 +1232,12 @@ def main():
     if len(args.cnv_files) != len(args.vcf_files):
       raise Exception('Number of CNV samples must match number of VCF samples. You provided %s CNV sample(s) and %s VCF sample(s)' % (len(args.cnv_files), len(args.vcf_files)))
     cn_regions = [CnvParser(cnvf).parse() for cnvf in args.cnv_files]
-    cellularity = find_cellularity(cn_regions)
-    cn_regions = MultisampleCnvCombiner().load_cnvs(cn_regions, cellularity)
-    grouper.add_cnvs(cn_regions, cellularity)
+    grouper.add_cnvs(cn_regions)
 
   if args.only_normal_cn:
     grouper.retain_only_variants_in_normal_cn_regions()
   elif grouper.has_cnvs():
-    grouper.exclude_variants_in_subclonal_cnvs()
+    grouper.exclude_variants_in_multiple_abnormal_or_unlisted_regions()
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
   subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms)
@@ -1173,9 +1247,9 @@ def main():
 
   if not args.only_normal_cn and grouper.has_cnvs():
     read_length = num_samples * [args.read_length]
-    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length, cellularity)
+    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
-      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, args.read_length, cellularity)
+      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, read_length)
   else:
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):
