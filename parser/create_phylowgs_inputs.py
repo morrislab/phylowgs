@@ -48,18 +48,6 @@ class VariantParser(object):
       records.append(variant)
     return records
 
-  def _is_good_chrom(self, chrom):
-    # Ignore the following:
-    #   * Variants unmapped ('chrUn') or mapped to fragmented chromosome ('_random')
-    #   * Weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
-    #   * Mitochondrial ("mt" or "m"), which are weird
-    #   * Sex chromosomes difficult to deal with, as expected frequency depends on
-    #     whether patient is male or female, so ignore them for now. TODO: fix this.
-    if chrom in [str(i) for i in range(1, 23)]:
-      return True
-    else:
-      return False
-
   def _does_variant_pass_filters(self, variant):
     if variant.FILTER is None:
       return True
@@ -74,7 +62,7 @@ class VariantParser(object):
     all_variants = self._parse_vcf(vcf_filename)
 
     for variant in all_variants:
-      if not self._is_good_chrom(variant.CHROM):
+      if not is_good_chrom(variant.CHROM):
         continue
       if not self._does_variant_pass_filters(variant):
         continue
@@ -767,6 +755,8 @@ class MultisampleCnvCombiner(object):
     abnormal_cnvs = defaultdict(list)
 
     for chrom, chrom_cnvs in self._cnvs.items():
+      if not is_good_chrom(chrom):
+        continue
       for cnv in chrom_cnvs:
         states_for_all_samples = self._get_abnormal_state_for_all_samples(cnv)
         if states_for_all_samples is None:
@@ -787,6 +777,8 @@ class MultisampleCnvCombiner(object):
     normal_cnvs = defaultdict(list)
 
     for chrom, chrom_cnvs in self._cnvs.items():
+      if not is_good_chrom(chrom):
+        continue
       for cnv in chrom_cnvs:
         if not self._is_multisample_region_normal_cn(cnv['major_cn'], cnv['minor_cn']):
           continue
@@ -1101,6 +1093,18 @@ def impute_missing_ref_reads(ref_reads, total_reads):
   assert np.sum(np.isnan(ref_reads)) == 0
 
   return ref_reads.astype(np.int)
+
+def is_good_chrom(chrom):
+  # Ignore the following:
+  #   * Variants unmapped ('chrUn') or mapped to fragmented chromosome ('_random')
+  #   * Weird chromosomes from Mutect (e.g., "chr17_ctg5_hap1").
+  #   * Mitochondrial ("mt" or "m"), which are weird
+  #   * Sex chromosomes difficult to deal with, as expected frequency depends on
+  #     whether patient is male or female, so ignore them for now. TODO: fix this.
+  if chrom in [str(i) for i in range(1, 23)]:
+    return True
+  else:
+    return False
 
 def parse_variants(args, vcf_types, num_samples):
   parsed_variants = []
