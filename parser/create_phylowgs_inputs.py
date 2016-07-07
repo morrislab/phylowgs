@@ -455,7 +455,7 @@ class VariantFormatter(object):
       raise Exception('Nonsensical frequency: %s' % freq)
     return freq
 
-  def format_variants(self, variants, ref_read_counts, total_read_counts, error_rate, gender):
+  def format_variants(self, variants, ref_read_counts, total_read_counts, error_rate, sex):
     for variant_idx, variant in enumerate(variants):
       ssm_id = 's%s' % self._counter
       if hasattr(variant, 'ID') and variant.ID is not None:
@@ -470,7 +470,7 @@ class VariantFormatter(object):
       # and mu_v fixed.
       # This is mu_r in PhyloWGS.
       expected_ref_freq = 1 - error_rate
-      if variant.CHROM in ('Y', 'M') or (variant.CHROM == 'X' and gender == 'male'):
+      if variant.CHROM in ('Y', 'M') or (variant.CHROM == 'X' and sex == 'male'):
         # Haploid, so should only see non-variants when sequencing error
         # occurred. Note that chrY and chrM are always haploid; chrX is haploid
         # only in men, so script must know sex of patient to choose correct
@@ -930,7 +930,7 @@ class VariantAndCnvGroup(object):
     # caller didn't know what to do with the region).
     self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'outside_subclonal_cn')
 
-  def format_variants(self, sample_size, error_rate, priority_ssms, gender):
+  def format_variants(self, sample_size, error_rate, priority_ssms, sex):
     if sample_size is None:
       sample_size = len(self._variant_idxs)
     random.shuffle(self._variant_idxs)
@@ -960,8 +960,8 @@ class VariantAndCnvGroup(object):
     nonsubsampled_total_counts = self._total_read_counts[nonsubsampled,:]
 
     formatter = VariantFormatter()
-    subsampled_formatted = list(formatter.format_variants(subsampled_variants, subsampled_ref_counts, subsampled_total_counts, error_rate, gender))
-    nonsubsampled_formatted = list(formatter.format_variants(nonsubsampled_variants, nonsubsampled_ref_counts, nonsubsampled_total_counts, error_rate, gender))
+    subsampled_formatted = list(formatter.format_variants(subsampled_variants, subsampled_ref_counts, subsampled_total_counts, error_rate, sex))
+    nonsubsampled_formatted = list(formatter.format_variants(nonsubsampled_variants, nonsubsampled_ref_counts, nonsubsampled_total_counts, error_rate, sex))
 
     return (subsampled_formatted, nonsubsampled_formatted)
 
@@ -1160,7 +1160,7 @@ def parse_variants(args, vcf_types, num_samples):
   ref_read_counts = impute_missing_ref_reads(ref_read_counts, total_read_counts)
   return (all_variant_ids, ref_read_counts, total_read_counts)
 
-def infer_gender(variant_ids):
+def infer_sex(variant_ids):
   num_y_variants = len([V for V in variant_ids if V.CHROM == 'Y'])
   if num_y_variants > 0:
     return 'male'
@@ -1202,8 +1202,8 @@ def main():
     help='If subsampling, write nonsubsampled variants to separate file, in addition to subsampled variants')
   parser.add_argument('--nonsubsampled-variants-cnvs', dest='output_nonsubsampled_variants_cnvs',
     help='If subsampling, write CNVs for nonsubsampled variants to separate file')
-  parser.add_argument('--gender', dest='gender', default='auto', choices=('auto', 'male', 'female'),
-    help='Gender of patient. Used to adjust expected variant frequencies on sex chromosomes. ' +
+  parser.add_argument('--sex', dest='sex', default='auto', choices=('auto', 'male', 'female'),
+    help='Sex of patient. Used to adjust expected variant frequencies on sex chromosomes. ' +
     'If auto, patient is set to male if any variants are provided on the Y chromosome, and female otherwise.')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('vcf_files', nargs='+', help='One or more space-separated occurrences of <vcf_type>=<path>. E.g., sanger=variants1.vcf muse=variants2.vcf. Valid vcf_type values: %s' % ', '.join(vcf_types))
@@ -1234,12 +1234,12 @@ def main():
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
 
-  if args.gender == 'auto':
-    gender = infer_gender(variant_ids)
+  if args.sex == 'auto':
+    sex = infer_sex(variant_ids)
   else:
-    gender = args.gender
+    sex = args.sex
 
-  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, gender)
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
   grouper.write_variants(subsampled_vars, args.output_variants)
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
