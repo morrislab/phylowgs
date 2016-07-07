@@ -470,7 +470,7 @@ class VariantFormatter(object):
       # and mu_v fixed.
       # This is mu_r in PhyloWGS.
       expected_ref_freq = 1 - error_rate
-      if variant.CHROM in ('x', 'y', 'm'):
+      if variant.CHROM in ('X', 'Y', 'M'):
         # Haploid, so should only see non-variants when sequencing error
         # occurred. Note that chrY and chrM are always haploid; chrX is haploid
         # only in men, so script must know sex of patient to choose correct
@@ -1022,7 +1022,7 @@ class CnvParser(object):
     with open(self._cn_filename) as cnf:
       reader = csv.DictReader(cnf, delimiter='\t')
       for record in reader:
-        chrom = record['chromosome']
+        chrom = record['chromosome'].upper()
         del record['chromosome']
         for key in ('start', 'end', 'major_cn', 'minor_cn'):
           # Some records from Battenberg have major and minor listed as, e.g.,
@@ -1101,7 +1101,7 @@ def is_good_chrom(chrom):
   #   * Mitochondrial ("mt" or "m"), which are weird
   #   * Sex chromosomes difficult to deal with, as expected frequency depends on
   #     whether patient is male or female, so ignore them for now. TODO: fix this.
-  if chrom in [str(i) for i in range(1, 23)]:
+  if chrom in [str(i) for i in range(1, 23)] + ['X', 'Y']:
     return True
   else:
     return False
