@@ -40,32 +40,23 @@ not make a proper determination of copy number (whether normal or abnormal) for
 unlisted regions, meaning that PhyloWGS will be unable to correct for
 copy-number changes for the SSMs in question.
 
-There are two modes of operation for the parser:
+You can choose to run on three types of regions, specified via the `--regions`
+parameter.
 
-  1. You specify `--only-normal-cn`: Only variants falling in regions
-     explicitly listed as normal will be output. This means the region in
-     question must be listed in `cnvs.txt` with `major_cn=1`, `minor_cn=1`, and
-     `cellular_prevalence=<cellularity>`. In this case, an empty `cnv_data.txt`
-     will be output for use with PhyloWGS' `evolve.py`.
+    * `--regions normal_and_abnormal_cn` (default): Include variants in clonal normal
+      regions, clonal abnormal regions, and regions that have at most one
+      subclonal abnormal state (e.g., a region that's a mix of (major, minor) =
+      (2, 1) and (2, 2) will be rejected). Place CNAs on the phylogenetic tree.
 
-  2. You do not specify `--only-normal-cn`: All variants falling in regions
-     listed in `cnvs.txt` will be output, along with variants in normal regions
-     listed in `cnvs.txt`. Note, however, that variants falling in regions for
-     which multiple overlapping subclonal-copy-number-change calls exist will
-     be ignored, as we don't know what order the CNVs occurred in, and thus
-     cannot properly correct the variant allele frequency for contained
-     variants.  (Variants falling in regions for which a single
-     subclonal-coy-number-change call exists, alongside an overlapping
-     demarcation of normal copy number for the same region in the remaining
-     cells, are perfectly fine, however.) In this case, both `ssm_data.txt` and
-     `cnv_data.txt` will be output with appropriate information for use with
-     PhyloWGS.
+    * `--regions normal_cn`: Include variants only in clonal normal regions
+      (i.e., major and minor alleles are both 1). Do not place CNAs on the
+      phylogenetic tree (i.e., an empty `cnv_data.txt` is output).
 
-Only SSMs on chromosomes 1 through 22 are considered. All other variants are
-ignored. (Variants on sex chromosomes are difficult to deal with, as the
-expected reference frequency will differ depending on whether the sample
-originated from a male or female patient. Mitochondiral variants are generally
-weird, and so are ignored by the parser.)
+    * `--regions all`: *Recommended only if you have no data on CNAs, or if you
+      are running PhyloWGS as part of the SMC-Het challenge*. Include every
+      variant. This will include variants in regions with multiple subclonal
+      abnormal states, as well as regions for which no copy number information
+      is reported.
 
 Installation
 ------------
@@ -131,7 +122,8 @@ Usage
     usage: create_phylowgs_inputs.py [-h] [-e ERROR_RATE]
                                      [--missing-variant-confidence MISSING_VARIANT_CONFIDENCE]
                                      [-s SAMPLE_SIZE] [-P PRIORITY_SSM_FILENAME]
-                                     [--cnvs CNV_FILE] [--only-normal-cn]
+                                     [--cnvs CNV_FILES] [--only-normal-cn]
+                                     [--regions {normal_cn,normal_and_abnormal_cn,all}]
                                      [--output-cnvs OUTPUT_CNVS]
                                      [--output-variants OUTPUT_VARIANTS]
                                      [--tumor-sample TUMOR_SAMPLE]
@@ -140,7 +132,7 @@ Usage
                                      [--muse-tier MUSE_TIER]
                                      [--nonsubsampled-variants OUTPUT_NONSUBSAMPLED_VARIANTS]
                                      [--nonsubsampled-variants-cnvs OUTPUT_NONSUBSAMPLED_VARIANTS_CNVS]
-                                     [--verbose]
+                                     [--sex {auto,male,female}] [--verbose]
                                      vcf_files [vcf_files ...]
 
     Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV
@@ -151,7 +143,7 @@ Usage
                             <vcf_type>=<path>. E.g., sanger=variants1.vcf
                             muse=variants2.vcf. Valid vcf_type values: strelka,
                             mutect_pcawg, dkfz, muse, vardict, mutect_smchet,
-                            mutect_tcga, sanger
+                            mutect_tcga, sanger, pcawg_consensus
 
     optional arguments:
       -h, --help            show this help message and exit
@@ -169,10 +161,15 @@ Usage
                             File containing newline-separated list of SSMs in
                             "<chr>_<locus>" format to prioritize for inclusion
                             (default: None)
-      --cnvs CNV_FILE       Path to CNV list created with parse_cnvs.py (default:
+      --cnvs CNV_FILES      Path to per-sample CNV files created with
+                            parse_cnvs.py. Specified once per CNV file. (default:
                             None)
       --only-normal-cn      Only output variants lying in normal CN regions. Do
                             not output CNV data directly. (default: False)
+      --regions {normal_cn,normal_and_abnormal_cn,all}
+                            Which regions to use variants from. Refer to the
+                            parser README for more details. (default:
+                            normal_and_abnormal_cn)
       --output-cnvs OUTPUT_CNVS
                             Output destination for CNVs (default: cnv_data.txt)
       --output-variants OUTPUT_VARIANTS
@@ -197,7 +194,13 @@ Usage
       --nonsubsampled-variants-cnvs OUTPUT_NONSUBSAMPLED_VARIANTS_CNVS
                             If subsampling, write CNVs for nonsubsampled variants
                             to separate file (default: None)
+      --sex {auto,male,female}
+                            Sex of patient. Used to adjust expected variant
+                            frequencies on sex chromosomes. If auto, patient is
+                            set to male if any variants are provided on the Y
+                            chromosome, and female otherwise. (default: auto)
       --verbose
+
 
 
 Notes
@@ -206,9 +209,8 @@ Notes
   reconstructions to 5000 is recommended to limit PhyloWGS' runtime. PhyloWGS
   runtime will scale linearly with the number of variants.
 
-* Any variants on mitochondrial or sex chromosomes are ignored. Mitochondrial
-  variants are weird, and sex-chromosome variants require knowing the patient's
-  gender to generate proper allele frequencies.
+* Any variants on the mitochondrial chromosome are ignored. Mitochondrial
+  variants are weird.
 
 * To permit CNVs to move more freely amongst populations in the sampled
   phylogenies, you can pass `--cnv-confidence [0.0, 1.0]`. This will scale the

@@ -1184,8 +1184,8 @@ def main():
     help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
   parser.add_argument('--cnvs', dest='cnv_files', action='append',
     help='Path to per-sample CNV files created with parse_cnvs.py. Specified once per CNV file.')
-  parser.add_argument('--only-normal-cn', dest='only_normal_cn', action='store_true', default=False,
-      help='Only output variants lying in normal CN regions. Do not output CNV data directly.')
+  parser.add_argument('--regions', dest='regions', choices=('normal_cn', 'normal_and_abnormal_cn', 'all'), default='normal_and_abnormal_cn',
+    help='Which regions to use variants from. Refer to the parser README for more details.')
   parser.add_argument('--output-cnvs', dest='output_cnvs', default='cnv_data.txt',
     help='Output destination for CNVs')
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
@@ -1227,10 +1227,17 @@ def main():
     cn_regions = [CnvParser(cnvf).parse() for cnvf in args.cnv_files]
     grouper.add_cnvs(cn_regions)
 
-  if args.only_normal_cn:
+  if not grouper.has_cnvs():
+    assert args.regions == 'all', 'If you do not provide CNA data, you must specify --regions=all'
+
+  if args.regions == 'normal_cn':
     grouper.retain_only_variants_in_normal_cn_regions()
-  elif grouper.has_cnvs():
+  elif args.regions == 'normal_and_abnormal_cn':
     grouper.exclude_variants_in_multiple_abnormal_or_unlisted_regions()
+  elif args.regions == 'all':
+    pass
+  else:
+    raise Exception('Unknown --regions value: %s' % args.regions)
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
 
@@ -1244,7 +1251,8 @@ def main():
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
 
-  if not args.only_normal_cn and grouper.has_cnvs():
+  if grouper.has_cnvs() and args.regions != 'normal_cn':
+    # Write CNVs.
     read_length = num_samples * [args.read_length]
     grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
