@@ -470,7 +470,7 @@ class VariantFormatter(object):
       raise Exception('Nonsensical frequency: %s' % freq)
     return freq
 
-  def format_variants(self, variants, ref_read_counts, total_read_counts, error_rate):
+  def format_variants(self, variants, ref_read_counts, total_read_counts, error_rate, sex):
     for variant_idx, variant in enumerate(variants):
       ssm_id = 's%s' % self._counter
       if hasattr(variant, 'ID') and variant.ID is not None:
@@ -485,7 +485,7 @@ class VariantFormatter(object):
       # and mu_v fixed.
       # This is mu_r in PhyloWGS.
       expected_ref_freq = 1 - error_rate
-      if variant.CHROM in ('x', 'y', 'm'):
+      if variant.CHROM in ('Y', 'M') or (variant.CHROM == 'X' and sex == 'male'):
         # Haploid, so should only see non-variants when sequencing error
         # occurred. Note that chrY and chrM are always haploid; chrX is haploid
         # only in men, so script must know sex of patient to choose correct
@@ -945,7 +945,7 @@ class VariantAndCnvGroup(object):
     # caller didn't know what to do with the region).
     self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'outside_subclonal_cn')
 
-  def format_variants(self, sample_size, error_rate, priority_ssms):
+  def format_variants(self, sample_size, error_rate, priority_ssms, sex):
     if sample_size is None:
       sample_size = len(self._variant_idxs)
     random.shuffle(self._variant_idxs)
@@ -975,8 +975,8 @@ class VariantAndCnvGroup(object):
     nonsubsampled_total_counts = self._total_read_counts[nonsubsampled,:]
 
     formatter = VariantFormatter()
-    subsampled_formatted = list(formatter.format_variants(subsampled_variants, subsampled_ref_counts, subsampled_total_counts, error_rate))
-    nonsubsampled_formatted = list(formatter.format_variants(nonsubsampled_variants, nonsubsampled_ref_counts, nonsubsampled_total_counts, error_rate))
+    subsampled_formatted = list(formatter.format_variants(subsampled_variants, subsampled_ref_counts, subsampled_total_counts, error_rate, sex))
+    nonsubsampled_formatted = list(formatter.format_variants(nonsubsampled_variants, nonsubsampled_ref_counts, nonsubsampled_total_counts, error_rate, sex))
 
     return (subsampled_formatted, nonsubsampled_formatted)
 
@@ -1037,7 +1037,7 @@ class CnvParser(object):
     with open(self._cn_filename) as cnf:
       reader = csv.DictReader(cnf, delimiter='\t')
       for record in reader:
-        chrom = record['chromosome']
+        chrom = record['chromosome'].upper()
         del record['chromosome']
         for key in ('start', 'end', 'major_cn', 'minor_cn'):
           # Some records from Battenberg have major and minor listed as, e.g.,
@@ -1116,7 +1116,7 @@ def is_good_chrom(chrom):
   #   * Mitochondrial ("mt" or "m"), which are weird
   #   * Sex chromosomes difficult to deal with, as expected frequency depends on
   #     whether patient is male or female, so ignore them for now. TODO: fix this.
-  if chrom in [str(i) for i in range(1, 23)]:
+  if chrom in [str(i) for i in range(1, 23)] + ['X', 'Y']:
     return True
   else:
     return False
@@ -1177,6 +1177,13 @@ def parse_variants(args, vcf_types, num_samples):
   ref_read_counts = impute_missing_ref_reads(ref_read_counts, total_read_counts)
   return (all_variant_ids, ref_read_counts, total_read_counts)
 
+def infer_sex(variant_ids):
+  num_y_variants = len([V for V in variant_ids if V.CHROM == 'Y'])
+  if num_y_variants > 0:
+    return 'male'
+  else:
+    return 'female'
+
 def main():
   vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict', 'pcawg_consensus'))
 
@@ -1194,8 +1201,8 @@ def main():
     help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
   parser.add_argument('--cnvs', dest='cnv_files', action='append',
     help='Path to per-sample CNV files created with parse_cnvs.py. Specified once per CNV file.')
-  parser.add_argument('--only-normal-cn', dest='only_normal_cn', action='store_true', default=False,
-      help='Only output variants lying in normal CN regions. Do not output CNV data directly.')
+  parser.add_argument('--regions', dest='regions', choices=('normal_cn', 'normal_and_abnormal_cn', 'all'), default='normal_and_abnormal_cn',
+    help='Which regions to use variants from. Refer to the parser README for more details.')
   parser.add_argument('--output-cnvs', dest='output_cnvs', default='cnv_data.txt',
     help='Output destination for CNVs')
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
@@ -1212,6 +1219,9 @@ def main():
     help='If subsampling, write nonsubsampled variants to separate file, in addition to subsampled variants')
   parser.add_argument('--nonsubsampled-variants-cnvs', dest='output_nonsubsampled_variants_cnvs',
     help='If subsampling, write CNVs for nonsubsampled variants to separate file')
+  parser.add_argument('--sex', dest='sex', default='auto', choices=('auto', 'male', 'female'),
+    help='Sex of patient. Used to adjust expected variant frequencies on sex chromosomes. ' +
+    'If auto, patient is set to male if any variants are provided on the Y chromosome, and female otherwise.')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('vcf_files', nargs='+', help='One or more space-separated occurrences of <vcf_type>=<path>. E.g., sanger=variants1.vcf muse=variants2.vcf. Valid vcf_type values: %s' % ', '.join(vcf_types))
   args = parser.parse_args()
@@ -1234,18 +1244,32 @@ def main():
     cn_regions = [CnvParser(cnvf).parse() for cnvf in args.cnv_files]
     grouper.add_cnvs(cn_regions)
 
-  if args.only_normal_cn:
+  if not grouper.has_cnvs():
+    assert args.regions == 'all', 'If you do not provide CNA data, you must specify --regions=all'
+
+  if args.regions == 'normal_cn':
     grouper.retain_only_variants_in_normal_cn_regions()
-  elif grouper.has_cnvs():
+  elif args.regions == 'normal_and_abnormal_cn':
     grouper.exclude_variants_in_multiple_abnormal_or_unlisted_regions()
+  elif args.regions == 'all':
+    pass
+  else:
+    raise Exception('Unknown --regions value: %s' % args.regions)
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
-  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms)
+
+  if args.sex == 'auto':
+    sex = infer_sex(variant_ids)
+  else:
+    sex = args.sex
+
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
   grouper.write_variants(subsampled_vars, args.output_variants)
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
 
-  if not args.only_normal_cn and grouper.has_cnvs():
+  if grouper.has_cnvs() and args.regions != 'normal_cn':
+    # Write CNVs.
     read_length = num_samples * [args.read_length]
     grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
