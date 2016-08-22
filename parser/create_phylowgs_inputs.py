@@ -545,6 +545,27 @@ class Segmenter(object):
     min_size_for_inclusion = 1
 
     for chrom, cnvs in cnv_set.items():
+      for cnv in cnvs:
+        # We sorted above to place start coordinates after end coordinates. But
+        # if a CNV was listed with *the same* start and end position (meaning a
+        # zero-length record, assuming intervals that are left-closed but
+        # right-open), we will encounter the end for that record before its
+        # start. As such, the "open_samples.remove()" call below will fail, as
+        # the given intervals will not have been opened when we encounter its
+        # end.
+        #
+        # Note the above assumes a half-open interpretation of intervals. I
+        # don't think I implemented this -- if I recall, the code dealing with
+        # CNVs (such as determining SSM overlap) assumes fully-closed intervals
+        # (i.e., it doesn't check if cnv.start <= ssm.locus <= (cnv.end + 1)).
+        # Normally this doesn't matter, given the low resolution of CNV calls
+        # -- we should never encounter such small intervals. But a pathological
+        # case in which CNV inputs had the same start & end coordinates for
+        # some intervals revealed that the code crashes on this input. We
+        # should provide a more informative error in such cases, which the
+        # following assertion does.
+        assert cnv['start'] < cnv['end'], ('In CNV %s, start position occurs at or after the end position' % cnv)
+
       start_pos = [(c['start'], 'start', (c['sample'], c['cell_prev'], c['major_cn'], c['minor_cn'])) for c in cnvs]
       end_pos   = [(c['end'],   'end',   (c['sample'], c['cell_prev'], c['major_cn'], c['minor_cn'])) for c in cnvs]
 
