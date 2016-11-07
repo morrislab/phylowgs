@@ -41,19 +41,19 @@ def print_best_tree(tssb,fout):
 
 def print_node2(node, parent,tree,fout):
 	global ctr;
-	num_data = node['node'].num_data()
+	num_data = node.num_data()
 	node_name  = ctr ; ctr+=1;
 	
-	genes = node['node'].get_data()
+	genes = node.get_data()
 	gnames = ''
 	if len(genes)>0:
 		gnames = genes[0].id#name
 		for g in arange(1,len(genes)):
 			gnames = gnames + '; ' + genes[g].id#name;
-	out_str = str(node_name) + ',\t' + str(around(node['node'].params,3)) + ',\t' + str(len(node['children'])) + ',\t' + str(len(genes)) + ',\t' + gnames +  '\n'
+	out_str = str(node_name) + ',\t' + str(around(node.params,3)) + ',\t' + str(len(node.children())) + ',\t' + str(len(genes)) + ',\t' + gnames +  '\n'
 	fout.write(out_str)
 	
-	for child in node['children']:
+	for child in node.children():
 		name_string = str(ctr)#+'('+str(len(child['node'].get_data()))+')'
 		print_node2(child, node_name,tree.add_child(name=name_string),fout)
 	
@@ -129,7 +129,7 @@ def print_tree_latex(tssb,fout,score):
 	level 4/.style={sibling distance=20mm},\
 	every edge/.style={-latex, thick}]\n'
 	tree_file+='\n\\'
-	tree_file=write_tree(tssb.root['node'], tree_file)
+	tree_file=write_tree(tssb.root, tree_file)
 	tree_file+=';\n'
 	tree_file+='\\end{tikzpicture}\n'
 	tree_file+='};\n'	
@@ -138,13 +138,13 @@ def print_tree_latex(tssb,fout,score):
 	tree_file+='\\begin{tikzpicture}\n'	
 	tree_file+='\\node (table){\n'
 	tree_file+='\\begin{tabular}{|c|p{5cm}|p{5cm}|'
-	for i in range(len(tssb.root['node'].params)):
+	for i in range(len(tssb.root.params)):
 		tree_file+='l|'
 	tree_file+='}\n'
 	tree_file+='\\hline\n'
-	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{Mutations}} & \multicolumn{{1}}{{|c|}}{{Frequencies}} \\\\\n'.format(len(tssb.root['node'].params))
+	tree_file+='Node & \multicolumn{{1}}{{|c|}}{{Mutations}} & \multicolumn{{1}}{{|c|}}{{Frequencies}} \\\\\n'.format(len(tssb.root.params))
 	tree_file+='\\hline\n'
-	tree_file=print_index(tssb.root['node'], tree_file)
+	tree_file=print_index(tssb.root, tree_file)
 	tree_file+='\\hline\n'
 	tree_file+='\\end{tabular}\n'
 	tree_file+='};\n'

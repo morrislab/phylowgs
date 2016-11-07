@@ -63,7 +63,6 @@ class Datum(object):
 	
 	# computes the binomial parameter
 	def compute_n_genomes(self,tp,new_state=0):
-	
 		def descend(nd,new_state):
 
 			pi = nd.pi1[tp] if new_state else nd.pi[tp] # this is needed for Metropolis-Hastings likelihood computations
@@ -95,7 +94,7 @@ class Datum(object):
 			else:
 				print "PANIC"
 		
-		nodes = self.tssb.root['node'].tssb.get_nodes()
+		nodes = self.tssb.root.tssb.get_nodes()
 		self.nr1 = 0
 		self.nv1 = 0
 		self.nr2 = 0 

@@ -50,7 +50,7 @@ class alleles(Node):
 		self._children = None
 
 	def logprob(self, x):
-		return x[0]._log_likelihood(self.params)
+		return x._log_likelihood(self.params)
 		
 	def complete_logprob(self):
-		return sum([self.logprob([data]) for data in self.get_data()])
+		return sum([self.logprob(data) for data in self.get_data()])

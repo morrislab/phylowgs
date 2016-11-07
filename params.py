@@ -61,13 +61,13 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	sp.check_call(['%s/mh.o' % script_dir, MH_ITR, MH_STD, N_SSM_DATA, N_CNV_DATA, NNODES, TREE_HEIGHT, FNAME_SSM_DATA, FNAME_CNV_DATA, FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS,FNAME_C_MH_ARATIO, NTPS])
 	ar = str(loadtxt(FNAME_C_MH_ARATIO,dtype='string'))
 	update_tree_params(tssb,FNAME_C_PARAMS) # update the tree with the new parameters sampled using the c++ code
-	
 	return ar
 
 # done for multi-sample
 def write_tree(tssb,n_ssms,fname):
 	fh=open(fname,'w')
 	wts,nodes=tssb.get_mixture()
+
 	did_int_dict=dict()
 	for dat in tssb.data:
 		if dat.id[0]=='s':
@@ -96,7 +96,7 @@ def write_tree(tssb,n_ssms,fname):
 		fh.flush()
 		###############
 	
-	descend(tssb.root['node'])
+	descend(tssb.root)
 	fh.flush()
 
 	fh.close()
