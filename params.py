@@ -119,12 +119,6 @@ def write_data_state(tssb,fname):
 		if not dat.cnv: continue # nothing to do for CNVs
 		if not dat.node: continue # todo: this won't happen
 		poss_n_genomes = dat.compute_n_genomes(0)
-		if poss_n_genomes[0][1] == 0:
-			nv = (False,True)
-		elif poss_n_genomes[1][1] == 0:
-			nv = (True,False)
-		else:
-			nv = (True,True)
 		for node in nodes:
 		
 			ssm_node = node.path[-1]
@@ -133,34 +127,44 @@ def write_data_state(tssb,fname):
             
 			dat.state1 = '' # maternal
 			dat.state2 = '' # paternal
+			dat.state3 = '' # maternal
+			dat.state4 = '' # paternal
+
 			if (not ssm_node in ancestors) and (not mr_cnv):
 				dat.state1 += str(node.id) + ',' + str(2) + ',' + str(0) + ';'
-				dat.state2=dat.state1
+				dat.state2 += str(node.id) + ',' + str(2) + ',' + str(0) + ';'
+				dat.state3 += str(node.id) + ',' + str(2) + ',' + str(0) + ';'
+				dat.state4 += str(node.id) + ',' + str(2) + ',' + str(0) + ';'
 			elif ssm_node in ancestors and (not mr_cnv):
 				dat.state1 += str(node.id) + ',' + str(1) + ',' + str(1) + ';'
-				dat.state2=dat.state1
+				dat.state2 += str(node.id) + ',' + str(1) + ',' + str(1) + ';'
+				dat.state3 += str(node.id) + ',' + str(1) + ',' + str(1) + ';'
+				dat.state4 += str(node.id) + ',' + str(1) + ',' + str(1) + ';'
 			elif (not ssm_node in ancestors) and mr_cnv:
 				dat.state1 += str(node.id) + ',' + str(mr_cnv[1]+mr_cnv[2]) + ',' + str(0) + ';'
-				dat.state2=dat.state1
+				dat.state2 += str(node.id) + ',' + str(mr_cnv[1]+mr_cnv[2]) + ',' + str(0) + ';'
+				dat.state3 += str(node.id) + ',' + str(mr_cnv[1]+mr_cnv[2]) + ',' + str(0) + ';'
+				dat.state4 += str(node.id) + ',' + str(mr_cnv[1]+mr_cnv[2]) + ',' + str(0) + ';'
 			elif ssm_node in ancestors and mr_cnv:
+				dat.state3 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(min(1,mr_cnv[1]+mr_cnv[2])) + ';'
+				dat.state4 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(min(1,mr_cnv[1]+mr_cnv[2])) + ';'
 				if ssm_node in mr_cnv[0].node.get_ancestors():
-					if nv == (False,True):
-						dat.state2 += str(node.id) + ',' + str(mr_cnv[2]) + ',' + str(mr_cnv[1]) + ';' # paternal
-						dat.state1=dat.state2
-					elif nv == (True, False):
-						dat.state1 += str(node.id) + ',' + str(mr_cnv[1]) + ',' + str(mr_cnv[2]) + ';' # maternal
-						dat.state2 = dat.state1
-					else:
-						dat.state1 += str(node.id) + ',' + str(mr_cnv[1]) + ',' + str(mr_cnv[2]) + ';' # maternal
-						dat.state2 += str(node.id) + ',' + str(mr_cnv[2]) + ',' + str(mr_cnv[1]) + ';' # paternal
-					
+					dat.state1 += str(node.id) + ',' + str(mr_cnv[1]) + ',' + str(mr_cnv[2]) + ';' # maternal
+					dat.state2 += str(node.id) + ',' + str(mr_cnv[2]) + ',' + str(mr_cnv[1]) + ';' # paternal
 				else:
 					dat.state1 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(min(1,mr_cnv[1]+mr_cnv[2])) + ';'
-					dat.state2 = dat.state1 
+					dat.state2 += str(node.id) + ',' + str(max(0,mr_cnv[1]+mr_cnv[2]-1)) + ',' + str(min(1,mr_cnv[1]+mr_cnv[2])) + ';'
 			else:
 				print "PANIC"
 			
-			fh.write(str(dat.id[1:]) + '\t' + dat.state1.strip(';') + '\t' + dat.state2.strip(';'))
+			if poss_n_genomes[0][1] == 0:
+				dat.state1 = dat.state2
+			elif poss_n_genomes[1][1] == 0:
+				dat.state2 = dat.state1
+			if len(poss_n_genomes) == 2:
+				dat.state3 = dat.state1
+				dat.state4 = dat.state2
+			fh.write(str(dat.id[1:]) + '\t' + dat.state1.strip(';') + '\t' + dat.state2.strip(';') +'\t' + dat.state3.strip(';') +'\t' + dat.state4.strip(';') +'\t')
 			fh.write('\n')
 		
 	fh.flush()

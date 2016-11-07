@@ -1,7 +1,7 @@
 function TreePlotter() {
 }
 
-TreePlotter.prototype._render_summary_table = function(populations) {
+TreePlotter.prototype._render_summary_table = function(structure, populations) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
   var summary_table = $('#snippets .tree-summary').clone().appendTo('#container');
@@ -13,7 +13,7 @@ TreePlotter.prototype._render_summary_table = function(populations) {
   pop_ids.forEach(function(pop_id) {
     var pop = populations[pop_id];
     var cp = pop.cellular_prevalence.map(function(E) { return E.toFixed(3); });
-    var ccf = self._calc_ccf(populations, pop_id);
+    var ccf = self._calc_ccf(structure, populations, pop_id);
     ccf = ccf.map(function(E) { return E.toFixed(3); });
 
     var entries = [pop_id].concat([pop.num_ssms, pop.num_cnvs]).concat(cp).concat(ccf).map(function(entry) {
@@ -23,7 +23,7 @@ TreePlotter.prototype._render_summary_table = function(populations) {
   });
 }
 
-TreePlotter.prototype._plot_pop_trajectories = function(populations) {
+TreePlotter.prototype._plot_pop_trajectories = function(structure, populations) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
   var num_cancer_pops = pop_ids.length - 1;
@@ -40,7 +40,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
 
   var self = this;
   var ccf = pop_ids.map(function(pop_id) {
-    return self._calc_ccf(populations, pop_id);
+    return self._calc_ccf(structure, populations, pop_id);
   });
   // Remove CCFs for non-cancerous first element, which will always be 1.
   ccf.shift();
@@ -81,11 +81,11 @@ TreePlotter.prototype._plot_pop_trajectories = function(populations) {
 TreePlotter.prototype.draw = function(populations, structure) {
   var root = this._generate_tree_struct(structure, populations);
   this._draw_tree(root);
-  this._plot_pop_trajectories(populations);
-  this._render_summary_table(populations);
+  this._plot_pop_trajectories(structure, populations);
+  this._render_summary_table(structure, populations);
 }
 
-TreePlotter.prototype._calc_ccf = function(populations, pop_id) {
+TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
 
@@ -93,28 +93,24 @@ TreePlotter.prototype._calc_ccf = function(populations, pop_id) {
   if(parseInt(pop_id, 10) === 0)
     return (new Array(num_samples)).fill(0);
 
-  var max_cps = new Array(num_samples.length);
+  var root_pidx = 0;
+  var clonal_pidxs = structure[root_pidx];
+  var purities = [];
 
   // Don't assume that populations[1] will have the maximum cellular
   // prevalence, as this may not be true for polyclonal tumors.
   for(var sampidx = 0; sampidx < num_samples; sampidx++) {
-    var max_sample_cp = 0;
-    pop_ids.forEach(function(pid) {
-      pid = parseInt(pid, 10);
-      // Ignore the non-cancerous root node, as its CP will always be 1.
-      if(pid === 0)
-        return;
-      if(populations[pid].cellular_prevalence[sampidx] > max_sample_cp) {
-        max_sample_cp = populations[pid].cellular_prevalence[sampidx];
-      }
+    var purity = 0;
+    clonal_pidxs.forEach(function(pidx) {
+        purity += populations[pidx].cellular_prevalence[sampidx];
     });
-    max_cps[sampidx] = max_sample_cp;
+    purities.push(purity);
   }
 
   var cps = populations[pop_id].cellular_prevalence;
   var ccf = [];
-  for(var i = 0; i < num_samples; i++) {
-    ccf.push(cps[i] / max_cps[i]);
+  for(var sampidx = 0; sampidx < num_samples; sampidx++) {
+    ccf.push(cps[sampidx] / purities[sampidx]);
   }
 
   return ccf;
