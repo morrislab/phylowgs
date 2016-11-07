@@ -77,7 +77,7 @@ class ResultGenerator(object):
         structure[current_idx].append(idx[0])
         _traverse_r(child, current_idx)
 
-    _traverse_r(tree.root['node'], None)
+    _traverse_r(tree.root, None)
     return (pops, mut_assignments, structure)
 
   def _list_mutations(self, tree, include_ssm_names, cnv_logical_physical_mapping):
@@ -86,7 +86,7 @@ class ResultGenerator(object):
     ssms_in_cnvs = defaultdict(list)
 
     def _traverse(node):
-      for mut in node['node'].get_data():
+      for mut in node.get_data():
         if mut.id.startswith('s'):
           ssms[mut.id] = {
             'ref_reads': mut.a,
@@ -111,7 +111,7 @@ class ResultGenerator(object):
           }
         else:
           raise Exception('Unknown mutation type: %s' % mut.id)
-      for child in node['children']:
+      for child in node.children():
         _traverse(child)
     _traverse(tree.root)
 
