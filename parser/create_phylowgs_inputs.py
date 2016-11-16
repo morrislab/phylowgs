@@ -1268,6 +1268,8 @@ def main():
     sex = args.sex
 
   subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
+  if len(subsampled_vars) == 0:
+    raise Exception('No variants to write')
   grouper.write_variants(subsampled_vars, args.output_variants)
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)
