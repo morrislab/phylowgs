@@ -327,7 +327,7 @@ class CnvFormatter(object):
       if P < 0.02:
         P = 0.02
 
-      d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (delta_cn  * P) / 2)
+      d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (abs(delta_cn)  * P) / 2)
 
       if no_net_change:
         # If no net change in CN occurred, the estimate was just based on BAFs,
