@@ -64,7 +64,7 @@ struct datum{
 	//int cnv;// just an indicator for cnv or ssm datum
 	
 	// this is used to compute the binomial parameter
-	vector <struct state> states1, states2; // maternal and paternal state
+	vector <struct state> states1, states2, states3, states4; // maternal and paternal state
 	
 	double log_ll1111(vector<double> phi, int old){
 		double llh = 0.0;
@@ -88,7 +88,7 @@ struct datum{
 			llh = log_binomial_likelihood(a[tp], d[tp], mu) + log_bin_norm_const[tp];			
 		}	
 		else{ // ssm data
-			double ll[2]; // maternal and paternal	
+			double ll[4]; // maternal and paternal	
 			nr=0;
 			nv=0;
 			for(int i=0;i<states1.size();i++){
@@ -102,7 +102,7 @@ struct datum{
 			}
 			if(nr+nv>0){
 				mu = (nv*(1-mu_r) + nr*mu_r)/(nr+nv);
-				ll[0] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.5) + log_bin_norm_const[tp];
+				ll[0] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.25) + log_bin_norm_const[tp];
 			}else{
 				ll[0]=log(pow(10,-99));
 			}
@@ -119,11 +119,45 @@ struct datum{
 			}
 			if(nr+nv>0){
 				mu = (nv*(1-mu_r) + nr*mu_r)/(nr+nv);
-				ll[1] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.5) + log_bin_norm_const[tp];
+				ll[1] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.25) + log_bin_norm_const[tp];
 			}else{
 				ll[1]=log(pow(10,-99));
 			}
-			llh = logsumexp(ll,2);
+			nr=nv=0;
+			for(int i=0;i<states3.size();i++){
+				if(old==0){
+					nr += (states3[i].nd->pi1[tp])*states3[i].nr;
+					nv += (states3[i].nd->pi1[tp])*states3[i].nv;
+				}else{
+					nr += (states3[i].nd->pi[tp])*states3[i].nr;
+					nv += (states3[i].nd->pi[tp])*states3[i].nv;
+				}				
+			}
+			if(nr+nv>0){
+				mu = (nv*(1-mu_r) + nr*mu_r)/(nr+nv);
+				ll[2] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.25) + log_bin_norm_const[tp];
+			}else{
+				ll[2]=log(pow(10,-99));
+			}
+
+			nr=nv=0;
+			for(int i=0;i<states4.size();i++){
+				if(old==0){
+					nr += (states4[i].nd->pi1[tp])*states4[i].nr;
+					nv += (states4[i].nd->pi1[tp])*states4[i].nv;
+				}else{
+					nr += (states4[i].nd->pi[tp])*states4[i].nr;
+					nv += (states4[i].nd->pi[tp])*states4[i].nv;
+				}				
+			}
+			if(nr+nv>0){
+				mu = (nv*(1-mu_r) + nr*mu_r)/(nr+nv);
+				ll[3] = log_binomial_likelihood(a[tp], d[tp], mu) + log(0.25) + log_bin_norm_const[tp];
+			}else{
+				ll[3]=log(pow(10,-99));
+			}
+
+			llh = logsumexp(ll,4);
 		}
 		return llh;
 	}	

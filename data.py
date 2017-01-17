@@ -71,17 +71,30 @@ class Datum(object):
 			mr_cnv = self.find_most_recent_cnv(nd)
 			ancestors = nd.get_ancestors()
 			if (not ssm_node in ancestors) and (not mr_cnv):
-				self.nr1 = self.nr1 + pi * 2
-				self.nr2 = self.nr2 + pi * 2
+				self.nr1 += pi * 2
+				self.nr2 += pi * 2
+				self.nr3 += pi * 2
+				self.nr4 += pi * 2
 			elif ssm_node in ancestors and (not mr_cnv):
-				self.nr1 = self.nr1 + pi
-				self.nv1 = self.nv1 + pi
-				self.nr2 = self.nr2 + pi
-				self.nv2 = self.nv2 + pi
+				self.nr1 += pi
+				self.nv1 += pi
+				self.nr2 += pi
+				self.nv2 += pi
+				self.nr3 += pi
+				self.nv3 += pi
+				self.nr4 += pi
+				self.nv4 += pi
 			elif (not ssm_node in ancestors) and mr_cnv:
-				self.nr1 = self.nr1 + pi * (mr_cnv[1] + mr_cnv[2])
-				self.nr2 = self.nr2 + pi * (mr_cnv[1] + mr_cnv[2])
+				self.nr1 += pi * (mr_cnv[1] + mr_cnv[2])
+				self.nr2 += pi * (mr_cnv[1] + mr_cnv[2])
+				self.nr3 += pi * (mr_cnv[1] + mr_cnv[2])
+				self.nr4 += pi * (mr_cnv[1] + mr_cnv[2])
 			elif ssm_node in ancestors and mr_cnv:
+				self.nr3 += pi * max(0,(mr_cnv[1]+mr_cnv[2] - 1))
+				self.nv3 += pi * min(1,mr_cnv[1]+mr_cnv[2])
+				self.nr4 += pi * max(0,(mr_cnv[1] + mr_cnv[2] - 1))
+				self.nv4 += pi * min(1,mr_cnv[1]+mr_cnv[2])
+
 				if ssm_node in mr_cnv[0].node.get_ancestors():
 					self.nr1 = self.nr1 + pi * mr_cnv[1]
 					self.nv1 = self.nv1 + pi * mr_cnv[2]
@@ -100,10 +113,16 @@ class Datum(object):
 		self.nv1 = 0
 		self.nr2 = 0 
 		self.nv2 = 0
+		self.nr3 = 0
+		self.nv3 = 0
+		self.nr4 = 0
+		self.nv4 = 0
 		for nd in nodes:
 			descend(nd, new_state)
-		out = [(self.nr1,self.nv1),(self.nr2,self.nv2)]
- 	
+		if len(self.cnv) == 1 and self.node == self.cnv[0][0].node:
+			out = [(self.nr1,self.nv1),(self.nr2,self.nv2),(self.nr3,self.nv3),(self.nr4,self.nv4)]
+ 		else:
+ 			out = [(self.nr1,self.nv1),(self.nr2,self.nv2)]
 		return out
 	
 	def find_most_recent_cnv(self, nd):
