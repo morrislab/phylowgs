@@ -342,7 +342,7 @@ class CnvFormatter(object):
       if P < 0.02:
         P = 0.02
 
-      d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (delta_cn  * P) / 2)
+      d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (abs(delta_cn)  * P) / 2)
 
       if no_net_change:
         # If no net change in CN occurred, the estimate was just based on BAFs,
@@ -1285,6 +1285,8 @@ def main():
     sex = args.sex
 
   subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
+  if len(subsampled_vars) == 0:
+    raise Exception('No variants to write')
   grouper.write_variants(subsampled_vars, args.output_variants)
   if args.output_nonsubsampled_variants:
     grouper.write_variants(nonsubsampled_vars, args.output_nonsubsampled_variants)

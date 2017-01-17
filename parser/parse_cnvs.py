@@ -137,6 +137,9 @@ class BattenbergParser(CnvParser):
         else:
           cnv1['cellular_prevalence'] = self._cellularity
 
+        if cnv1['start'] >= cnv1['end'] or (cnv2 is not None and cnv2['start'] >= cnv2['end']):
+          continue
+
         cn_regions[chrom].append(cnv1)
         if cnv2 is not None:
           cn_regions[chrom].append(cnv2)
