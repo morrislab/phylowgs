@@ -207,6 +207,10 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
 
+		if len(state['tssb'].root['children']) > 1:
+			logmsg('Polyclonal tree detected with %s clones.' % len(state['tssb'].root['children']))
+			sys.exit(4)
+
 		new_mcmc_sample_time = time.time()
 		mcmc_sample_times.append(new_mcmc_sample_time - last_mcmc_sample_time)
 		last_mcmc_sample_time = new_mcmc_sample_time
