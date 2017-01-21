@@ -179,6 +179,13 @@ class BackupManager(object):
 	for fn, backup_fn in zip(self._filenames, self._backup_filenames):
 	    shutil.copy2(backup_fn, fn)
 
+    def remove_backup(self):
+	for backup_fn in self._backup_filenames:
+	    try:
+		os.remove(backup_fn)
+	    except OSError:
+		pass
+
 class StateManager(object):
     default_last_state_fn = 'state.last.pickle'
     default_initial_state_fn = 'state.initial.pickle'

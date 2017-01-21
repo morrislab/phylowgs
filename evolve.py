@@ -234,6 +234,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 			if should_write_backup:
 				backup_manager.save_backup()
 
+	backup_manager.remove_backup()
 	safe_to_exit.clear()
 	#save the best tree
 	print_top_trees(TreeWriter.default_archive_fn, state['top_k_trees_file'], state['top_k'])
