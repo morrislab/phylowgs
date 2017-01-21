@@ -207,7 +207,8 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 		state['rand_state'] = get_state()
 		state['last_iteration'] = iteration
 
-		if len(state['tssb'].root['children']) > 1:
+
+		if len([C for C in state['tssb'].root['children'] if C['node'].has_data()]) > 1:
 			logmsg('Polyclonal tree detected with %s clones.' % len(state['tssb'].root['children']))
 			sys.exit(4)
 
