@@ -30,20 +30,15 @@ from datetime import datetime
 def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config, ssm_file, cnv_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
 	state = {}
 
-	with open('random_seed.txt', 'w') as seedf:
-		seedf.write('%s\n' % rand_seed)
 	try:
-		rand_seed = int(rand_seed)
-		state['rand_seed'] = rand_seed
-		seed(state['rand_seed'])
+		state['rand_seed'] = int(rand_seed)
 	except TypeError:
 		# If rand_seed is not provided as command-line arg, it will be None,
-		# meaning it will hit this code path. Explicitly avoid calling seed(None)
-		# -- though this is currently the equivalent of calling seed() in that it
-		# seeds the PRNG with /dev/urandom, the semantics of seed(None) might
-		# change in later NumPy versions to always seed to the same state.
-		state['rand_seed'] = rand_seed
-		seed()
+		# meaning it will hit this code path. Can seed with [0, 2**32).
+		state['rand_seed'] = randint(2**32)
+	seed(state['rand_seed'])
+	with open('random_seed.txt', 'w') as seedf:
+		seedf.write('%s\n' % state['rand_seed'])
 
 	state['ssm_file'] = ssm_file
 	state['cnv_file'] = cnv_file
