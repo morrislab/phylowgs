@@ -12,6 +12,8 @@ import numpy as np
 import numpy.ma as ma
 from scipy.stats.mstats import gmean
 
+VariantId = namedtuple('VariantId', ['CHROM', 'POS'])
+
 class ReadCountsUnavailableError(Exception):
   pass
 
@@ -29,6 +31,7 @@ class VariantParser(object):
       try:
         ref_reads, total_reads = self._calc_read_counts(variant)
       except ReadCountsUnavailableError as exc:
+        log('Read counts unavailable for %s_%s' % (variant.CHROM, variant.POS))
         continue
       variants_and_reads.append((variant, ref_reads, total_reads))
     return variants_and_reads
@@ -854,6 +857,11 @@ class VariantAndCnvGroup(object):
 
   def add_variants(self, variants, ref_read_counts, total_read_counts):
     self._variants = variants
+    # Ensure no duoplicates.
+    assert len(variants) == len(set(variants))
+    # Note that self._variant_idxs will change as we filter out variants,
+    # reflecting only the remaining valid variants. self._variants, however,
+    # will not change.
     self._variant_idxs = list(range(len(variants)))
     self._ref_read_counts = ref_read_counts
     self._total_read_counts = total_read_counts
@@ -971,19 +979,31 @@ class VariantAndCnvGroup(object):
       sample_size = len(self._variant_idxs)
     random.shuffle(self._variant_idxs)
 
-    subsampled, remaining = [], []
+    subsampled, nonsubsampled = [], []
+    variant_idx_map = {self._variants[idx]: idx for idx in self._variant_idxs}
+    used_variant_idxs = set() # Use a set for O(1) testing of membership.
+
+    for prissm in priority_ssms:
+      if prissm not in variant_idx_map:
+        continue
+      if len(subsampled) >= sample_size:
+        break
+      log('%s_%s in priority' % (prissm.CHROM, prissm.POS))
+      varidx = variant_idx_map[prissm]
+      used_variant_idxs.add(varidx)
+      subsampled.append(varidx)
 
     for variant_idx in self._variant_idxs:
+      if variant_idx in used_variant_idxs:
+        continue
+      used_variant_idxs.add(variant_idx)
       variant = self._variants[variant_idx]
-      if len(subsampled) < sample_size and (variant.CHROM, variant.POS) in priority_ssms:
+      if len(subsampled) < sample_size:
         subsampled.append(variant_idx)
       else:
-        remaining.append(variant_idx)
+        nonsubsampled.append(variant_idx)
 
-    assert len(subsampled) <= sample_size
-    needed = sample_size - len(subsampled)
-    subsampled = subsampled + remaining[:needed]
-    nonsubsampled = remaining[needed:]
+    assert len(used_variant_idxs) == len(self._variant_idxs) == len(subsampled) + len(nonsubsampled)
 
     subsampled.sort(key = lambda idx: variant_key(self._variants[idx]))
     subsampled_variants = get_elements_at_indices(self._variants, subsampled)
@@ -1083,15 +1103,15 @@ def get_elements_at_indices(L, indices):
 
 def parse_priority_ssms(priority_ssm_filename):
   if priority_ssm_filename is None:
-    return set()
-  with open(priority_ssm_filename) as priof:
-    lines = priof.readlines()
+    return []
+  priority_ssms = []
 
-  priority_ssms = set()
-  for line in lines:
-    chrom, pos = line.strip().split('_', 1)
-    priority_ssms.add((chrom.upper(), int(pos)))
-  return set(priority_ssms)
+  with open(priority_ssm_filename) as priof:
+    for line in priof:
+      chrom, pos = line.strip().split('_', 1)
+      priority_ssms.append(VariantId(CHROM=chrom.upper(), POS=int(pos)))
+
+  return priority_ssms
 
 def impute_missing_total_reads(total_reads, missing_variant_confidence):
   # Change NaNs to masked values via SciPy.
@@ -1145,8 +1165,6 @@ def is_good_chrom(chrom):
 def parse_variants(args, vcf_types, num_samples):
   parsed_variants = []
   all_variant_ids = []
-
-  VariantId = namedtuple('VariantId', ['CHROM', 'POS'])
 
   for vcf_file in args.vcf_files:
     vcf_type, vcf_fn = vcf_file.split('=', 1)
