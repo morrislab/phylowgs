@@ -13,8 +13,8 @@
 
 using namespace std;
 
-//  g++ -o mh.o  mh.cpp  util.cpp `gsl-config --cflags --libs`
-// ./mh.o 5000 100 11 1 8 4 ssm_data.txt cnv_data.txt c_tree_ssm_data_1.txt c_data_states_ssm_data_1.txt c_params.txt 5
+//  g++ -o phylowgs_mh mh.cpp  util.cpp `gsl-config --cflags --libs`
+// ./phylowgs_mh 5000 100 11 1 8 4 ssm_data.txt cnv_data.txt c_tree_ssm_data_1.txt c_data_states_ssm_data_1.txt c_params.txt 5
 //https://www.gnu.org/software/gsl/manual/html_node/Shared-Libraries.html
 
 
