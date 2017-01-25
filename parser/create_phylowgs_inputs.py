@@ -1105,11 +1105,19 @@ def parse_priority_ssms(priority_ssm_filename):
   if priority_ssm_filename is None:
     return []
   priority_ssms = []
+  already_seen = set()
 
   with open(priority_ssm_filename) as priof:
     for line in priof:
       chrom, pos = line.strip().split('_', 1)
-      priority_ssms.append(VariantId(CHROM=chrom.upper(), POS=int(pos)))
+      variant = VariantId(CHROM=chrom.upper(), POS=int(pos))
+      # Prevent duplicates -- otherwise, we'll add the variant to our
+      # subsampled list of variants twice. This manifested as a problem in the
+      # PCAWG 6cfce053-bfd6-4ca0-b74b-b2e4549e4f1f sample.
+      if variant in already_seen:
+        continue
+      priority_ssms.append(variant)
+      already_seen.add(variant)
 
   return priority_ssms
 
