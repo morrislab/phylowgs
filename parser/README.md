@@ -94,6 +94,15 @@ Examples
         ./parse_cnvs.py -f titan -c 0.81 cnv_calls_segs.txt
         ./create_phylowgs_inputs.py --cnvs cnvs.txt vardict=sample.vcf
 
+* Run multiple samples concurrently. Note that, for each sample, you must have
+  a separate set of CNV calls and SSM calls. Moreover, the sample order must be
+  the same for the CNV calls and SSM calls you pass on the command line.
+
+        ./parse_cnvs.py -f titan -c 0.81 --cnv-output cnvs1.txt samp1_segs.txt
+        ./parse_cnvs.py -f titan -c 0.74 --cnv-output cnvs2.txt samp2_segs.txt
+        ./create_phylowgs_inputs.py --cnvs cnvs1.txt --cnvs cnvs2.txt vardict=variants1.vcf vardict=variants2.vcf
+        
+
 Usage
 -----
 ### CNV pre-parser
