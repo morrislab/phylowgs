@@ -10,6 +10,7 @@ import random
 import sys
 import numpy as np
 import numpy.ma as ma
+import json
 from scipy.stats.mstats import gmean
 
 VariantId = namedtuple('VariantId', ['CHROM', 'POS'])
@@ -1170,33 +1171,34 @@ def is_good_chrom(chrom):
   else:
     return False
 
-def parse_variants(args, vcf_types, num_samples):
+def parse_variants(samples, vcf_files, vcf_types, tumor_sample, missing_variant_confidence):
   parsed_variants = []
   all_variant_ids = []
+  num_samples = len(samples)
 
-  for vcf_file in args.vcf_files:
-    vcf_type, vcf_fn = vcf_file.split('=', 1)
+  for sample in samples:
+    vcf_fn, vcf_type = vcf_files[sample], vcf_types[sample]
 
     if vcf_type == 'sanger':
-      variant_parser = SangerParser(vcf_fn, args.tumor_sample)
+      variant_parser = SangerParser(vcf_fn, tumor_sample)
     elif vcf_type == 'mutect_pcawg':
-      variant_parser = MutectPcawgParser(vcf_fn, args.tumor_sample)
+      variant_parser = MutectPcawgParser(vcf_fn, tumor_sample)
     elif vcf_type == 'mutect_smchet':
-      variant_parser = MutectSmchetParser(vcf_fn, args.tumor_sample)
+      variant_parser = MutectSmchetParser(vcf_fn, tumor_sample)
     elif vcf_type == 'mutect_tcga':
-      variant_parser = MutectTcgaParser(vcf_fn, args.tumor_sample)
+      variant_parser = MutectTcgaParser(vcf_fn, tumor_sample)
     elif vcf_type == 'muse':
-      variant_parser = MuseParser(vcf_fn, args.muse_tier, args.tumor_sample)
+      variant_parser = MuseParser(vcf_fn, muse_tier, tumor_sample)
     elif vcf_type == 'dkfz':
-      variant_parser = DKFZParser(vcf_fn, args.tumor_sample)
+      variant_parser = DKFZParser(vcf_fn, tumor_sample)
     elif vcf_type == 'strelka':
-      variant_parser = StrelkaParser(vcf_fn, args.tumor_sample)
+      variant_parser = StrelkaParser(vcf_fn, tumor_sample)
     elif vcf_type == 'vardict':
-      variant_parser = VarDictParser(vcf_fn, args.tumor_sample)
+      variant_parser = VarDictParser(vcf_fn, tumor_sample)
     elif vcf_type == 'pcawg_consensus':
-      variant_parser = PcawgConsensusParser(vcf_fn, args.tumor_sample)
+      variant_parser = PcawgConsensusParser(vcf_fn, tumor_sample)
     elif vcf_type == 'somsnip':
-      variant_parser = SomSnipParser(vcf_fn, args.tumor_sample)
+      variant_parser = SomSnipParser(vcf_fn, tumor_sample)
     else:
       raise Exception('Unknowon variant type: %s' % vcf_type)
 
@@ -1220,7 +1222,7 @@ def parse_variants(args, vcf_types, num_samples):
       ref_read_counts[variant_idx, sample_idx] = ref_reads
       total_read_counts[variant_idx, sample_idx] = total_reads
 
-  total_read_counts = impute_missing_total_reads(total_read_counts, args.missing_variant_confidence)
+  total_read_counts = impute_missing_total_reads(total_read_counts, missing_variant_confidence)
   ref_read_counts = impute_missing_ref_reads(ref_read_counts, total_read_counts)
   return (all_variant_ids, ref_read_counts, total_read_counts)
 
@@ -1231,13 +1233,49 @@ def infer_sex(variant_ids):
   else:
     return 'female'
 
+def extract_sample_data(vcf_files_and_samples, vcf_types_and_samples, cnv_files_and_samples):
+  vcf_files = {}
+  vcf_types = {}
+  cnv_files = {}
+
+  assert len(vcf_files_and_samples) == len(vcf_types_and_samples), 'Must specify same number of VCF files and VCF types'
+  srcs_and_dsts = [(vcf_files_and_samples, vcf_files), (vcf_types_and_samples, vcf_types)]
+
+  should_use_cnvs = cnv_files_and_samples is not None
+  if should_use_cnvs:
+    assert len(cnv_files_and_samples) == len(vcf_files_and_samples), 'Must specify same number of VCF and CNV files'
+    srcs_and_dsts.append( (cnv_files_and_samples, cnv_files) )
+
+  for (src, dst) in srcs_and_dsts:
+    for combined in src:
+      assert '=' in combined, ('%s should be in format <sample>=<item>' % combined)
+      sample, val = combined.split('=', 1)
+      dst[sample] = val
+
+  # Sample order will dictate eventual output order.
+  common_samps = reduce(lambda s1, s2: s1 & s2, [set(D[1].keys()) for D in srcs_and_dsts])
+  ordered_samps = [S.split('=', 1)[0] for S in vcf_files_and_samples]
+  assert len(ordered_samps) == len(common_samps) # Ensure no duplicates.
+
+  assert set(vcf_files.keys()) == common_samps, \
+    ('VCF file samples (%s) differ from common samples (%s)' % (vcf_files.keys(), common_samps))
+  assert set(vcf_types.keys()) == common_samps, \
+    ('VCF type samples (%s) differ from common samples (%s)' % (vcf_types.keys(), common_samps))
+  if should_use_cnvs:
+    assert set(cnv_files.keys()) == common_samps, \
+      ('CNV file samples (%s) differ from CNV file samples (%s)' % (cnv_files.keys(), common_samps))
+
+  return (ordered_samps, vcf_files, vcf_types, cnv_files)
+
 def main():
-  vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict', 'pcawg_consensus'))
+  all_vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict', 'pcawg_consensus'))
 
   parser = argparse.ArgumentParser(
     description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
+  parser.add_argument('--vcf-type', dest='vcf_types', action='append', required=True,
+    help='Type of VCF file for each sample, specified as <sample>=<vcf_type>. Valid VCF types are %s.' % ','.join(all_vcf_types))
   parser.add_argument('-e', '--error-rate', dest='error_rate', type=restricted_float, default=0.001,
     help='Expected error rate of sequencing platform')
   parser.add_argument('--missing-variant-confidence', dest='missing_variant_confidence', type=restricted_float, default=1.,
@@ -1247,13 +1285,15 @@ def main():
   parser.add_argument('-P', '--priority-ssms', dest='priority_ssm_filename',
     help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
   parser.add_argument('--cnvs', dest='cnv_files', action='append',
-    help='Path to per-sample CNV files created with parse_cnvs.py. Specified once per CNV file.')
+    help='Path to CNV file created with parse_cnvs.py for each sample. Specified as <sample>=<CNV path>.')
   parser.add_argument('--regions', dest='regions', choices=('normal_cn', 'normal_and_abnormal_cn', 'all'), default='normal_and_abnormal_cn',
     help='Which regions to use variants from. Refer to the parser README for more details.')
   parser.add_argument('--output-cnvs', dest='output_cnvs', default='cnv_data.txt',
     help='Output destination for CNVs')
   parser.add_argument('--output-variants', dest='output_variants', default='ssm_data.txt',
     help='Output destination for variants')
+  parser.add_argument('--output-params', dest='output_params', default='params.json',
+    help='Output destination for run parameters')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
   parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=0.5,
@@ -1270,13 +1310,16 @@ def main():
     help='Sex of patient. Used to adjust expected variant frequencies on sex chromosomes. ' +
     'If auto, patient is set to male if any variants are provided on the Y chromosome, and female otherwise.')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
-  parser.add_argument('vcf_files', nargs='+', help='One or more space-separated occurrences of <vcf_type>=<path>. E.g., sanger=variants1.vcf muse=variants2.vcf. Valid vcf_type values: %s' % ', '.join(vcf_types))
+  parser.add_argument('vcf_files', nargs='+', help='Path to VCF file for each sample. Specified as <sample>=<VCF path>.')
   args = parser.parse_args()
 
   log.verbose = args.verbose
-  num_samples = len(args.vcf_files)
+  params = {}
 
-  variant_ids, ref_read_counts, total_read_counts = parse_variants(args, vcf_types, num_samples)
+  samples, vcf_files, vcf_types, cnv_files = extract_sample_data(args.vcf_files, args.vcf_types, args.cnv_files)
+  params['samples'], params['vcf_files'], params['vcf_types'], params['cnv_files'] = samples, vcf_files, vcf_types, cnv_files
+  num_samples = len(samples)
+  variant_ids, ref_read_counts, total_read_counts = parse_variants(samples, vcf_files, vcf_types, args.tumor_sample, args.missing_variant_confidence)
 
   # Fix random seed to ensure same set of SSMs chosen when subsampling on each
   # invocation.
@@ -1285,10 +1328,9 @@ def main():
   grouper = VariantAndCnvGroup()
   grouper.add_variants(variant_ids, ref_read_counts, total_read_counts)
 
-  if args.cnv_files:
-    if len(args.cnv_files) != len(args.vcf_files):
-      raise Exception('Number of CNV samples must match number of VCF samples. You provided %s CNV sample(s) and %s VCF sample(s)' % (len(args.cnv_files), len(args.vcf_files)))
-    cn_regions = [CnvParser(cnvf).parse() for cnvf in args.cnv_files]
+  if len(cnv_files) > 0:
+    # Load CNV files in same order as sample order given for VCFs.
+    cn_regions = [CnvParser(cnv_files[S]).parse() for S in samples]
     grouper.add_cnvs(cn_regions)
 
   if not grouper.has_cnvs():
@@ -1328,6 +1370,9 @@ def main():
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):
       pass
+
+  with open(args.output_params, 'w') as F:
+    json.dump(params, F)
 
 if __name__ == '__main__':
   main()
