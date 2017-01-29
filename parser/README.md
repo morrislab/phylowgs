@@ -109,10 +109,11 @@ You can generate inputs from an arbitrary number of samples, each of which must 
         ./parse_cnvs.py -f titan -c 0.74 --cnv-output cnvs2.txt samp2_segs.txt
 
 Now run the parser. Note that you must specify unique sample names for each
-`--cnvs` option, each `--vcf-type` option, and each VCF file you pass. The
-order of the VCF files given determines the order in which samples will appear
-during post-processing; the order of the different `--cnvs` and `--vcf-type`
-options, however, does not matter.
+`--cnvs` option, each `--vcf-type` option, and each VCF file you pass. Here we
+use sample names `S1` and `S2`, but they can be arbitrary strings. The order of
+the VCF files given determines the order in which samples will appear during
+post-processing; the order of the different `--cnvs` and `--vcf-type` options,
+however, does not matter.
 
         ./create_phylowgs_inputs.py --cnvs S1=cnvs1.txt --cnvs S2=cnvs2.txt --vcf-type S1=vardict --vcf-type S2=vardict S1=variants1.vcf S2=variants2.vcf
 
