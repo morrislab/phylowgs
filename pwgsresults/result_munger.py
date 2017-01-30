@@ -1,5 +1,4 @@
 import numpy as np
-from collections import defaultdict
 
 class ResultMunger(object):
   def __init__(self, tree_summaries, mutlist, mutass, min_ssms):
@@ -8,53 +7,46 @@ class ResultMunger(object):
     self._mutass = mutass
     self._min_ssms = min_ssms
 
-    self._subclone_idx_map = defaultdict(dict)
-
   def _convert_keys_to_ints(self, dic):
     keys = dic.keys()
     for key in dic.keys():
       dic[int(key)] = dic[key]
       del dic[key]
 
-  def munge(self):
+  def remove_small_nodes(self):
     for tree_idx, tree_features in self._tree_summaries.items():
-      small_nodes = self._remove_small_nodes(tree_idx, tree_features['populations'])
-      self._remove_nodes_from_tree_structure(small_nodes, tree_features['structure'])
-      self._renumber_nodes(tree_idx)
-
-      self._reassign_muts(tree_idx)
-      # Correct mutation counts.
-      for sidx, subclone in tree_features['populations'].items():
-        # Note that only mutass entries for subclones with (> 0 SSMs or > 0
-        # CNVs) will exist. Thus, no mutass entry will exist for node 0, as it
-        # never has SSMs or CNVs.
-        if sidx == 0:
-          continue
-        for mut_type in ('ssms', 'cnvs'):
-          subclone['num_%s' % mut_type] = len(self._mutass[tree_idx][sidx][mut_type])
+      small_nodes = self._find_small_nodes(tree_idx, tree_features['populations'])
+      self._remove_nodes(small_nodes, tree_idx)
 
     return (self._tree_summaries, self._mutass)
 
-  def _renumber_nodes(self, tree_idx):
+  def _renumber_nodes(self, tree_idx, subclone_idx_map):
     subclone_idxs = sorted(self._tree_summaries[tree_idx]['populations'].keys())
 
     num_removed = 0
     # We may have removed populations beyond max(subclone_idxs), but as these
-    # occurred *after* the highest-indexed of the remaining populations, so
-    # renumbering is necessary for them.
+    # occurred *after* the highest-indexed of the remaining populations,
+    # renumbering is not necessary for them -- i.e., nothing in the tree is
+    # affected by their removal.
     for subclone_idx in range(1, max(subclone_idxs) + 1):
       if subclone_idx not in self._tree_summaries[tree_idx]['populations']:
+        # Node was removed.
         num_removed += 1
       elif num_removed > 0:
-        self._subclone_idx_map[tree_idx][subclone_idx] = subclone_idx - num_removed
+        # Node not removed, but something before it was, so renumber.
+        subclone_idx_map[subclone_idx] = subclone_idx - num_removed
 
     # By proceeding in sorted order, we guarantee we're not overwriting a
-    # single element twice, which would give the wrong values.
+    # single element twice, which would give the wrong values. Why? Since the
+    # new_idx of a node is always less than its original index, we guarantee
+    # that we only move it "down". Since we proceed in sorted order, we have
+    # already moved any nodes that preceded it, so we don't overwrite them.
     for subclone_idx in subclone_idxs:
-      if subclone_idx not in self._subclone_idx_map[tree_idx]:
-        # Node was removed, so do nothing.
+      if subclone_idx not in subclone_idx_map:
+        # No preceding nodes were removed, so do nothing.
         continue
-      new_idx = self._subclone_idx_map[tree_idx][subclone_idx]
+      # Node remains, so must renumber it.
+      new_idx = subclone_idx_map[subclone_idx]
 
       self._tree_summaries[tree_idx]['populations'][new_idx] = self._tree_summaries[tree_idx]['populations'][subclone_idx]
       del self._tree_summaries[tree_idx]['populations'][subclone_idx]
@@ -67,13 +59,39 @@ class ResultMunger(object):
     # parents isn't enough.
     for subclone_idx, children in self._tree_summaries[tree_idx]['structure'].items():
       self._tree_summaries[tree_idx]['structure'][subclone_idx] = [
-        self._subclone_idx_map[tree_idx][c]
-        if c in self._subclone_idx_map[tree_idx]
+        subclone_idx_map[c]
+        if c in subclone_idx_map
         else c
         for c in children
       ]
 
-  def _remove_small_nodes(self, tree_idx, populations):
+  def _correct_mut_counts(self, populations, tree_idx):
+    for sidx, subclone in populations.items():
+      # Note that only mutass entries for subclones with (> 0 SSMs or > 0
+      # CNVs) will exist. Thus, no mutass entry will exist for node 0, as it
+      # never has SSMs or CNVs.
+      if sidx == 0:
+        continue
+      for mut_type in ('ssms', 'cnvs'):
+        subclone['num_%s' % mut_type] = len(self._mutass[tree_idx][sidx][mut_type])
+
+  def _remove_nodes(self, nodes, tree_idx):
+    subclone_idx_map = {}
+    tree_features = self._tree_summaries[tree_idx]
+
+    # Remove summary stats about population.
+    for node_idx in nodes:
+      del tree_features['populations'][node_idx]
+      # Mark node as removed. Use subclone_idx_map to track both node removals
+      # and renumberings.
+      subclone_idx_map[node_idx] = None
+
+    self._remove_nodes_from_tree_structure(subclone_idx_map, tree_features['structure'])
+    self._renumber_nodes(tree_idx, subclone_idx_map)
+    self._reassign_muts(tree_idx, subclone_idx_map)
+    self._correct_mut_counts(tree_features['populations'], tree_idx)
+
+  def _find_small_nodes(self, tree_idx, populations):
     small_nodes = set()
 
     subclone_idxs = sorted(populations.keys())
@@ -104,21 +122,17 @@ class ResultMunger(object):
         continue
       small_nodes.add(subclone_idx)
 
-    for node_idx in small_nodes:
-      del populations[node_idx]
-      # Mark node as removed.
-      self._subclone_idx_map[tree_idx][node_idx] = None
-
     return small_nodes
 
-  def _remove_nodes_from_tree_structure(self, removed, tree_structure):
+  def _remove_nodes_from_tree_structure(self, subclonal_idx_map, tree_structure):
     def _find_parent(struct, idx):
       for parent, children in struct.items():
         if idx in children:
           return parent
       raise Exception('Could not find parent of %s in %s' % (idx, struct))
 
-    removed = set(removed)
+    removed = set([N for N in subclonal_idx_map.keys() if subclonal_idx_map[N] is None])
+
     for rem in removed:
       parent = _find_parent(tree_structure, rem)
       # Remove node from parent
@@ -157,12 +171,12 @@ class ResultMunger(object):
 
         mutass[best_node][mut_type].append(mut_id)
 
-  def _reassign_muts(self, tree_idx):
+  def _reassign_muts(self, tree_idx, subclone_idx_map):
     deleted_muts = []
     mutass = self._mutass[tree_idx]
 
-    for sidx in sorted(self._subclone_idx_map[tree_idx].keys()):
-      new_idx = self._subclone_idx_map[tree_idx][sidx]
+    for sidx in sorted(subclone_idx_map.keys()):
+      new_idx = subclone_idx_map[sidx]
       # This ensures we're not improperly overwriting assignments.
       assert new_idx < sidx
 

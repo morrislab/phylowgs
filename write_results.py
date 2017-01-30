@@ -56,7 +56,7 @@ def main():
   summaries, mutlist, mutass = ResultGenerator().generate(args.tree_file, args.include_ssm_names)
 
   munger = ResultMunger(summaries, mutlist, mutass, args.min_ssms)
-  summaries, mutass = munger.munge()
+  summaries, mutass = munger.remove_small_nodes()
 
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, args.tree_summary_output)
