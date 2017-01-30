@@ -8,13 +8,16 @@ def compare(vcf_format, input_vcf, good_ssm_output):
   output_dir = tempfile.mkdtemp()
   ssm_output_path = os.path.join(output_dir, 'output.ssm')
   cnv_output_path = os.path.join(output_dir, 'output.cnv')
-  subprocess.call([
+  cmd =[
     'python2',
     '../create_phylowgs_inputs.py',
+    '--regions', 'all',
     '--output-variants', ssm_output_path,
     '--output-cnvs', cnv_output_path,
-    '%s=%s' % (vcf_format, input_vcf),
-  ])
+    '--vcf-type', 'S1=%s' % vcf_format,
+    'S1=%s' % input_vcf,
+  ]
+  subprocess.call(cmd)
 
   variant_output_matches = filecmp.cmp(ssm_output_path, good_ssm_output)
   cnv_output_matches = os.path.getsize(cnv_output_path) == 0
