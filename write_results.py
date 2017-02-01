@@ -1,36 +1,8 @@
 #!/usr/bin/env python2
 import argparse
-import json
-import gzip
-import zipfile
 from pwgsresults.result_generator import ResultGenerator
 from pwgsresults.result_munger import ResultMunger
-
-class JsonWriter(object):
-  def __init__(self, dataset_name):
-    self._dataset_name = dataset_name
-
-  def write_mutlist(self, mutlist, mutlist_outfn):
-    with gzip.GzipFile(mutlist_outfn, 'w') as mutf:
-      mutlist['dataset_name'] = self._dataset_name
-      json.dump(mutlist, mutf)
-
-  def write_summaries(self, summaries, summaries_outfn):
-    to_dump = {
-      'dataset_name': self._dataset_name,
-      'trees': summaries,
-    }
-    with gzip.GzipFile(summaries_outfn, 'w') as summf:
-      json.dump(to_dump, summf)
-
-  def write_mutass(self, mutass, mutass_outfn):
-    with zipfile.ZipFile(mutass_outfn, 'w', compression=zipfile.ZIP_DEFLATED) as muts_file:
-      for tree_idx, tree_mutass in mutass.items():
-        to_dump = {
-          'mut_assignments': tree_mutass,
-          'dataset_name': self._dataset_name
-        }
-        muts_file.writestr('%s.json' % tree_idx, json.dumps(to_dump))
+from pwgsresults.json_writer import JsonWriter
 
 def main():
   parser = argparse.ArgumentParser(
@@ -55,8 +27,10 @@ def main():
 
   summaries, mutlist, mutass = ResultGenerator().generate(args.tree_file, args.include_ssm_names)
 
-  munger = ResultMunger(summaries, mutlist, mutass, args.min_ssms)
-  summaries, mutass = munger.remove_small_nodes()
+  munger = ResultMunger(summaries, mutlist, mutass)
+  summaries, mutass = munger.remove_small_nodes(args.min_ssms)
+  munger.remove_superclones()
+  munger.remove_polyclonal_trees()
 
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, args.tree_summary_output)

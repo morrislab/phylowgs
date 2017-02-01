@@ -51,3 +51,7 @@ class ResultLoader(object):
       tree_indices.sort()
       for tree_idx in tree_indices:
         yield (tree_idx, self._load_assignments(mutf, tree_idx))
+
+  def load_all_mut_assignments_into_memory(self):
+    mutass = {I: M for (I, M) in self.load_all_mut_assignments()}
+    return mutass
