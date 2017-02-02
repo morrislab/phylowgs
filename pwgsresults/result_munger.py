@@ -62,8 +62,9 @@ class ResultMunger(object):
       child_nssms, child_cp = child['num_ssms'], np.array(child['cellular_prevalence'])
       total_nssms = clonal_nssms + child_nssms
       # Cellular prevalence is a vector, so we must brought it into NumPy so we
-      # can do scalar division on it.
-      clone['cellular_prevalence'] = ((clonal_cp * clonal_nssms) + (child_cp * child_nssms)) / total_nssms
+      # can do scalar division on it. We must, however, convert it back to a
+      # list so we can dump it to JSON.
+      clone['cellular_prevalence'] = list(((clonal_cp * clonal_nssms) + (child_cp * child_nssms)) / total_nssms)
 
       # Remove the "true" clonal node and move its mutations to the superclonal
       # node. This is easier than the reverse, as it means that idx=1 always
