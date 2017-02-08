@@ -35,6 +35,11 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	except TypeError:
 		# If rand_seed is not provided as command-line arg, it will be None,
 		# meaning it will hit this code path.
+		#
+		# Use random seed in this order:
+		#   1. If a seed is given on the command line, use that.
+		#   2. Otherwise, if `random_seed.txt` exists, use the seed stored there.
+		#   3. Otherwise, choose a new random seed and write to random_seed.txt.
 		try:
 			with open('random_seed.txt') as seedf:
 				state['rand_seed'] = int(seedf.read().strip())

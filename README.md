@@ -54,6 +54,14 @@ be empty. You can create the empty file via the command `touch cnv_data.txt`.
   triplet consisting of SSM ID, maternal copy number, and paternal copy
   number. These triplets are separated by semicolons.
 
+When running `evolve.py`, the random seed used for the run will be written to
+`random_seed.txt` in the current directory. To choose this seed, you may give
+the `--random-seed <integer>` option to `evolve.py`. If no random seed is
+specified, but the `random_seed.txt` file already exists in the current working
+directory, the seed stored in that file will be used. This behaviour lets you
+deterministically repeat runs by copying the `random_seed.txt` files from a
+previous batch.
+
 Running PhyloWGS
 ----------------
 

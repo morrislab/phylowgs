@@ -1271,7 +1271,7 @@ def main():
   all_vcf_types = set(('sanger', 'mutect_pcawg', 'mutect_smchet', 'mutect_tcga', 'muse','dkfz', 'strelka', 'vardict', 'pcawg_consensus'))
 
   parser = argparse.ArgumentParser(
-    description='Create ssm_dat.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
+    description='Create ssm_data.txt and cnv_data.txt input files for PhyloWGS from VCF and CNV data.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('--vcf-type', dest='vcf_types', action='append', required=True,
