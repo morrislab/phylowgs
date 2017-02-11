@@ -140,7 +140,6 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 		tree_writer = TreeWriter(resume_run = True)
 
 	set_state(state['rand_state']) # Restore NumPy's RNG state.
-	os.chdir(state['working_directory'])
 	codes, n_ssms, n_cnvs, cnv_logical_physical_mapping = load_data(state['ssm_file'], state['cnv_file'])
 	NTPS = len(codes[0].a) # number of samples / time point
 
