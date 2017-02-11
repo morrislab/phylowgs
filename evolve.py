@@ -267,7 +267,6 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 	glist = array(freq.keys(),str)
 	glist.shape=(1,len(glist))
 	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
-	state_manager.delete_state_file()
 
 	safe_to_exit.set()
 	run_succeeded.set()
