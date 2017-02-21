@@ -32,6 +32,10 @@ TreeViewer.prototype.render = function(dataset) {
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
         + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
+      ['linearity_index', 'branching_index', 'coclustering_index'].forEach(function(idxname) {
+        var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname] : '&mdash;';
+        row += '<td>' + val.toFixed(2) + '</td>';
+      });
       $('<tr/>').html(row).appendTo(tree_container);
     });
 
