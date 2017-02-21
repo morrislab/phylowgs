@@ -46,6 +46,9 @@ class ResultMunger(object):
       # At this point, "clone" is the superclone to remove, and "child" will be
       # the new clonal node.
       clone, child = pops[clonal_idx], pops[child_idx]
+      if child ['num_ssms'] == 0:
+        # Prevent division by zero.
+        continue
       if not (float(clone['num_ssms']) / child['num_ssms'] <= 0.33):
         # Child must have at least 3 times the number of SSMs as parent to be
         # considered superclonal tree.
