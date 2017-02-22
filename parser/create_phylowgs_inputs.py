@@ -722,6 +722,9 @@ class MultisampleCnvCombiner(object):
 
 
   def _get_abnormal_state_for_all_samples(self, cnv):
+    '''On a per-sample basis, record which samples report the CNA is abnormal
+    CN, and which report it is normal CN. If multiple different abnormal states
+    occur in different samples, return None.'''
     # All samples must have at least one record for this region, or don't
     # include it.
     if set(cnv['sampidx']) != self.sampidxs:
@@ -837,8 +840,7 @@ class MultisampleCnvCombiner(object):
 
   def load_cnvs(self):
     '''
-    Return all regions that are clonal normal across all samples, or possess at
-    most one (clonal or subclonal) abnormal state in each sample.
+    Return both normal and abnormal regions.
     '''
     combined = defaultdict(list)
 
@@ -1052,7 +1054,6 @@ class VariantAndCnvGroup(object):
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms', 'physical_cnvs')), file=outf)
       formatter = CnvFormatter(cnv_confidence, self._estimated_read_depth, read_length, self._sampidxs)
-      # Last place I'm working is at this position
       for cnv in formatter.format_and_merge_cnvs(self._multisamp_cnv.load_single_abnormal_state_cnvs(), variants, self._cellularity):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
