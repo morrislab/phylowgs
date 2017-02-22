@@ -45,13 +45,17 @@ TreeViewer.prototype.render = function(dataset) {
     $('#trees').bind('aftertablesort', function() {
       if(already_autosorted)
         return;
+      // If any restore events are in progress (e.g., waiting on a timer),
+      // don't automatically click on the first element.
+      if(StateManager.restoring > 0)
+        return;
       tree_container.find('tr:first').click();
       already_autosorted = true;
     });
 
     // If direction not specified, this can end up being ascending or
     // descending sort, depending on prior sort state of table.
-    $('#tree-llh').stupidsort('desc');
+    $('#tree-llh').stupidsort('asc');
 
     tree_container.find('tr').click(function(evt) {
       evt.preventDefault();
@@ -60,6 +64,7 @@ TreeViewer.prototype.render = function(dataset) {
       self.addClass('active');
 
       var tidx = self.find('.tree-index').text();
+      StateManager.update('tidx', tidx);
       var tree_plotter = new TreePlotter();
       tree_plotter.draw(summary.trees[tidx].populations, summary.trees[tidx].structure);
       tplotter._plot_pop_vafs(dataset, tidx);

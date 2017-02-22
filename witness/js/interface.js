@@ -43,6 +43,7 @@ Interface.prototype._activate_navbar = function() {
     iface._renderer = null;
     for(var nav_class in mapping) {
       if(self.hasClass(nav_class)) {
+        StateManager.update('section', nav_class);
         iface._renderer = mapping[nav_class];
         break;
       }
@@ -80,6 +81,10 @@ Interface.prototype._load_samples = function() {
       var self = $(this);
       make_parent_active(self);
       var run_name = self.text();
+      // Upon loading a new run, reset the sample so that, if the interface is
+      // restored from this point, no sample will be selected.
+      StateManager.update('run', run_name);
+      StateManager.update('sample', null);
 
       var prev_dataset = iface._dataset;
       iface._dataset = null;
@@ -104,6 +109,7 @@ Interface.prototype._load_samples = function() {
 
         iface._dataset = self.data('dataset');
         $('.page-header').text(iface._dataset.name);
+        StateManager.update('sample', iface._dataset.name)
         iface._render();
       });
 

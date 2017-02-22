@@ -15,11 +15,11 @@ function get_url_param(name) {
   return results === null ? "" : decodeURIComponent(results[1].replace(/\+/g, " "));
 }
 
-google.charts.load('44', {packages: ['corechart', 'bar', 'line']});
-google.charts.setOnLoadCallback(main);
-
 function main() {
   new Interface();
+  setTimeout(function() {
+    StateManager.restore();
+  }, 500);
 
   if(window.location.href.indexOf('debug=1') !== -1) {
     setTimeout(function() {
@@ -29,3 +29,6 @@ function main() {
     }, 1000);
   }
 }
+
+google.charts.load('45', {packages: ['corechart', 'bar', 'line']});
+google.charts.setOnLoadCallback(main);
