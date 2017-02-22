@@ -21,6 +21,11 @@ TreeViewer.prototype.render = function(dataset) {
   d3.json(dataset.summary_path, function(summary) {
     var tree_indices = Util.sort_ints(Object.keys(summary.trees));
     tree_container.empty();
+
+    var first_tree_idx = tree_indices[0];
+    var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
+    var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
+
     tree_indices.forEach(function(tidx) {
       var total_ssms = 0;
       Object.keys(summary.trees[tidx].populations).forEach(function(pidx) {
@@ -28,7 +33,9 @@ TreeViewer.prototype.render = function(dataset) {
       });
 
       var normllh_nats = -summary.trees[tidx].llh / total_ssms;
+      normllh_nats /= num_samples;
       var normllh_bits = normllh_nats / Math.log(2);
+
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
         + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
