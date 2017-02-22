@@ -22,9 +22,20 @@ TreeViewer.prototype.render = function(dataset) {
     var tree_indices = Util.sort_ints(Object.keys(summary.trees));
     tree_container.empty();
     tree_indices.forEach(function(tidx) {
+      var total_ssms = 0;
+      Object.keys(summary.trees[tidx].populations).forEach(function(pidx) {
+        total_ssms += summary.trees[tidx].populations[pidx].num_ssms;
+      });
+
+      var normllh_nats = -summary.trees[tidx].llh / total_ssms;
+      var normllh_bits = normllh_nats / Math.log(2);
       var row = '<td class="tree-index">' + tidx + '</td>'
-        + '<td class="tree-llh">' + summary.trees[tidx].llh.toFixed(1) + '</td>'
+        + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
         + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
+      ['linearity_index', 'branching_index', 'coclustering_index'].forEach(function(idxname) {
+        var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname] : '&mdash;';
+        row += '<td>' + val.toFixed(2) + '</td>';
+      });
       $('<tr/>').html(row).appendTo(tree_container);
     });
 
