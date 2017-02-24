@@ -1,13 +1,26 @@
 function TreePlotter() {
 }
 
-TreePlotter.prototype._render_summary_table = function(structure, populations) {
+TreePlotter.prototype._render_summary_table = function(structure, populations, num_samples, sample_names) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
-  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
   var summary_table = $('#snippets .tree-summary').clone().appendTo('#container');
   summary_table.find('.cellprev').attr('colspan', num_samples);
   summary_table.find('.ccf').attr('colspan', num_samples);
+  var header = summary_table.find('thead');
   summary_table = summary_table.find('tbody');
+
+  // Empty cells for Node, SSMs, and CNVs columns.
+  var samps_header = ['&mdash;', '&mdash;', '&mdash;'];
+  // Do once for cellular prevalence, and once for CCF.
+  for(var i = 0; i < 2; i++) {
+    sample_names.forEach(function(S) {
+      samps_header.push(S);
+    });
+  }
+  var samps_header = samps_header.map(function(entry) {
+    return '<th>' + entry + '</th>';
+  });
+  $('<tr/>').html(samps_header.join('')).appendTo(header);
 
   var self = this;
   pop_ids.forEach(function(pop_id) {
@@ -23,9 +36,8 @@ TreePlotter.prototype._render_summary_table = function(structure, populations) {
   });
 }
 
-TreePlotter.prototype._plot_pop_trajectories = function(structure, populations) {
+TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, num_samples, sample_names) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
-  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
   var num_cancer_pops = pop_ids.length - 1;
 
   // Don't plot for single-sample data.
@@ -45,11 +57,10 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations) 
   // Remove CCFs for non-cancerous first element, which will always be 1.
   ccf.shift();
 
-  var samp_ids = (new Array(num_samples)).fill(0).map(function(val, idx) {
-    return 'Sample ' + (idx + 1);
-  });
-
-  var data_vals_T = [samp_ids].concat(ccf);
+  if(num_samples !== sample_names.length) {
+    throw 'Improper number of samples provided';
+  }
+  var data_vals_T = [sample_names].concat(ccf);
   data.addRows(Util.transpose(data_vals_T));
 
   var container = $('<div/>').appendTo('#container');
@@ -78,11 +89,20 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations) 
   chart.draw(data, options);
 }
 
-TreePlotter.prototype.draw = function(populations, structure) {
+TreePlotter.prototype.draw = function(populations, structure, sample_names) {
+  var pop_ids = Util.sort_ints(Object.keys(populations));
+  var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
+
+  if(sample_names === null) {
+    sample_names = (new Array(num_samples)).fill(0).map(function(val, idx) {
+      return 'Sample ' + (idx + 1);
+    });
+  }
+
   var root = this._generate_tree_struct(structure, populations);
   this._draw_tree(root);
-  this._plot_pop_trajectories(structure, populations);
-  this._render_summary_table(structure, populations);
+  this._plot_pop_trajectories(structure, populations, num_samples, sample_names);
+  this._render_summary_table(structure, populations, num_samples, sample_names);
 }
 
 TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id) {
