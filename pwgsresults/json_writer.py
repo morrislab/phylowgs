@@ -11,9 +11,10 @@ class JsonWriter(object):
       mutlist['dataset_name'] = self._dataset_name
       json.dump(mutlist, mutf)
 
-  def write_summaries(self, summaries, summaries_outfn):
+  def write_summaries(self, summaries, params, summaries_outfn):
     to_dump = {
       'dataset_name': self._dataset_name,
+      'params': params,
       'trees': summaries,
     }
     with gzip.GzipFile(summaries_outfn, 'w') as summf:

@@ -26,7 +26,7 @@ def main():
     help='Output file for JSON-formatted list of SSMs and CNVs assigned to each subclone')
   args = parser.parse_args()
 
-  summaries, mutlist, mutass = ResultGenerator().generate(args.tree_file, args.include_ssm_names)
+  summaries, mutlist, mutass, params = ResultGenerator().generate(args.tree_file, args.include_ssm_names)
 
   munger = ResultMunger(summaries, mutlist, mutass)
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
@@ -40,7 +40,7 @@ def main():
     summary['coclustering_index'] = calculator.calc_coclustering_index()
 
   writer = JsonWriter(args.dataset_name)
-  writer.write_summaries(summaries, args.tree_summary_output)
+  writer.write_summaries(summaries, params, args.tree_summary_output)
   writer.write_mutlist(mutlist, args.mutlist_output)
   writer.write_mutass(mutass, args.mutass_output)
 

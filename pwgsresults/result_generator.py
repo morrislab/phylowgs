@@ -12,7 +12,14 @@ class ResultGenerator(object):
     reader = util2.TreeReader(tree_file)
     first_tree = next(reader.load_trees())
     cnv_logical_physical_mapping = json.loads(reader.read_extra_file('cnv_logical_physical_mapping.json'))
+    try:
+      params = json.loads(reader.read_extra_file('params.json'))
+    except KeyError:
+      # File not present in archive, likely because it originates from an older
+      # run.
+      params = {}
     reader.close()
+
     mutlist = self._list_mutations(first_tree, include_ssm_names, cnv_logical_physical_mapping)
 
     summaries = {}
@@ -25,7 +32,7 @@ class ResultGenerator(object):
       }
       all_mutass[idx] = mutass
 
-    return summaries, mutlist, all_mutass
+    return summaries, mutlist, all_mutass, params
 
   def _summarize_all_pops(self, tree_file):
     reader = util2.TreeReader(tree_file)
