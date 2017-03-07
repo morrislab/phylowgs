@@ -163,6 +163,33 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
+TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branch_idx) {
+  var traces = [{
+    x: lin_idx,
+    y: branch_idx,
+    name: 'points',
+    mode: 'markers',
+    type: 'scatter',
+    hovermode: 'closest'
+  },
+  {
+    x: lin_idx,
+    y: branch_idx,
+    ncontours: 20,
+    colorscale: 'Viridis',
+    type: 'histogram2dcontour',
+  }];
+  var layout = {
+    title: 'Branching index vs. linearity index',
+    xaxis: { title: 'Linearity index'},
+    yaxis: { title: 'Branching index'}
+  };
+  var container = document.querySelector('#container');
+  var plot_container = document.createElement('div');
+  container.appendChild(plot_container);
+  Plotly.newPlot(plot_container, traces, layout);
+}
+
 TreeSummarizer.prototype.render = function(dataset) {
   this._render_vafs(dataset);
 
@@ -172,6 +199,9 @@ TreeSummarizer.prototype.render = function(dataset) {
   var pop_counts = [];
   var cell_prevs = new Array(pops_to_examine);
   var ssm_counts = new Array(pops_to_examine);
+  var lin_idx = [];
+  var branch_idx = [];
+
   for(var i = 0; i < pops_to_examine; i++) {
     cell_prevs[i] = [];
     ssm_counts[i] = [];
@@ -180,8 +210,10 @@ TreeSummarizer.prototype.render = function(dataset) {
   var self = this;
   d3.json(dataset.summary_path, function(summary) {
     for(var tidx in summary.trees) {
-      var populations = summary.trees[tidx].populations;
+      lin_idx.push(summary.trees[tidx].linearity_index);
+      branch_idx.push(summary.trees[tidx].branching_index);
 
+      var populations = summary.trees[tidx].populations;
       var num_pops = 0;
       for(var pop_idx in populations) {
         var pop = populations[pop_idx];
@@ -200,6 +232,7 @@ TreeSummarizer.prototype.render = function(dataset) {
       }
     }
 
+    self._render_lin_idx_vs_branch_idx(lin_idx, branch_idx);
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);
