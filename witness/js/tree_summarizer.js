@@ -191,13 +191,83 @@ TreeSummarizer.prototype._calc_euclid_dist = function(A, B) {
   return Math.sqrt(dist);
 }
 
+TreeSummarizer.prototype._cov_matrix = function(X) {
+  var XT = transposeMatrix(X);
+  var N = X.length;
+  var D = XT.length;
+
+  var means = [];
+  for(var i = 0; i < D; i++) {
+    var sum = XT[i].reduce(function(a, b) { return a + b; });
+    means.push(sum / N);
+  }
+  var residuals = [];
+  for(var i = 0; i < D; i++) {
+    residuals[i] = [];
+    for(var j = 0; j < N; j++) {
+      residuals[i].push(XT[i][j] - means[i]);
+    }
+  }
+
+  var cov = zeros(D, D);
+  for(var i = 0; i < D; i++) {
+    for(var j = 0; j < D; j++) {
+      var res_sum = 0;
+      for(var k = 0; k < N; k++) {
+        res_sum += (XT[i][k] - means[i]) * (XT[j][k] - means[j]);
+      }
+      cov[i][j] = res_sum / (N - 1);
+    }
+  }
+
+  return cov;
+}
+
+TreeSummarizer.prototype._gaussian_pdf = function(X, mu, sigma) {
+  var lambda = inverseMatrix(sigma);
+  var detsigma = determinant(sigma);
+
+  var density = X.map(function(x) {
+    var D = x.length;
+    var R = [x.map(function(x, i) { return x - mu[i]; })]; // 1xD
+    var dens = Math.exp(-0.5 * matrixMultiply(R, matrixMultiply(lambda, transposeMatrix(R))));
+    dens /= Math.sqrt(Math.pow(2 * Math.PI, D) * detsigma);
+    return dens;
+  });
+  return density;
+}
+
+TreeSummarizer.prototype._zerovec = function(N) {
+  return Array.apply(null, Array(N)).map(Number.prototype.valueOf,0);
+}
+
+TreeSummarizer.prototype._kde = function(points) {
+  var N = points.length;
+  var D = points[0].length;
+
+  // Scott's Rule from SciPy
+  var bandwidth = Math.pow(N, -1/(D + 4));
+  var sigma = this._cov_matrix(points);
+  sigma = matrixScalarMultiply(sigma, Math.pow(bandwidth, 2));
+
+  var density = this._zerovec(N);
+  var self = this;
+  points.forEach(function(P) {
+    var density_P = self._gaussian_pdf(points, P, sigma);
+    for(var i = 0; i < density_P.length; i++) {
+      density[i] += density_P[i];
+    }
+  });
+  return density;
+}
+
 TreeSummarizer.prototype._find_best_tree = function(indices, tree_idx) {
   var self = this;
   var min_dist = Number.POSITIVE_INFINITY;
   var best_tree_idx = null;
 
   indices.individual.forEach(function(idxs, i) {
-    var dist = self._calc_euclid_dist(idxs, indices.mean);
+    var dist = self._calc_euclid_dist([idxs[0], idxs[1]], [indices.mean[0], indices.mean[1]]);
     if(dist < min_dist) {
       min_dist = dist;
       best_tree_idx = i;
@@ -216,17 +286,25 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
   var best_tree_idx = this._find_best_tree(indices, tree_idx);
   var xpoints = lin_idx;
   var ypoints = branch_idx;
-  var labels = tree_idx.map(function(T) { return 'Tree ' + T; })
+  var labels = tree_idx.map(function(T) { return 'Tree ' + T; });
+
+  var points = [];
+  for(var i = 0; i < xpoints.length; i++) {
+    points.push([xpoints[i], ypoints[i]]);
+  }
+  //var colours = this._kde(points);
 
   for(var i = 0; i < lin_idx.length; i++) {
     marker_symbols.push(i === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(i === best_tree_idx ? 30 : 6);
+    //colours[i] = i;
   }
 
   xpoints.push(indices.mean[0]);
   ypoints.push(indices.mean[1]);
   marker_symbols.push('diamond');
   marker_sizes.push(30);
+  //colours.push(0);
   labels.push('Mean');
 
   var traces = [{
@@ -236,7 +314,12 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
     mode: 'markers',
     type: 'scatter',
     text: labels,
-    marker: { symbol: marker_symbols, size: marker_sizes, line: { width: 0 }},
+    marker: {
+      symbol: marker_symbols,
+      size: marker_sizes,
+      line: { width: 0 },
+      color: '#ff5858',
+    },
   },
   {
     x: lin_idx,
@@ -246,7 +329,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
     type: 'histogram2dcontour',
   }];
   var layout = {
-    title: 'Branching index vs. linearity index',
+    title: 'Branching index vs. linearity index (best tree: ' + best_tree_idx + ')',
     height: 1000,
     xaxis: { title: 'Linearity index'},
     yaxis: { title: 'Branching index'},
