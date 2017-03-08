@@ -163,14 +163,80 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
-TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branch_idx) {
+TreeSummarizer.prototype._make_indices = function(lin_idx, branch_idx) {
+  var N = lin_idx.length;
+  var indices = [];
+  var mean_indices = [0, 0, 0];
+
+  for(var i = 0; i < N; i++) {
+    var cocluster_idx = 1 - (lin_idx[i] + branch_idx[i]);
+    indices.push([lin_idx[i], branch_idx[i], cocluster_idx]);
+    mean_indices[0] += lin_idx[i];
+    mean_indices[1] += branch_idx[i];
+    mean_indices[2] += cocluster_idx;
+  }
+  mean_indices[0] /= N;
+  mean_indices[1] /= N;
+  mean_indices[2] /= N;
+
+  return { individual: indices, mean: mean_indices };
+}
+
+TreeSummarizer.prototype._calc_euclid_dist = function(A, B) {
+  var N = A.length;
+  var dist = 0;
+  for(var i = 0; i < N; i++) {
+    dist += Math.pow(A[i] - B[i], 2);
+  }
+  return Math.sqrt(dist);
+}
+
+TreeSummarizer.prototype._find_best_tree = function(indices, tree_idx) {
+  var self = this;
+  var min_dist = Number.POSITIVE_INFINITY;
+  var best_tree_idx = null;
+
+  indices.individual.forEach(function(idxs, i) {
+    var dist = self._calc_euclid_dist(idxs, indices.mean);
+    if(dist < min_dist) {
+      min_dist = dist;
+      best_tree_idx = i;
+      if(parseInt(tree_idx[i], 10) !== i)
+        throw "tree_idx doesn't match expected index " + parseInt(tree_idx[i], 10) + ", " + i;
+    }
+  });
+  return best_tree_idx;
+}
+
+TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branch_idx, tree_idx) {
+  var marker_symbols = [];
+  var marker_sizes = [];
+
+  var indices = this._make_indices(lin_idx, branch_idx);
+  var best_tree_idx = this._find_best_tree(indices, tree_idx);
+  var xpoints = lin_idx;
+  var ypoints = branch_idx;
+  var labels = tree_idx.map(function(T) { return 'Tree ' + T; })
+
+  for(var i = 0; i < lin_idx.length; i++) {
+    marker_symbols.push(i === best_tree_idx ? 'cross' : 'dot');
+    marker_sizes.push(i === best_tree_idx ? 30 : 6);
+  }
+
+  xpoints.push(indices.mean[0]);
+  ypoints.push(indices.mean[1]);
+  marker_symbols.push('diamond');
+  marker_sizes.push(30);
+  labels.push('Mean');
+
   var traces = [{
     x: lin_idx,
     y: branch_idx,
     name: 'points',
     mode: 'markers',
     type: 'scatter',
-    hovermode: 'closest'
+    text: labels,
+    marker: { symbol: marker_symbols, size: marker_sizes, line: { width: 0 }},
   },
   {
     x: lin_idx,
@@ -181,8 +247,10 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
   }];
   var layout = {
     title: 'Branching index vs. linearity index',
+    height: 1000,
     xaxis: { title: 'Linearity index'},
-    yaxis: { title: 'Branching index'}
+    yaxis: { title: 'Branching index'},
+    hovermode: 'closest',
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
@@ -201,6 +269,7 @@ TreeSummarizer.prototype.render = function(dataset) {
   var ssm_counts = new Array(pops_to_examine);
   var lin_idx = [];
   var branch_idx = [];
+  var tree_idx = [];
 
   for(var i = 0; i < pops_to_examine; i++) {
     cell_prevs[i] = [];
@@ -209,9 +278,13 @@ TreeSummarizer.prototype.render = function(dataset) {
 
   var self = this;
   d3.json(dataset.summary_path, function(summary) {
-    for(var tidx in summary.trees) {
+    var tidxs = Object.keys(summary.trees);
+    tidxs.sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); });
+
+    tidxs.forEach(function(tidx) {
       lin_idx.push(summary.trees[tidx].linearity_index);
       branch_idx.push(summary.trees[tidx].branching_index);
+      tree_idx.push(tidx);
 
       var populations = summary.trees[tidx].populations;
       var num_pops = 0;
@@ -230,9 +303,9 @@ TreeSummarizer.prototype.render = function(dataset) {
           ssm_counts[i].push([pops[i].num_ssms]);
         }
       }
-    }
+    });
 
-    self._render_lin_idx_vs_branch_idx(lin_idx, branch_idx);
+    self._render_lin_idx_vs_branch_idx(lin_idx, branch_idx, tree_idx);
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);
