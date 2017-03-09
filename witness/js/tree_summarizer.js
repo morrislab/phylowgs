@@ -163,34 +163,6 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
-TreeSummarizer.prototype._make_indices = function(lin_idx, branch_idx) {
-  var N = lin_idx.length;
-  var indices = [];
-  var mean_indices = [0, 0, 0];
-
-  for(var i = 0; i < N; i++) {
-    var cocluster_idx = 1 - (lin_idx[i] + branch_idx[i]);
-    indices.push([lin_idx[i], branch_idx[i], cocluster_idx]);
-    mean_indices[0] += lin_idx[i];
-    mean_indices[1] += branch_idx[i];
-    mean_indices[2] += cocluster_idx;
-  }
-  mean_indices[0] /= N;
-  mean_indices[1] /= N;
-  mean_indices[2] /= N;
-
-  return { individual: indices, mean: mean_indices };
-}
-
-TreeSummarizer.prototype._calc_euclid_dist = function(A, B) {
-  var N = A.length;
-  var dist = 0;
-  for(var i = 0; i < N; i++) {
-    dist += Math.pow(A[i] - B[i], 2);
-  }
-  return Math.sqrt(dist);
-}
-
 TreeSummarizer.prototype._cov_matrix = function(X) {
   var XT = transposeMatrix(X);
   var N = X.length;
@@ -261,55 +233,33 @@ TreeSummarizer.prototype._kde = function(points) {
   return density;
 }
 
-TreeSummarizer.prototype._find_best_tree = function(indices, tree_idx) {
-  var self = this;
-  var min_dist = Number.POSITIVE_INFINITY;
-  var best_tree_idx = null;
-
-  indices.individual.forEach(function(idxs, i) {
-    var dist = self._calc_euclid_dist([idxs[0], idxs[1]], [indices.mean[0], indices.mean[1]]);
-    if(dist < min_dist) {
-      min_dist = dist;
-      best_tree_idx = i;
-      if(parseInt(tree_idx[i], 10) !== i)
-        throw "tree_idx doesn't match expected index " + parseInt(tree_idx[i], 10) + ", " + i;
-    }
-  });
-  return best_tree_idx;
-}
-
 TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branch_idx, tree_idx) {
   var marker_symbols = [];
   var marker_sizes = [];
 
-  var indices = this._make_indices(lin_idx, branch_idx);
-  var best_tree_idx = this._find_best_tree(indices, tree_idx);
-  var xpoints = lin_idx;
-  var ypoints = branch_idx;
-  var labels = tree_idx.map(function(T) { return 'Tree ' + T; });
+  var btf = new BestTreeFinder(lin_idx, branch_idx, tree_idx);
+  var indices = btf.make_indices();
+  var mean_index = btf.calc_mean_index();
+  var best_tree_idx = btf.find_best_tree();
 
-  var points = [];
-  for(var i = 0; i < xpoints.length; i++) {
-    points.push([xpoints[i], ypoints[i]]);
-  }
-  //var colours = this._kde(points);
+  var labels = tree_idx.map(function(T) { return 'Tree ' + T; });
 
   for(var i = 0; i < lin_idx.length; i++) {
     marker_symbols.push(i === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(i === best_tree_idx ? 30 : 6);
-    //colours[i] = i;
   }
 
-  xpoints.push(indices.mean[0]);
-  ypoints.push(indices.mean[1]);
+  var xpoints = lin_idx.slice(); // Duplicate array
+  var ypoints = branch_idx.slice();
+  xpoints.push(mean_index[0]);
+  ypoints.push(mean_index[1]);
   marker_symbols.push('diamond');
   marker_sizes.push(30);
-  //colours.push(0);
   labels.push('Mean');
 
   var traces = [{
-    x: lin_idx,
-    y: branch_idx,
+    x: xpoints,
+    y: ypoints,
     name: 'points',
     mode: 'markers',
     type: 'scatter',
@@ -322,8 +272,8 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
     },
   },
   {
-    x: lin_idx,
-    y: branch_idx,
+    x: xpoints,
+    y: ypoints,
     ncontours: 20,
     colorscale: 'Viridis',
     type: 'histogram2dcontour',
