@@ -33,7 +33,7 @@ TreeViewer.prototype.render = function(dataset) {
       branch_idxs.push(summary.trees[tidx].branching_index);
     });
     var btf = new BestTreeFinder(lin_idxs, branch_idxs, tree_indices);
-    var dists = btf.calc_dists_from_mean(true);
+    var dists = btf.calc_dists(true);
 
     tree_indices.forEach(function(tidx) {
       var total_ssms = 0;

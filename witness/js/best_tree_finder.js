@@ -40,6 +40,21 @@ BestTreeFinder.prototype._calc_euclid_dist = function(A, B) {
   return Math.sqrt(dist);
 }
 
+BestTreeFinder.prototype.calc_dists = function(normalize) {
+  var indices = this.make_indices();
+  var N = indices.length;
+  var dists = {};
+  for(var i = 0; i < N; i++) {
+    var D = [];
+    for(var j = 0; j < N; j++) {
+      D.push(this._calc_euclid_dist(indices[i], indices[j]));
+    }
+    var median = D.sort()[Math.floor(N/2)];
+    dists[i] = median;
+  }
+  return dists;
+}
+
 BestTreeFinder.prototype.calc_dists_from_mean = function(normalize) {
   var dists = {};
   var indices = this.make_indices();
@@ -66,7 +81,7 @@ BestTreeFinder.prototype.find_best_tree = function() {
   var min_dist = Number.POSITIVE_INFINITY;
   var best_tree_idx = null;
   var indices = this.make_indices();
-  var dists = this.calc_dists_from_mean();
+  var dists = this.calc_dists();
 
   Object.keys(dists).forEach(function(tidx) {
     var dist = dists[tidx];

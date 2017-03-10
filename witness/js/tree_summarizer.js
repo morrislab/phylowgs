@@ -238,7 +238,6 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branc
   var marker_sizes = [];
 
   var btf = new BestTreeFinder(lin_idx, branch_idx, tree_idx);
-  var indices = btf.make_indices();
   var mean_index = btf.calc_mean_index();
   var best_tree_idx = btf.find_best_tree();
 
