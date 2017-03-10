@@ -10,8 +10,8 @@ BestTreeFinder.prototype._extract_indices = function(tree_summ) {
   var self = this;
   Object.keys(tree_summ).forEach(function(tidx) {
     self.linearity_indices[tidx] = tree_summ[tidx].linearity_index;
-    self.branching_indices[tidx] = tree_summ[tidx].linearity_index;
-    self.coclustering_indices[tidx] = 1 - (self.linearity_indices[tidx] + self.branching_indices[tidx]);
+    self.branching_indices[tidx] = tree_summ[tidx].branching_index;
+    self.coclustering_indices[tidx] = tree_summ[tidx].coclustering_index;
   });
   this.num_trees = Object.keys(this.linearity_indices).length;
 }
@@ -62,7 +62,6 @@ BestTreeFinder.prototype._calc_dists_from_median = function() {
 BestTreeFinder.prototype._calc_dists_from_mean = function() {
   var dists = {};
   var mean_index = this.calc_mean_index();
-  console.log('mean', mean_index);
   var meanvec = [mean_index.linearity, mean_index.branching, mean_index.coclustering];
 
   var self = this;
