@@ -233,25 +233,28 @@ TreeSummarizer.prototype._kde = function(points) {
   return density;
 }
 
-TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(lin_idx, branch_idx, tree_idx) {
-  var marker_symbols = [];
-  var marker_sizes = [];
-
-  var btf = new BestTreeFinder(lin_idx, branch_idx, tree_idx);
-  var mean_index = btf.calc_mean_index();
+TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
+  var btf = new BestTreeFinder(tree_summary);
   var best_tree_idx = btf.find_best_tree();
 
-  var labels = tree_idx.map(function(T) { return 'Tree ' + T; });
+  var xpoints = [];
+  var ypoints = [];
+  var marker_symbols = [];
+  var marker_sizes = [];
+  var labels = [];
 
-  for(var i = 0; i < lin_idx.length; i++) {
-    marker_symbols.push(i === best_tree_idx ? 'cross' : 'dot');
-    marker_sizes.push(i === best_tree_idx ? 30 : 6);
-  }
+  Object.keys(btf.linearity_indices).forEach(function(tidx) {
+    tidx = parseInt(tidx, 10);
+    labels.push('Tree ' + tidx);
+    xpoints.push(btf.linearity_indices[tidx]);
+    ypoints.push(btf.branching_indices[tidx]);
+    marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
+    marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
+  });
 
-  var xpoints = lin_idx.slice(); // Duplicate array
-  var ypoints = branch_idx.slice();
-  xpoints.push(mean_index[0]);
-  ypoints.push(mean_index[1]);
+  var mean_index = btf.calc_mean_index();
+  xpoints.push(mean_index.linearity);
+  ypoints.push(mean_index.branching);
   marker_symbols.push('diamond');
   marker_sizes.push(30);
   labels.push('Mean');
@@ -310,14 +313,7 @@ TreeSummarizer.prototype.render = function(dataset) {
 
   var self = this;
   d3.json(dataset.summary_path, function(summary) {
-    var tidxs = Object.keys(summary.trees);
-    tidxs.sort(function(a, b) { return parseInt(a, 10) - parseInt(b, 10); });
-
-    tidxs.forEach(function(tidx) {
-      lin_idx.push(summary.trees[tidx].linearity_index);
-      branch_idx.push(summary.trees[tidx].branching_index);
-      tree_idx.push(tidx);
-
+    Object.keys(summary.trees).forEach(function(tidx) {
       var populations = summary.trees[tidx].populations;
       var num_pops = 0;
       for(var pop_idx in populations) {
@@ -337,7 +333,7 @@ TreeSummarizer.prototype.render = function(dataset) {
       }
     });
 
-    self._render_lin_idx_vs_branch_idx(lin_idx, branch_idx, tree_idx);
+    self._render_lin_idx_vs_branch_idx(summary.trees);
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);

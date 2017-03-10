@@ -1,34 +1,32 @@
-function BestTreeFinder(lin_idx, branch_idx, tree_idx) {
-  this._mean_index = null;
-  this._lin_idx = lin_idx;
-  this._branch_idx = branch_idx;
-  this._tree_idx = tree_idx;
+function BestTreeFinder(tree_summ) {
+  this._extract_indices(tree_summ);
+}
+
+BestTreeFinder.prototype._extract_indices = function(tree_summ) {
+  this.linearity_indices = {};
+  this.branching_indices = {};
+  this.coclustering_indices = {};
+
+  var self = this;
+  Object.keys(tree_summ).forEach(function(tidx) {
+    self.linearity_indices[tidx] = tree_summ[tidx].linearity_index;
+    self.branching_indices[tidx] = tree_summ[tidx].linearity_index;
+    self.coclustering_indices[tidx] = 1 - (self.linearity_indices[tidx] + self.branching_indices[tidx]);
+  });
+  this.num_trees = Object.keys(this.linearity_indices).length;
 }
 
 BestTreeFinder.prototype.calc_mean_index = function() {
-  if(this._mean_index === null)
-    this.make_indices();
-  return this._mean_index;
-}
-
-BestTreeFinder.prototype.make_indices = function() {
-  var N = this._lin_idx.length;
-  var indices = [];
-  var mean_indices = [0, 0, 0];
-
-  for(var i = 0; i < N; i++) {
-    var cocluster_idx = 1 - (this._lin_idx[i] + this._branch_idx[i]);
-    indices.push([this._lin_idx[i], this._branch_idx[i], cocluster_idx]);
-    mean_indices[0] += this._lin_idx[i];
-    mean_indices[1] += this._branch_idx[i];
-    mean_indices[2] += cocluster_idx;
-  }
-  mean_indices[0] /= N;
-  mean_indices[1] /= N;
-  mean_indices[2] /= N;
-  this._mean_index = mean_indices;
-
-  return indices;
+  var mean = {};
+  var self = this;
+  ['linearity', 'branching', 'coclustering'].forEach(function(T) {
+    var source = self[T + '_indices'];
+    var sum = Object.keys(source).reduce(function(acc, tidx) {
+      return acc + source[tidx];
+    }, 0);
+    mean[T] = sum / self.num_trees;
+  });
+  return mean;
 }
 
 BestTreeFinder.prototype._calc_euclid_dist = function(A, B) {
@@ -40,47 +38,60 @@ BestTreeFinder.prototype._calc_euclid_dist = function(A, B) {
   return Math.sqrt(dist);
 }
 
-BestTreeFinder.prototype.calc_dists = function(normalize) {
-  var indices = this.make_indices();
-  var N = indices.length;
+BestTreeFinder.prototype._calc_dists_from_median = function() {
+  var N = this.num_trees;
   var dists = {};
-  for(var i = 0; i < N; i++) {
+
+  var self = this;
+  Object.keys(this.linearity_indices).forEach(function(i) {
     var D = [];
-    for(var j = 0; j < N; j++) {
-      D.push(this._calc_euclid_dist(indices[i], indices[j]));
-    }
+    var vec_i = [self.linearity_indices[i], self.branching_indices[i], self.coclustering_indices[i]];
+
+    Object.keys(self.linearity_indices).forEach(function(j) {
+      var vec_j = [self.linearity_indices[j], self.branching_indices[j], self.coclustering_indices[j]];
+      D.push(self._calc_euclid_dist(vec_i, vec_j));
+    });
+
     var median = D.sort()[Math.floor(N/2)];
     dists[i] = median;
-  }
+  });
+
   return dists;
 }
 
-BestTreeFinder.prototype.calc_dists_from_mean = function(normalize) {
+BestTreeFinder.prototype._calc_dists_from_mean = function() {
   var dists = {};
-  var indices = this.make_indices();
-
-  var K = this._mean_index.length;
-  var max_len = Math.sqrt(K);
+  var mean_index = this.calc_mean_index();
+  console.log('mean', mean_index);
+  var meanvec = [mean_index.linearity, mean_index.branching, mean_index.coclustering];
 
   var self = this;
-  indices.forEach(function(idxs, i) {
-    dists[i] = self._calc_euclid_dist(idxs, self._mean_index);
-    // Don't normalize by default -- caller must explicitly request this.
-    if(normalize) {
-      dists[i] /= max_len;
-    }
-    if(parseInt(self._tree_idx[i], 10) !== i) {
-      throw "tree_idx doesn't match expected index " + parseInt(self._tree_idx[i], 10) + ", " + i;
-    }
+  Object.keys(this.linearity_indices).forEach(function(tidx) {
+    var idxvec = [self.linearity_indices[tidx], self.branching_indices[tidx], self.coclustering_indices[tidx]];
+    dists[tidx] = self._calc_euclid_dist(meanvec, idxvec);
   });
   return dists;
 }
 
+BestTreeFinder.prototype.calc_dists = function(normalize) {
+  var dists = this._calc_dists_from_median();
+
+  if(normalize) {
+    // Since we use Euclidean distance and three-component vectors with elements // in [0, 1], the max distance is sqrt(3).
+    var max_dist = Math.sqrt(3);
+    var normed = [];
+    Object.keys(dists).forEach(function(tidx) {
+      normed[tidx] = dists[tidx] / max_dist;
+    });
+    dists = normed;
+  }
+
+  return dists;
+}
+
 BestTreeFinder.prototype.find_best_tree = function() {
-  var self = this;
   var min_dist = Number.POSITIVE_INFINITY;
   var best_tree_idx = null;
-  var indices = this.make_indices();
   var dists = this.calc_dists();
 
   Object.keys(dists).forEach(function(tidx) {
@@ -90,6 +101,7 @@ BestTreeFinder.prototype.find_best_tree = function() {
       best_tree_idx = parseInt(tidx, 10);
     }
   });
+
   return best_tree_idx;
 }
 

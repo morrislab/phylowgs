@@ -26,13 +26,7 @@ TreeViewer.prototype.render = function(dataset) {
     var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
     var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
 
-    var lin_idxs = [];
-    var branch_idxs = [];
-    tree_indices.forEach(function(tidx) {
-      lin_idxs.push(summary.trees[tidx].linearity_index);
-      branch_idxs.push(summary.trees[tidx].branching_index);
-    });
-    var btf = new BestTreeFinder(lin_idxs, branch_idxs, tree_indices);
+    var btf = new BestTreeFinder(summary.trees);
     var dists = btf.calc_dists(true);
 
     tree_indices.forEach(function(tidx) {
