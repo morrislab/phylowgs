@@ -36,7 +36,7 @@ TreePlotter.prototype._render_summary_table = function(structure, populations, n
   });
 }
 
-TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, num_samples, sample_names) {
+TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, num_samples, sample_names, hidden_samples) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_cancer_pops = pop_ids.length - 1;
 
@@ -60,8 +60,17 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, 
   if(num_samples !== sample_names.length) {
     throw 'Improper number of samples provided';
   }
-  var data_vals_T = [sample_names].concat(ccf);
-  data.addRows(Util.transpose(data_vals_T));
+  var data_vals = Util.transpose([sample_names].concat(ccf));
+  var visible = [];
+  for(var i = 0; i < data_vals.length; i++) {
+    var samp = data_vals[i][0];
+    if(hidden_samples.indexOf(samp) === -1) {
+      visible.push(data_vals[i]);
+    } else {
+      console.log('Hiding ' + samp);
+    }
+  }
+  data.addRows(visible);
 
   var container = $('<div/>').appendTo('#container');
   // hAxis.minValue and vAxis.title attributes don't work with Material charts.
@@ -75,33 +84,46 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, 
     height: 650,
     hAxis: {
       minValue: 1,
+      slantedText: true,
+      slantedTextAngle: 90,
     },
     vAxis: {
       title: 'Cancer cell fraction',
     },
   };
 
-  var chart = new google.charts.Line(container.get(0));
+  //var chart = new google.charts.Line(container.get(0));
   // Uncomment this to switch to using pre-Material charts, which have more
   // options (like, oh, you know, titling the axes) but are less pretty and
   // don't have the hover-over-legend-to-highlight-line function.
-  //var chart = new google.visualization.LineChart(container.get(0));
+  var chart = new google.visualization.LineChart(container.get(0));
   chart.draw(data, options);
 }
 
-TreePlotter.prototype.draw = function(populations, structure, sample_names) {
+TreePlotter.prototype.draw = function(populations, structure, params) {
+  if(params !== undefined) {
+
+  }
+
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
 
-  if(sample_names === null) {
-    sample_names = (new Array(num_samples)).fill(0).map(function(val, idx) {
+  if(!params || !params.samples) {
+    var sample_names = (new Array(num_samples)).fill(0).map(function(val, idx) {
       return 'Sample ' + (idx + 1);
     });
+  } else {
+    var sample_names = params.samples;
+  }
+  if(!params || !params.hidden_samples) {
+    var hidden_samples = [];
+  } else {
+    var hidden_samples = params.hidden_samples;
   }
 
   var root = this._generate_tree_struct(structure, populations);
   this._draw_tree(root);
-  this._plot_pop_trajectories(structure, populations, num_samples, sample_names);
+  this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples);
   this._render_summary_table(structure, populations, num_samples, sample_names);
 }
 
