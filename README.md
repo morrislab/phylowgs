@@ -73,7 +73,7 @@ Running PhyloWGS
 
 2. Compile the C++ file.
 
-        g++ -o mh.o -O3 mh.cpp  util.cpp `gsl-config --cflags --libs`
+        g++ -o phylowgs_mh -O3 mh.cpp  util.cpp `gsl-config --cflags --libs`
 
 3. Run PhyloWGS. Minimum invocation on sample data set:
 

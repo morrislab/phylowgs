@@ -4,12 +4,12 @@ from collections import defaultdict
 import sys
 import os
 sys.path.append(os.path.join(os.path.dirname(os.path.realpath(__file__)), '..'))
-import util2
+import phylowgs.util2
 import json
 
 class ResultGenerator(object):
   def generate(self, tree_file, include_ssm_names):
-    reader = util2.TreeReader(tree_file)
+    reader = phylowgs.util2.TreeReader(tree_file)
     first_tree = next(reader.load_trees())
     cnv_logical_physical_mapping = json.loads(reader.read_extra_file('cnv_logical_physical_mapping.json'))
     try:
@@ -35,7 +35,7 @@ class ResultGenerator(object):
     return summaries, mutlist, all_mutass, params
 
   def _summarize_all_pops(self, tree_file):
-    reader = util2.TreeReader(tree_file)
+    reader = phylowgs.util2.TreeReader(tree_file)
     for idx, llh, tree in reader.load_trees_and_metadata(remove_empty_vertices = True):
       yield (idx, llh) + self._summarize_pops(tree)
     reader.close()

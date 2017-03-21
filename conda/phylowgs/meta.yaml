@@ -1,0 +1,27 @@
+package:
+  name: phylowgs
+  version: 'smchet5'
+
+source:
+  git_url: https://github.com/morrislab/phylowgs.git
+  git_rev: smchet5
+
+requirements:
+  build:
+    - python
+    - gsl
+  run:
+    - python
+    - numpy
+    - scipy
+    - ete2
+    - gsl
+
+build:
+  number: 1
+
+about:
+  home: https://github.com/morrislab/phylowgs.git
+  license: GPL
+  summary: Application for inferring subclonal composition and evolution from whole-genome sequencing data.
+
