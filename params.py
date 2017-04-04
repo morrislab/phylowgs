@@ -121,7 +121,7 @@ def write_data_state(tssb,fname):
 		poss_n_genomes = dat.compute_n_genomes(0)
 		for node in nodes:
 		
-			ssm_node = node.path[-1]
+			ssm_node = dat.node.path[-1]
 			mr_cnv = find_most_recent_cnv(dat,node)
 			ancestors = node.get_ancestors()
             
