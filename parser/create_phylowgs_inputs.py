@@ -292,14 +292,9 @@ class DKFZParser(VariantParser):
     return (ref_reads, total_reads)
 
 class CnvFormatter(object):
-  def __init__(self, cnv_confidence, read_depth, read_length, sampidxs):
-    self._cnv_confidence = cnv_confidence
+  def __init__(self, read_depth, sampidxs):
     self._read_depth = read_depth
-    self._read_length = read_length
     self._sampidxs = sampidxs
-
-  def _max_reads(self, sampidx):
-    return 1e6 * self._read_depth[sampidx]
 
   def _find_overlapping_variants(self, chrom, cnv, variants):
     overlapping = []
@@ -319,50 +314,30 @@ class CnvFormatter(object):
       ref_reads[sampidx] = int((1 - vaf) * total_reads[sampidx])
     return ref_reads
 
-  def _calc_total_reads(self, cellular_prev, locus_start, locus_end, major_cn, minor_cn):
-    total_reads = np.zeros(len(self._sampidxs))
-    assert len(set(major_cn)) == len(set(minor_cn)) == 1
-    total_cn = major_cn[0] + minor_cn[0]
+  def _calc_total_reads(self, locus_start, locus_end):
+    def _calc(samp_read_depth):
+      # We estimate 7 heterozygous SNPs per 10 kb, which goes as input to CNA
+      # algorithms. Thus, we determine how many SNPs are equivalent to a region
+      # of the given size, then weight accordingly.
+      hetsnp_rate = 7 / 1e4
+      assert locus_start < locus_end
+      # Figure out approximately equivalent number of SSMs to this region.
+      equiv_ssms = (locus_end - locus_start) * hetsnp_rate
+      return int(np.round(equiv_ssms * samp_read_depth))
 
-    for sampidx in self._sampidxs:
-      # Proportion of all cells carrying CNV.
-      P = cellular_prev[sampidx]
-      if total_cn == 2:
-        # If no net change in copy number -- e.g., because (major, minor) went
-        # from (1, 1) to (2, 0) -- force the delta_cn to be 1.
-        delta_cn = 1.
-        no_net_change = True
-      else:
-        delta_cn = float(total_cn - 2)
-        no_net_change = False
-
-      region_length = locus_end - locus_start + 1
-      fn = (self._read_depth[sampidx] * region_length) / self._read_length[sampidx]
-
-      # This is a hack to prevent division by zero (when delta_cn = -2). Its
-      # effect will be to make d large.
-      if P > 0.98:
-        P = 0.98
-      if P < 0.02:
-        P = 0.02
-
-      d = (delta_cn**2 / 4) * (fn * P * (2 - P)) / (1 + (abs(delta_cn)  * P) / 2)
-
-      if no_net_change:
-        # If no net change in CN occurred, the estimate was just based on BAFs,
-        # meaning we have lower confidence in it. Indicate this lack of
-        # confidence via d by multiplying it by (read length / distance between
-        # common SNPs), with the "distance between common SNPs" taken to be 1000 bp.
-        d *= (self._read_length[sampidx] / 1000.)
-
-      # Cap at 1e6 * read_depth.
-      total_reads[sampidx] = int(round(min(d, self._max_reads(sampidx))))
-    return total_reads
+    D = [_calc(self._read_depth[sampidx]) for sampidx in self._sampidxs]
+    return self._cap_cnv_D(D)
 
   def _format_overlapping_variants(self, variants, maj_cn, min_cn):
     assert len(set(maj_cn)) == len(set(min_cn)) == 1
     variants = [(ssm_id, str(min_cn[0]), str(maj_cn[0])) for ssm_id in variants]
     return variants
+
+  def _cap_cnv_D(self, D):
+    # Average tumour has ~3k SSMs, so say that a CNA region should be
+    # equivalent to no more than this.
+    avg_ssms_in_tumour = 3000
+    return np.minimum(D, avg_ssms_in_tumour * self._read_depth)
 
   def _format_cnvs(self, cnvs, variants):
     log('Estimated read depth: %s' % self._read_depth)
@@ -370,13 +345,7 @@ class CnvFormatter(object):
     for chrom, chrom_cnvs in cnvs.items():
       for cnv in chrom_cnvs:
         overlapping_variants = self._find_overlapping_variants(chrom, cnv, variants)
-        total_reads = self._calc_total_reads(
-          cnv['cell_prev'],
-          cnv['start'],
-          cnv['end'],
-          cnv['major_cn'],
-          cnv['minor_cn']
-        )
+        total_reads = self._calc_total_reads(cnv['start'], cnv['end'])
         ref_reads = self._calc_ref_reads(cnv['cell_prev'], total_reads)
         yield {
           'chrom': chrom,
@@ -438,7 +407,7 @@ class CnvFormatter(object):
       and np.array_equal(last['cellular_prevalence'], cellularity):
         # Merge the CNVs.
         log('Merging %s_%s and %s_%s' % (current['chrom'], current['start'], last['chrom'], last['start']))
-        last['total_reads'] = current['total_reads'] + last['total_reads']
+        last['total_reads'] = self._cap_cnv_D(current['total_reads'] + last['total_reads'])
         last['ref_reads'] = self._calc_ref_reads(last['cellular_prevalence'], last['total_reads'])
         last['physical_cnvs'] += ';' + current['physical_cnvs']
         self._merge_variants(last, current)
@@ -447,10 +416,6 @@ class CnvFormatter(object):
         current['cnv_id'] = 'c%s' % counter
         merged.append(current)
         counter += 1
-
-    for cnv in merged:
-      cnv['ref_reads'] = np.round(cnv['ref_reads'] * self._cnv_confidence).astype(np.int)
-      cnv['total_reads'] = np.round(cnv['total_reads'] * self._cnv_confidence).astype(np.int)
 
     return merged
 
@@ -1048,12 +1013,12 @@ class VariantAndCnvGroup(object):
       log('No variants available, so fixing read depth at %s.' % default_read_depth)
       return default_read_depth
     else:
-      return np.nanmean(self._total_read_counts, axis=0)
+      return np.nanmedian(self._total_read_counts, axis=0)
 
-  def write_cnvs(self, variants, outfn, cnv_confidence, read_length):
+  def write_cnvs(self, variants, outfn):
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms', 'physical_cnvs')), file=outf)
-      formatter = CnvFormatter(cnv_confidence, self._estimated_read_depth, read_length, self._sampidxs)
+      formatter = CnvFormatter(self._estimated_read_depth, self._sampidxs)
       for cnv in formatter.format_and_merge_cnvs(self._multisamp_cnv.load_single_abnormal_state_cnvs(), variants, self._cellularity):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
@@ -1297,10 +1262,6 @@ def main():
     help='Output destination for run parameters')
   parser.add_argument('--tumor-sample', dest='tumor_sample',
     help='Name of the tumor sample in the input VCF file. Defaults to last sample if not specified.')
-  parser.add_argument('--cnv-confidence', dest='cnv_confidence', type=restricted_float, default=0.5,
-    help='Confidence in CNVs. Set to < 1 to scale "d" values used in CNV output file')
-  parser.add_argument('--read-length', dest='read_length', type=int, default=100,
-    help='Approximate length of reads. Used to calculate confidence in CNV frequencies')
   parser.add_argument('--muse-tier', dest='muse_tier', type=int, default=0,
     help='Maximum MuSE tier to include')
   parser.add_argument('--nonsubsampled-variants', dest='output_nonsubsampled_variants',
@@ -1363,10 +1324,9 @@ def main():
 
   if grouper.has_cnvs() and args.regions != 'normal_cn':
     # Write CNVs.
-    read_length = num_samples * [args.read_length]
-    grouper.write_cnvs(subsampled_vars, args.output_cnvs, args.cnv_confidence, read_length)
+    grouper.write_cnvs(subsampled_vars, args.output_cnvs)
     if args.output_nonsubsampled_variants and args.output_nonsubsampled_variants_cnvs:
-      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs, args.cnv_confidence, read_length)
+      grouper.write_cnvs(nonsubsampled_vars, args.output_nonsubsampled_variants_cnvs)
   else:
     # Write empty CNV file.
     with open(args.output_cnvs, 'w'):
