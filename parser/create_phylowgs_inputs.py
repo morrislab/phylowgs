@@ -308,7 +308,7 @@ class CnvFormatter(object):
     return overlapping
 
   def _calc_ref_reads(self, cellular_prev, total_reads):
-    ref_reads = np.zeros(len(self._sampidxs))
+    ref_reads = np.zeros(len(self._sampidxs), dtype=np.int64)
     for sampidx in self._sampidxs:
       vaf = cellular_prev[sampidx] / 2
       ref_reads[sampidx] = int((1 - vaf) * total_reads[sampidx])
@@ -337,7 +337,8 @@ class CnvFormatter(object):
     # Average tumour has ~3k SSMs, so say that a CNA region should be
     # equivalent to no more than this.
     avg_ssms_in_tumour = 3000
-    return np.minimum(D, avg_ssms_in_tumour * self._read_depth)
+    D_max = int(np.round(avg_ssms_in_tumour * self._read_depth))
+    return np.minimum(D, D_max)
 
   def _format_cnvs(self, cnvs, variants):
     log('Estimated read depth: %s' % self._read_depth)
