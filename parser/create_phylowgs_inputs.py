@@ -646,11 +646,12 @@ class Segmenter(object):
     return self._create_intervals(organized)
 
 class MultisampleCnvCombiner(object):
-  def __init__(self, cn_regions, cellularity):
+  def __init__(self, cn_regions, cellularity, sex):
     self.sampidxs = set(range(len(cn_regions)))
     segments = Segmenter().segment(cn_regions)
     self._cnvs = self._reformat_segments_as_cnvs(segments)
     self._cellularity = cellularity
+    self._sex = sex
 
   def _reformat_segments_as_cnvs(self, segments):
     reformatted = defaultdict(list)
@@ -680,14 +681,18 @@ class MultisampleCnvCombiner(object):
         current, next = chrom_cnvs[idx], chrom_cnvs[idx + 1]
         assert current['start'] < current['end'] <= next['start'] < next['end']
 
-  def _is_region_normal_cn(self, major, minor):
-    return major == minor == 1
+  def _is_region_normal_cn(self, chrom, major, minor):
+    return self._is_multisample_region_normal_cn(chrom, [major], [minor])
 
-  def _is_multisample_region_normal_cn(self, major, minor):
-    return set(major) == set(minor) == set([1])
+  def _is_multisample_region_normal_cn(self, chrom, major, minor):
+    normal_major = set([1])
+    if self._sex == 'male' and chrom in (('X', 'Y')):
+      normal_minor = set([0])
+    else:
+      normal_minor = set([1])
+    return set(major) == normal_major and set(minor) == normal_minor
 
-
-  def _get_abnormal_state_for_all_samples(self, cnv):
+  def _get_abnormal_state_for_all_samples(self, chrom, cnv):
     '''On a per-sample basis, record which samples report the CNA is abnormal
     CN, and which report it is normal CN. If multiple different abnormal states
     occur in different samples, return None.'''
@@ -701,7 +706,7 @@ class MultisampleCnvCombiner(object):
 
     for sampidx, cell_prev, major, minor in zip(cnv['sampidx'], cnv['cell_prev'], cnv['major_cn'], cnv['minor_cn']):
       # Region may be (clonal or subclonal) normal in a sample, so ignore such records.
-      if self._is_region_normal_cn(major, minor):
+      if self._is_region_normal_cn(chrom, major, minor):
         continue
 
       # Either we haven't observed an abnormal CN state in this region before,
@@ -767,7 +772,7 @@ class MultisampleCnvCombiner(object):
       if not is_good_chrom(chrom):
         continue
       for cnv in chrom_cnvs:
-        states_for_all_samples = self._get_abnormal_state_for_all_samples(cnv)
+        states_for_all_samples = self._get_abnormal_state_for_all_samples(chrom, cnv)
         if states_for_all_samples is None:
           continue
 
@@ -789,7 +794,7 @@ class MultisampleCnvCombiner(object):
       if not is_good_chrom(chrom):
         continue
       for cnv in chrom_cnvs:
-        if not self._is_multisample_region_normal_cn(cnv['major_cn'], cnv['minor_cn']):
+        if not self._is_multisample_region_normal_cn(chrom, cnv['major_cn'], cnv['minor_cn']):
           continue
         if not set(cnv['sampidx']) == self.sampidxs:
           continue
@@ -849,9 +854,9 @@ class VariantAndCnvGroup(object):
 
     return max_cellular_prevs
 
-  def add_cnvs(self, cn_regions):
+  def add_cnvs(self, cn_regions, sex):
     self._cellularity = self._find_cellularity(cn_regions)
-    self._multisamp_cnv = MultisampleCnvCombiner(cn_regions, self._cellularity)
+    self._multisamp_cnv = MultisampleCnvCombiner(cn_regions, self._cellularity, sex)
     self._sampidxs = self._multisamp_cnv.sampidxs
 
   def has_cnvs(self):
@@ -941,7 +946,7 @@ class VariantAndCnvGroup(object):
 
     # If variant isn't listed in *any* region: exclude (as we suspect CNV
     # caller didn't know what to do with the region).
-    self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'outside_subclonal_cn')
+    self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'within_cn_regions')
 
   def format_variants(self, sample_size, error_rate, priority_ssms, sex):
     if sample_size is None:
@@ -1288,13 +1293,18 @@ def main():
   # invocation.
   random.seed(1)
 
+  if args.sex == 'auto':
+    sex = infer_sex(variant_ids)
+  else:
+    sex = args.sex
+
   grouper = VariantAndCnvGroup()
   grouper.add_variants(variant_ids, ref_read_counts, total_read_counts)
 
   if len(cnv_files) > 0:
     # Load CNV files in same order as sample order given for VCFs.
     cn_regions = [CnvParser(cnv_files[S]).parse() for S in samples]
-    grouper.add_cnvs(cn_regions)
+    grouper.add_cnvs(cn_regions, sex)
 
   if not grouper.has_cnvs():
     assert args.regions == 'all', 'If you do not provide CNA data, you must specify --regions=all'
@@ -1309,11 +1319,6 @@ def main():
     raise Exception('Unknown --regions value: %s' % args.regions)
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
-
-  if args.sex == 'auto':
-    sex = infer_sex(variant_ids)
-  else:
-    sex = args.sex
 
   subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
   if len(subsampled_vars) == 0:
