@@ -197,14 +197,18 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
 }
 
 TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
-  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
+  if(!tree_summary.hasOwnProperty('tree_densities')) {
+    return;
+  }
 
+  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
   var xpoints = [];
   var ypoints = [];
   var marker_symbols = [];
   var marker_sizes = [];
   var labels = [];
   var colours = [];
+  var epsilon = 0.000001;
 
   Object.keys(tree_summary.trees).forEach(function(tidx) {
     tidx = parseInt(tidx, 10);
@@ -212,11 +216,11 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
 
     labels.push('Tree ' + tidx);
     xpoints.push(T.clustering_index);
-    ypoints.push(T.branching_index / (T.branching_index + T.linearity_index));
+    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
+    ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
     marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
     colours.push(tree_summary.tree_densities[tidx]);
-    console.log([tidx, tree_summary.tree_densities[tidx]]);
   });
 
   var traces = [{
