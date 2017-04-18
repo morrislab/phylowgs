@@ -9,9 +9,11 @@ def calc_tree_densities(summaries):
   tidxs = sorted(summaries.keys())
   _extract = lambda idxname: np.array([summaries[tidx][idxname] for tidx in tidxs])
 
+  epsilon = 0.000001
   indices = {I: _extract(I + '_index') for I in ('linearity', 'branching', 'clustering')}
   X = indices['clustering']
-  Y = indices['branching'] / (indices['branching'] + indices['linearity'])
+  # Epsilon prevents division by zero in case of single-node trees.
+  Y = indices['branching'] / (indices['branching'] + indices['linearity'] + epsilon)
 
   # Must be (# dimensions, # data points)
   XY = np.vstack((X, Y))
