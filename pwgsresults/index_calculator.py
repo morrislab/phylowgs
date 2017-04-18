@@ -53,7 +53,7 @@ class IndexCalculator(object):
   def calc_linearity_index(self):
     lowertrisum = self._calc_index('anc_desc')
     # Note that the matrix isn't symmetric -- if A is an ancestor of B, then we
-    # know that B is *not* an ancestor of A. The coclustering and branching
+    # know that B is *not* an ancestor of A. The clustering and branching
     # matrices are, however, symmetric. Thus, for this, we should be
     # normalizing against (N choose 2) instead of (N permute 2); but since
     # _calc_index() normalizes against the latter, we multiply by two to
@@ -65,8 +65,8 @@ class IndexCalculator(object):
   def calc_branching_index(self):
     return self._calc_index('cousin')
 
-  def calc_coclustering_index(self):
-    # Technically, in the coclustering matrix, the diagonal should be 1's
+  def calc_clustering_index(self):
+    # Technically, in the clustering matrix, the diagonal should be 1's
     # (since a mutation should be said to cluster with itself). But to keep the
     # value in the denominator against which we normalize the same across all
     # three indices, thereby ensuring that the sum of the three normalized

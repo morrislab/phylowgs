@@ -1,6 +1,23 @@
+from pwgsresults.index_calculator import IndexCalculator
 import json
 import gzip
 import zipfile
+import numpy as np
+import scipy.stats
+
+def calc_tree_densities(summaries):
+  tidxs = sorted(summaries.keys())
+  _extract = lambda idxname: np.array([summaries[tidx][idxname] for tidx in tidxs])
+
+  indices = {I: _extract(I + '_index') for I in ('linearity', 'branching', 'clustering')}
+  X = indices['clustering']
+  Y = indices['branching'] / (indices['branching'] + indices['linearity'])
+
+  # Must be (# dimensions, # data points)
+  XY = np.vstack((X, Y))
+  # Must conver to Python list so it can be serialized to JSON.
+  density = list(scipy.stats.gaussian_kde(XY)(XY))
+  return dict(zip(tidxs, density))
 
 class JsonWriter(object):
   def __init__(self, dataset_name):
@@ -12,10 +29,17 @@ class JsonWriter(object):
       json.dump(mutlist, mutf)
 
   def write_summaries(self, summaries, params, summaries_outfn):
+    for summary in summaries.values():
+      calculator = IndexCalculator(summary)
+      summary['linearity_index'] = calculator.calc_linearity_index()
+      summary['branching_index'] = calculator.calc_branching_index()
+      summary['clustering_index'] = calculator.calc_clustering_index()
+
     to_dump = {
       'dataset_name': self._dataset_name,
       'params': params,
       'trees': summaries,
+      'tree_densities': calc_tree_densities(summaries),
     }
     with gzip.GzipFile(summaries_outfn, 'w') as summf:
       json.dump(to_dump, summf)

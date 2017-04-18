@@ -163,101 +163,61 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
-TreeSummarizer.prototype._cov_matrix = function(X) {
-  var XT = transposeMatrix(X);
-  var N = X.length;
-  var D = XT.length;
+TreeSummarizer.prototype._extract_indices = function(tree_summ) {
+  this.linearity_indices = {};
+  this.branching_indices = {};
+  this.coclustering_indices = {};
 
-  var means = [];
-  for(var i = 0; i < D; i++) {
-    var sum = XT[i].reduce(function(a, b) { return a + b; });
-    means.push(sum / N);
-  }
-  var residuals = [];
-  for(var i = 0; i < D; i++) {
-    residuals[i] = [];
-    for(var j = 0; j < N; j++) {
-      residuals[i].push(XT[i][j] - means[i]);
-    }
-  }
-
-  var cov = zeros(D, D);
-  for(var i = 0; i < D; i++) {
-    for(var j = 0; j < D; j++) {
-      var res_sum = 0;
-      for(var k = 0; k < N; k++) {
-        res_sum += (XT[i][k] - means[i]) * (XT[j][k] - means[j]);
-      }
-      cov[i][j] = res_sum / (N - 1);
-    }
-  }
-
-  return cov;
-}
-
-TreeSummarizer.prototype._gaussian_pdf = function(X, mu, sigma) {
-  var lambda = inverseMatrix(sigma);
-  var detsigma = determinant(sigma);
-
-  var density = X.map(function(x) {
-    var D = x.length;
-    var R = [x.map(function(x, i) { return x - mu[i]; })]; // 1xD
-    var dens = Math.exp(-0.5 * matrixMultiply(R, matrixMultiply(lambda, transposeMatrix(R))));
-    dens /= Math.sqrt(Math.pow(2 * Math.PI, D) * detsigma);
-    return dens;
-  });
-  return density;
-}
-
-TreeSummarizer.prototype._zerovec = function(N) {
-  return Array.apply(null, Array(N)).map(Number.prototype.valueOf,0);
-}
-
-TreeSummarizer.prototype._kde = function(points) {
-  var N = points.length;
-  var D = points[0].length;
-
-  // Scott's Rule from SciPy
-  var bandwidth = Math.pow(N, -1/(D + 4));
-  var sigma = this._cov_matrix(points);
-  sigma = matrixScalarMultiply(sigma, Math.pow(bandwidth, 2));
-
-  var density = this._zerovec(N);
   var self = this;
-  points.forEach(function(P) {
-    var density_P = self._gaussian_pdf(points, P, sigma);
-    for(var i = 0; i < density_P.length; i++) {
-      density[i] += density_P[i];
+  Object.keys(tree_summ).forEach(function(tidx) {
+    self.linearity_indices[tidx] = tree_summ[tidx].linearity_index;
+    self.branching_indices[tidx] = tree_summ[tidx].branching_index;
+    self.coclustering_indices[tidx] = tree_summ[tidx].coclustering_index;
+  });
+  this.num_trees = Object.keys(this.linearity_indices).length;
+}
+
+TreeSummarizer.prototype._find_best_tree = function(densities) {
+  var max_density = 0;
+  var best_tidx = null;
+
+  Object.keys(densities).forEach(function(tidx) {
+    var density = densities[tidx];
+    if(density > max_density) {
+      max_density = density;
+      best_tidx = tidx;
     }
   });
-  return density;
+
+  if(best_tidx == null) {
+    throw "best_tidx is null";
+  }
+
+  return parseInt(best_tidx, 10);
 }
 
 TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
-  var btf = new BestTreeFinder(tree_summary);
-  var best_tree_idx = btf.find_best_tree();
+  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
 
   var xpoints = [];
   var ypoints = [];
   var marker_symbols = [];
   var marker_sizes = [];
   var labels = [];
+  var colours = [];
 
-  Object.keys(btf.linearity_indices).forEach(function(tidx) {
+  Object.keys(tree_summary.trees).forEach(function(tidx) {
     tidx = parseInt(tidx, 10);
+    var T = tree_summary.trees[tidx];
+
     labels.push('Tree ' + tidx);
-    xpoints.push(btf.linearity_indices[tidx]);
-    ypoints.push(btf.branching_indices[tidx]);
+    xpoints.push(T.clustering_index);
+    ypoints.push(T.branching_index / (T.branching_index + T.linearity_index));
     marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
+    colours.push(tree_summary.tree_densities[tidx]);
+    console.log([tidx, tree_summary.tree_densities[tidx]]);
   });
-
-  var mean_index = btf.calc_mean_index();
-  xpoints.push(mean_index.linearity);
-  ypoints.push(mean_index.branching);
-  marker_symbols.push('diamond');
-  marker_sizes.push(30);
-  labels.push('Mean');
 
   var traces = [{
     x: xpoints,
@@ -270,22 +230,17 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
       symbol: marker_symbols,
       size: marker_sizes,
       line: { width: 0 },
-      color: '#ff5858',
+      colorscale: 'Viridis',
+      color: colours,
     },
-  },
-  {
-    x: xpoints,
-    y: ypoints,
-    ncontours: 20,
-    colorscale: 'Viridis',
-    type: 'histogram2dcontour',
   }];
   var layout = {
-    title: 'Branching index vs. linearity index (best tree: ' + best_tree_idx + ')',
+    title: 'Clustering degree vs. branching degree (best tree: ' + best_tree_idx + ')',
     height: 1000,
-    xaxis: { title: 'Linearity index'},
-    yaxis: { title: 'Branching index'},
+    xaxis: { title: 'CI'},
+    yaxis: { title: 'BI / (BI + LI)'},
     hovermode: 'closest',
+    plot_bgcolor: '#440154',
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
@@ -333,7 +288,7 @@ TreeSummarizer.prototype.render = function(dataset) {
       }
     });
 
-    self._render_lin_idx_vs_branch_idx(summary.trees);
+    self._render_lin_idx_vs_branch_idx(summary);
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);

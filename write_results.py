@@ -3,7 +3,6 @@ import argparse
 from pwgsresults.result_generator import ResultGenerator
 from pwgsresults.result_munger import ResultMunger
 from pwgsresults.json_writer import JsonWriter
-from pwgsresults.index_calculator import IndexCalculator
 
 def main():
   parser = argparse.ArgumentParser(
@@ -32,12 +31,6 @@ def main():
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
   munger.remove_superclones()
   munger.remove_polyclonal_trees()
-
-  for summary in summaries.values():
-    calculator = IndexCalculator(summary)
-    summary['linearity_index'] = calculator.calc_linearity_index()
-    summary['branching_index'] = calculator.calc_branching_index()
-    summary['coclustering_index'] = calculator.calc_coclustering_index()
 
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, params, args.tree_summary_output)
