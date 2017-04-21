@@ -292,9 +292,10 @@ class DKFZParser(VariantParser):
     return (ref_reads, total_reads)
 
 class CnvFormatter(object):
-  def __init__(self, read_depth, sampidxs):
+  def __init__(self, read_depth, sampidxs, hetsnp_rate):
     self._read_depth = read_depth
     self._sampidxs = sampidxs
+    self._hetsnp_rate = hetsnp_rate
 
   def _find_overlapping_variants(self, chrom, cnv, variants):
     overlapping = []
@@ -319,10 +320,9 @@ class CnvFormatter(object):
       # We estimate 7 heterozygous SNPs per 10 kb, which goes as input to CNA
       # algorithms. Thus, we determine how many SNPs are equivalent to a region
       # of the given size, then weight accordingly.
-      hetsnp_rate = 7 / 1e4
       assert locus_start < locus_end
       # Figure out approximately equivalent number of SSMs to this region.
-      equiv_ssms = (locus_end - locus_start) * hetsnp_rate
+      equiv_ssms = (locus_end - locus_start) * self._hetsnp_rate
       return int(np.round(equiv_ssms * samp_read_depth))
 
     D = [_calc(self._read_depth[sampidx]) for sampidx in self._sampidxs]
@@ -825,9 +825,10 @@ class MultisampleCnvCombiner(object):
     return combined
 
 class VariantAndCnvGroup(object):
-  def __init__(self):
+  def __init__(self, hetsnp_rate):
     self._multisamp_cnv = None
     self._cellularity = None
+    self._hetsnp_rate = hetsnp_rate
 
   def add_variants(self, variants, ref_read_counts, total_read_counts):
     self._variants = variants
@@ -1277,6 +1278,10 @@ def main():
   parser.add_argument('--sex', dest='sex', default='auto', choices=('auto', 'male', 'female'),
     help='Sex of patient. Used to adjust expected variant frequencies on sex chromosomes. ' +
     'If auto, patient is set to male if any variants are provided on the Y chromosome, and female otherwise.')
+  parser.add_argument('--het-snp-rate', dest='hetsnp_rate', default=7e-4, type=float,
+    help='Average number of heterozygous SNPs per base used to call copy ' +
+    'number. This determines how heavily we weight somatic CNAs relative to ' +
+    'SNVs. Defaults to 7 SNPs per 10 kb, as per Battenberg.')
   parser.add_argument('--verbose', dest='verbose', action='store_true')
   parser.add_argument('vcf_files', nargs='+', help='Path to VCF file for each sample. Specified as <sample>=<VCF path>.')
   args = parser.parse_args()
@@ -1298,7 +1303,7 @@ def main():
   else:
     sex = args.sex
 
-  grouper = VariantAndCnvGroup()
+  grouper = VariantAndCnvGroup(args.hetsnp_rate)
   grouper.add_variants(variant_ids, ref_read_counts, total_read_counts)
 
   if len(cnv_files) > 0:
