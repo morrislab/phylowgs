@@ -1025,7 +1025,7 @@ class VariantAndCnvGroup(object):
   def write_cnvs(self, variants, outfn):
     with open(outfn, 'w') as outf:
       print('\t'.join(('cnv', 'a', 'd', 'ssms', 'physical_cnvs')), file=outf)
-      formatter = CnvFormatter(self._estimated_read_depth, self._sampidxs)
+      formatter = CnvFormatter(self._estimated_read_depth, self._sampidxs, self._hetsnp_rate)
       for cnv in formatter.format_and_merge_cnvs(self._multisamp_cnv.load_single_abnormal_state_cnvs(), variants, self._cellularity):
         overlapping = [','.join(o) for o in cnv['overlapping_variants']]
         vals = (
