@@ -9,7 +9,7 @@ def calc_tree_densities(summaries):
   tidxs = sorted(summaries.keys())
   _extract = lambda idxname: np.array([summaries[tidx][idxname] for tidx in tidxs])
 
-  epsilon = 0.000001
+  epsilon = 0.0001
   indices = {I: _extract(I + '_index') for I in ('linearity', 'branching', 'clustering')}
   X = indices['clustering']
   # Epsilon prevents division by zero in case of single-node trees.
@@ -18,7 +18,13 @@ def calc_tree_densities(summaries):
   # Must be (# dimensions, # data points)
   XY = np.vstack((X, Y))
   # Must conver to Python list so it can be serialized to JSON.
-  density = list(scipy.stats.gaussian_kde(XY)(XY))
+
+  try:
+    density = list(scipy.stats.gaussian_kde(XY)(XY))
+  except np.linalg.linalg.LinAlgError:
+    # Occurs when matrix is singular because, e.g., it's all zeros.
+    density = np.zeros(len(X))
+
   return dict(zip(tidxs, density))
 
 class JsonWriter(object):
