@@ -949,7 +949,7 @@ class VariantAndCnvGroup(object):
     # caller didn't know what to do with the region).
     self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'within_cn_regions')
 
-  def format_variants(self, sample_size, error_rate, priority_ssms, sex):
+  def format_variants(self, sample_size, error_rate, priority_ssms, only_priority, sex):
     if sample_size is None:
       sample_size = len(self._variant_idxs)
     random.shuffle(self._variant_idxs)
@@ -973,7 +973,7 @@ class VariantAndCnvGroup(object):
         continue
       used_variant_idxs.add(variant_idx)
       variant = self._variants[variant_idx]
-      if len(subsampled) < sample_size:
+      if (not only_priority) and len(subsampled) < sample_size:
         subsampled.append(variant_idx)
       else:
         nonsubsampled.append(variant_idx)
@@ -1257,6 +1257,8 @@ def main():
     help='Subsample SSMs to reduce PhyloWGS runtime')
   parser.add_argument('-P', '--priority-ssms', dest='priority_ssm_filename',
     help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
+  parser.add_argument('--only-priority', dest='only_priority', action='store_true',
+    help='Only sample variants provided on priority list')
   parser.add_argument('--cnvs', dest='cnv_files', action='append',
     help='Path to CNV file created with parse_cnvs.py for each sample. Specified as <sample>=<CNV path>.')
   parser.add_argument('--regions', dest='regions', choices=('normal_cn', 'normal_and_abnormal_cn', 'all'), default='normal_and_abnormal_cn',
@@ -1325,7 +1327,7 @@ def main():
 
   priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
 
-  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, sex)
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, args.only_priority, sex)
   if len(subsampled_vars) == 0:
     print('No variants to write', file=sys.stderr)
     sys.exit(0)
