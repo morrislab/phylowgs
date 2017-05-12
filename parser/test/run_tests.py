@@ -4,7 +4,6 @@ import filecmp
 import os
 import shutil
 
-#def compare(vcf_format, input_vcf, good_ssm_output):
 def compare_outputs(comparison, parser_params=None):
   if parser_params is None:
     parser_params = []
@@ -40,7 +39,7 @@ def compare_outputs(comparison, parser_params=None):
   all_match = True
   for inf, outf in files:
     all_match = all_match and filecmp.cmp(inf, outf)
-  #shutil.rmtree(output_dir)
+  shutil.rmtree(output_dir)
   if all_match:
     print('%s passed' % comparison['name'])
   else:
@@ -91,9 +90,10 @@ def test_multisamp_cnvs():
   compare_outputs(comparison)
 
 def main():
-  #test_vcf_formats()
+  test_vcf_formats()
   test_singlesamp_cnv()
   test_multisamp_cnvs()
+
   # This test is broken right now. D'oh.
   #test_id_parsing()
 
