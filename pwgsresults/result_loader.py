@@ -25,6 +25,13 @@ class ResultLoader(object):
       tree_json = json.load(treesummf)
       self.dataset_name = tree_json['dataset_name']
       self.tree_summary = tree_json['trees']
+      self.params = tree_json['params']
+
+      if 'tree_densities' in tree_json:
+        self.tree_densities = tree_json['tree_densities']
+        self._convert_keys_to_ints(self.tree_densities)
+      else:
+        self.tree_densities = {}
 
     self._convert_keys_to_ints(self.tree_summary)
     for tree_idx, tree_features in self.tree_summary.items():
