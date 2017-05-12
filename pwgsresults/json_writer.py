@@ -5,6 +5,8 @@ import zipfile
 import numpy as np
 import scipy.stats
 
+np.seterr(invalid='raise')
+
 def calc_tree_densities(summaries):
   tidxs = sorted(summaries.keys())
   _extract = lambda idxname: np.array([summaries[tidx][idxname] for tidx in tidxs])
@@ -21,7 +23,7 @@ def calc_tree_densities(summaries):
 
   try:
     density = list(scipy.stats.gaussian_kde(XY)(XY))
-  except np.linalg.linalg.LinAlgError:
+  except (np.linalg.linalg.LinAlgError, FloatingPointError):
     # Occurs when matrix is singular because, e.g., it's all zeros.
     density = np.zeros(len(X))
 
