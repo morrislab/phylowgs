@@ -337,7 +337,7 @@ class CnvFormatter(object):
     # Average tumour has ~3k SSMs, so say that a CNA region should be
     # equivalent to no more than this.
     avg_ssms_in_tumour = 3000
-    D_max = int(np.round(avg_ssms_in_tumour * self._read_depth))
+    D_max = np.round(avg_ssms_in_tumour * self._read_depth).astype(np.int)
     return np.minimum(D, D_max)
 
   def _format_cnvs(self, cnvs, variants):
