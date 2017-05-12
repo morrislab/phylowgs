@@ -1,0 +1,4 @@
+chromosome	start	end	major_cn	minor_cn	cellular_prevalence	level	star
+1	1	100000	1	1	0.81	d	2
+1	141500000	148899999	1	1	0.81	d	2
+1	148900000	163507499	1	1	0.81	d	2

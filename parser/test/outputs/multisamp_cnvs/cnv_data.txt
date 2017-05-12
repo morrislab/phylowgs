@@ -1,0 +1,3 @@
+cnv	a	d	ssms	physical_cnvs
+c0	60000,40383	60000,63000	s2,1,2	chrom=1,start=141500000,end=148899999,major_cn=2,minor_cn=1,cell_prev=0.0|0.718
+c1	60000,40383	60000,63000		chrom=1,start=148900000,end=163507499,major_cn=2,minor_cn=1,cell_prev=0.0|0.718
