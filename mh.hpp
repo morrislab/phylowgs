@@ -23,6 +23,9 @@ void write_params(char fname[], struct node nodes[], struct config conf);
 
 void mh_loop(struct node nodes[], struct datum data[], char* fname, struct config conf);
 
+void write_llh_cache(char fname[], struct datum *data, struct node *nodes, struct config conf);
+
+
 struct config{
 	int MH_ITR;
 	float MH_STD;

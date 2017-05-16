@@ -52,7 +52,8 @@ def parse_physical_cnvs(pcnvs):
 def load_data(fname1,fname2):
 	# load ssm data
 	reader = csv.DictReader(open(fname1,'rU'), delimiter='\t')
-	data = dict()  
+	data = dict()
+	id2 = 0
 	for row in reader:
 		name = row['gene']
 		id = row['id']
@@ -64,7 +65,8 @@ def load_data(fname1,fname2):
 			mu_r = float(row['mu_r'])
 			mu_v = float(row['mu_v'])
 
-		data[id] = Datum(name, id, a, d, mu_r, mu_v)
+		data[id] = Datum(name, id, id2, a, d, mu_r, mu_v)
+		id2 += 1
 	
 	n_ssms = len(data.keys())
 	n_cnvs = 0
@@ -79,7 +81,8 @@ def load_data(fname1,fname2):
 		a = [int(x) for x in row['a'].split(',')]
 		d = [int(x) for x in row['d'].split(',')]
 
-		data[id] = Datum(name, id, a, d,0.999,0.5)
+		data[id] = Datum(name, id, id2, a, d,0.999,0.5)
+		id2 += 1
 
 		ssms = row['ssms']
 		if ssms is None: continue

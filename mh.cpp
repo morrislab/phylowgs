@@ -38,7 +38,9 @@ int main(int argc, char* argv[]){
 	char* FNAME_C_PARAMS = argv[11];
 	char* FNAME_C_MH_AR = argv[12];
 
-	conf.NTPS = atoi(argv[13]); // no. of samples 
+	conf.NTPS = atoi(argv[13]); // no. of samples
+
+	char* FNAME_C_LLH_CACHE = argv[14];
 	
 	struct datum *data = new datum[conf.N_SSM_DATA+conf.N_CNV_DATA];
 	load_ssm_data(FNAME_SSM_DATA, data,conf);
@@ -56,7 +58,10 @@ int main(int argc, char* argv[]){
 	
 	// write updated params to disk
 	write_params(FNAME_C_PARAMS,nodes,conf);		
-	
+
+	// write llh cache to disk
+	write_llh_cache(FNAME_C_LLH_CACHE, data, nodes, conf);
+
 	return 0;	
 }
 
@@ -459,5 +464,34 @@ void load_data_states(char fname[], struct datum* data, struct node* nodes, stru
 			ctr+=1;
 		}		
 	}	
+	dfile.close();
+}
+
+
+void write_llh_cache2(char fname[], struct datum *data, struct node *nodes, struct config conf){
+	ofstream dfile;
+	dfile.open(fname);
+	for(int i=0;i<conf.NNODES;i++){
+	    for(int j=0;j<conf.N_SSM_DATA+conf.N_CNV_DATA;j++){
+            dfile<<data[j].id<<'\t'<<nodes[i].id<<'\t';
+            for(int tp=0;tp<conf.NTPS;tp++)
+                dfile<<data[j].log_ll(nodes[i].param[tp],1,tp)<<',';
+            dfile<<'\n';
+	    }
+	}
+	dfile.close();
+}
+
+void write_llh_cache(char fname[], struct datum *data, struct node *nodes, struct config conf){
+	ofstream dfile;
+	dfile.open(fname);
+	for(int i=0;i<conf.NNODES;i++){
+	    for(int j=0;j<(nodes[i].dids).size();j++){
+            dfile<<data[nodes[i].dids.at(j)].id<<'\t'<<nodes[i].id<<'\t';
+            for(int tp=0;tp<conf.NTPS;tp++)
+                dfile<<data[nodes[i].dids.at(j)].log_ll(nodes[i].param[tp],1,tp)<<',';
+            dfile<<'\n';
+	    }
+	}
 	dfile.close();
 }

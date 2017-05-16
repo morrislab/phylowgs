@@ -31,6 +31,7 @@ class TSSB(object):
                      'sticks': empty((0, 1)),
                      'children': []}
         root_node.tssb = self
+        self.llh_cache = dict()
 
         if False:
             data_u = rand(self.num_data)

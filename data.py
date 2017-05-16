@@ -4,9 +4,9 @@ from scipy.special import gammaln
 import util2 as u
 
 class Datum(object):
-	def __init__(self, name, id, a, d, mu_r=0, mu_v=0):
+	def __init__(self, name, id, id2, a, d, mu_r=0, mu_v=0):
 		self.name = name # SSM name, blank for CNV
-		self.id = id
+		self.id = id; self.id2=id2
 		self.a = a
 		self.d = d
 		self.mu_r = mu_r # 1-p_error
@@ -45,7 +45,19 @@ class Datum(object):
 		ntps = len(self.a)
 		return sum([self.__log_complete_likelihood__(phi, mu_r, mu_v,tp) for tp in arange(ntps)])
 	def __log_complete_likelihood__(self, phi, mu_r, mu_v, tp, new_state=0):	
-		
+
+
+		# check if llh is in cache
+
+		key = ''
+		try:
+			key = str(self.id2)+'_'+str(self.node.id)
+		except:
+			pass
+		if key in self.tssb.llh_cache:
+			#print key, self.tssb.llh_cache[key][tp]
+			return self.tssb.llh_cache[key][tp]
+
 		if self.cnv:
 			ll = []
 			poss_n_genomes = self.compute_n_genomes(tp,new_state)
