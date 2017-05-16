@@ -26,9 +26,6 @@ TreeViewer.prototype.render = function(dataset) {
     var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
     var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
 
-    var btf = new BestTreeFinder(summary.trees);
-    var dists = btf.calc_dists(true);
-
     tree_indices.forEach(function(tidx) {
       var total_ssms = 0;
       Object.keys(summary.trees[tidx].populations).forEach(function(pidx) {
@@ -41,9 +38,8 @@ TreeViewer.prototype.render = function(dataset) {
 
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
-        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>'
-        + '<td class="tree-dist">' + dists[tidx].toFixed(2) + '</td>';
-      ['linearity_index', 'branching_index', 'coclustering_index'].forEach(function(idxname) {
+        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
+      ['linearity_index', 'branching_index', 'clustering_index'].forEach(function(idxname) {
         var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname].toFixed(2) : '&mdash;';
         row += '<td>' + val + '</td>';
       });

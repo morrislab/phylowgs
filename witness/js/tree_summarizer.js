@@ -166,13 +166,13 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
 TreeSummarizer.prototype._extract_indices = function(tree_summ) {
   this.linearity_indices = {};
   this.branching_indices = {};
-  this.coclustering_indices = {};
+  this.clustering_indices = {};
 
   var self = this;
   Object.keys(tree_summ).forEach(function(tidx) {
     self.linearity_indices[tidx] = tree_summ[tidx].linearity_index;
     self.branching_indices[tidx] = tree_summ[tidx].branching_index;
-    self.coclustering_indices[tidx] = tree_summ[tidx].coclustering_index;
+    self.clustering_indices[tidx] = tree_summ[tidx].clustering_index;
   });
   this.num_trees = Object.keys(this.linearity_indices).length;
 }
