@@ -949,7 +949,7 @@ class VariantAndCnvGroup(object):
     # caller didn't know what to do with the region).
     self._filter_variants_outside_regions(self._multisamp_cnv.load_cnvs(), 'all_variants', 'within_cn_regions')
 
-  def format_variants(self, sample_size, error_rate, priority_ssms, only_priority, sex):
+  def format_variants(self, sample_size, error_rate, priority_1_ssms, priority_2_ssms, only_priority, sex):
     if sample_size is None:
       sample_size = len(self._variant_idxs)
     random.shuffle(self._variant_idxs)
@@ -958,15 +958,32 @@ class VariantAndCnvGroup(object):
     variant_idx_map = {self._variants[idx]: idx for idx in self._variant_idxs}
     used_variant_idxs = set() # Use a set for O(1) testing of membership.
 
-    for prissm in priority_ssms:
+    used_priority_1_ssms = set()
+    used_priority_2_ssms = set()
+
+    for prissm in priority_1_ssms:
       if prissm not in variant_idx_map:
         continue
-      if len(subsampled) >= sample_size:
-        break
-      log('%s_%s in priority' % (prissm.CHROM, prissm.POS))
+      #if len(subsampled) >= sample_size:
+        #break
+      log('%s_%s in priority_1' % (prissm.CHROM, prissm.POS))
       varidx = variant_idx_map[prissm]
       used_variant_idxs.add(varidx)
       subsampled.append(varidx)
+      used_priority_1_ssms.add(prissm)
+
+    for prissm in priority_2_ssms:
+      if prissm not in variant_idx_map:
+        continue
+      if prissm in used_priority_1_ssms:
+        continue
+      if len(used_priority_2_ssms) >= sample_size:
+        break
+      log('%s_%s in priority_2' % (prissm.CHROM, prissm.POS))
+      varidx = variant_idx_map[prissm]
+      used_variant_idxs.add(varidx)
+      subsampled.append(varidx)
+      used_priority_2_ssms.add(prissm)
 
     for variant_idx in self._variant_idxs:
       if variant_idx in used_variant_idxs:
@@ -1255,7 +1272,9 @@ def main():
     help='Confidence in range [0, 1] that SSMs missing from a sample are indeed not present in that sample')
   parser.add_argument('-s', '--sample-size', dest='sample_size', type=int,
     help='Subsample SSMs to reduce PhyloWGS runtime')
-  parser.add_argument('-P', '--priority-ssms', dest='priority_ssm_filename',
+  parser.add_argument('-P', '--priority-1-ssms', dest='priority_1_ssm_filename',
+    help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
+  parser.add_argument('--priority-2-ssms', dest='priority_2_ssm_filename',
     help='File containing newline-separated list of SSMs in "<chr>_<locus>" format to prioritize for inclusion')
   parser.add_argument('--only-priority', dest='only_priority', action='store_true',
     help='Only sample variants provided on priority list')
@@ -1325,9 +1344,10 @@ def main():
   else:
     raise Exception('Unknown --regions value: %s' % args.regions)
 
-  priority_ssms = parse_priority_ssms(args.priority_ssm_filename)
+  priority_1_ssms = parse_priority_ssms(args.priority_1_ssm_filename)
+  priority_2_ssms = parse_priority_ssms(args.priority_2_ssm_filename)
 
-  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_ssms, args.only_priority, sex)
+  subsampled_vars, nonsubsampled_vars = grouper.format_variants(args.sample_size, args.error_rate, priority_1_ssms, priority_2_ssms, args.only_priority, sex)
   if len(subsampled_vars) == 0:
     print('No variants to write', file=sys.stderr)
     sys.exit(0)
