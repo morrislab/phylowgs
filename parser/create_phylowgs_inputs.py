@@ -139,10 +139,9 @@ class PcawgConsensusParser(VariantParser):
   def _calc_read_counts(self, variant):
     if not ('t_alt_count' in variant.INFO and 't_ref_count' in variant.INFO):
       raise ReadCountsUnavailableError()
-    assert len(variant.INFO['t_alt_count']) == len(variant.INFO['t_ref_count']) == 1
 
-    alt_reads = int(variant.INFO['t_alt_count'][0])
-    ref_reads = int(variant.INFO['t_ref_count'][0])
+    alt_reads = int(variant.INFO['t_alt_count'])
+    ref_reads = int(variant.INFO['t_ref_count'])
     total_reads = alt_reads + ref_reads
     # Some variants havezero alt and ref reads.
     if total_reads == 0:
