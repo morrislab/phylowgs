@@ -1,7 +1,7 @@
 function TreePlotter() {
 }
 
-TreePlotter.prototype._render_summary_table = function(structure, populations, num_samples, sample_names) {
+TreePlotter.prototype._render_summary_table = function(structure, populations, num_samples, sample_names, root_id) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var summary_table = $('#snippets .tree-summary').clone().appendTo('#container');
   summary_table.find('.cellprev').attr('colspan', num_samples);
@@ -26,7 +26,7 @@ TreePlotter.prototype._render_summary_table = function(structure, populations, n
   pop_ids.forEach(function(pop_id) {
     var pop = populations[pop_id];
     var cp = pop.cellular_prevalence.map(function(E) { return E.toFixed(3); });
-    var ccf = self._calc_ccf(structure, populations, pop_id);
+    var ccf = self._calc_ccf(structure, populations, pop_id, root_id);
     ccf = ccf.map(function(E) { return E.toFixed(3); });
 
     var entries = [pop_id].concat([pop.num_ssms, pop.num_cnvs]).concat(cp).concat(ccf).map(function(entry) {
@@ -36,7 +36,7 @@ TreePlotter.prototype._render_summary_table = function(structure, populations, n
   });
 }
 
-TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, num_samples, sample_names, hidden_samples) {
+TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, num_samples, sample_names, hidden_samples, root_id) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_cancer_pops = pop_ids.length - 1;
 
@@ -52,7 +52,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, 
 
   var self = this;
   var ccf = pop_ids.map(function(pop_id) {
-    return self._calc_ccf(structure, populations, pop_id);
+    return self._calc_ccf(structure, populations, pop_id, root_id);
   });
   // Remove CCFs for non-cancerous first element, which will always be 1.
   ccf.shift();
@@ -100,10 +100,8 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, 
   chart.draw(data, options);
 }
 
-TreePlotter.prototype.draw = function(populations, structure, params) {
-  if(params !== undefined) {
-
-  }
+TreePlotter.prototype.draw = function(populations, structure, root_id, params) {
+  if(params !== undefined) { }
 
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
@@ -121,13 +119,23 @@ TreePlotter.prototype.draw = function(populations, structure, params) {
     var hidden_samples = params.hidden_samples;
   }
 
-  var root = this._generate_tree_struct(structure, populations);
+  // This may not exist in the JSON, as it was an extension to the format on
+  // June 27, 2017.
+  if(typeof root_id === 'undefined') {
+    // Find smallest node ID.
+    var node_ids = Object.keys(populations).map(function(k) {
+        return parseInt(k, 10);
+    });
+    root_id = Math.min.apply(Math, node_ids);
+  }
+
+  var root = this._generate_tree_struct(structure, populations, root_id);
   this._draw_tree(root);
-  this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples);
-  this._render_summary_table(structure, populations, num_samples, sample_names);
+  this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples, root_id);
+  this._render_summary_table(structure, populations, num_samples, sample_names, root_id);
 }
 
-TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id) {
+TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id, root_id) {
   var pop_ids = Util.sort_ints(Object.keys(populations));
   var num_samples = populations[pop_ids[0]].cellular_prevalence.length;
 
@@ -135,8 +143,7 @@ TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id) {
   if(parseInt(pop_id, 10) === 0)
     return (new Array(num_samples)).fill(0);
 
-  var root_pidx = 0;
-  var clonal_pidxs = structure[root_pidx];
+  var clonal_pidxs = structure[root_id];
   var purities = [];
 
   // Don't assume that populations[1] will have the maximum cellular
@@ -234,7 +241,7 @@ TreePlotter.prototype._find_max_ssms = function(populations) {
   return max_ssms;
 }
 
-TreePlotter.prototype._generate_tree_struct = function(adjlist, pops) {
+TreePlotter.prototype._generate_tree_struct = function(adjlist, pops, root_id) {
   var max_ssms = this._find_max_ssms(pops);
 
   var _add_node = function(node_id, struct) {
@@ -255,12 +262,6 @@ TreePlotter.prototype._generate_tree_struct = function(adjlist, pops) {
   };
 
   var root = {};
-  var node_ids = Object.keys(pops).map(function(k) {
-      return parseInt(k, 10);
-  });
-  // Find smallest node ID.
-  var initial_node = Math.min.apply(Math, node_ids);
-
-  _add_node(initial_node, root);
+  _add_node(root_id, root);
   return root;
 }

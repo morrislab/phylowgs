@@ -74,7 +74,7 @@ TreeViewer.prototype.render = function(dataset) {
       StateManager.update('tidx', tidx);
       var tree_plotter = new TreePlotter();
 
-      tree_plotter.draw(summary.trees[tidx].populations, summary.trees[tidx].structure, summary.params);
+      tree_plotter.draw(summary.trees[tidx].populations, summary.trees[tidx].structure, summary.trees[tidx].root, summary.params);
       tplotter._plot_pop_vafs(dataset, tidx);
     });
     $('#tree-list').scrollTop(0);
