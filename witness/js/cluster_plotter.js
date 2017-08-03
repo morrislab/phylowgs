@@ -1,3 +1,5 @@
+// NB: this must be updated for D3 v4. It's still using the D3 v3 API.
+
 function ClusterPlotter() {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,

@@ -130,7 +130,7 @@ TreePlotter.prototype.draw = function(populations, structure, root_id, params) {
   }
 
   var root = this._generate_tree_struct(structure, populations, root_id);
-  this._draw_tree(root);
+  this._draw_tree(root, '#container');
   this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples, root_id);
   this._render_summary_table(structure, populations, num_samples, sample_names, root_id);
 }
@@ -165,7 +165,7 @@ TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id, root_
   return ccf;
 }
 
-TreePlotter.prototype._draw_tree = function(root) {
+TreePlotter.prototype._draw_tree = function(root, container) {
   // horiz_padding should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -175,60 +175,48 @@ TreePlotter.prototype._draw_tree = function(root) {
       h = 600 - m[0] - m[2],
       i = 0;
 
-  var tree = d3.layout.tree()
-      .size([h, w])
-      .sort(function(a, b) {
-        return d3.ascending(parseInt(a.name, 10), parseInt(b.name, 10));
-      });
-
-  var diagonal = d3.svg.diagonal()
-      .projection(function(d) { return [d.y, d.x]; });
-
-  var vis = d3.select('#container').html('').append('svg:svg')
+  // Compute the new tree layout.
+  var tree = d3.tree().size([h, w]);
+  root = tree(d3.hierarchy(root));
+  root.descendants().sort(function(a, b) {
+    return d3.ascending(parseInt(a.data.name, 10), parseInt(b.data.name, 10));
+  });
+  var svg = d3.select(container).html('').append('svg:svg')
       .attr('width', w + m[1] + m[3])
-      .attr('height', h + m[0] + m[2])
-      .append('svg:g')
+      .attr('height', h + m[0] + m[2]);
+  var vis = svg.append('svg:g')
       .attr('transform', 'translate(' + m[3] + ',' + m[0] + ')');
 
-  // Compute the new tree layout.
-  var nodes = tree.nodes(root);
-
-  // Update the nodes…
+  // Update the nodes.
   var node = vis.selectAll('g.node')
-      .data(nodes, function(d) { return d.name; });
+      .data(root.descendants(), function(d) { return d.data.name; });
 
   // Enter any new nodes at the parent's previous position.
-  var nodeEnter = node.enter().append('svg:g')
-      .attr('class', 'node');
-
+  var nodeEnter = node.enter().append('svg:g');
+  nodeEnter.attr('class', 'node')
+    .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
   nodeEnter.append('svg:circle')
-      .attr('r', function(d) { return d.radius; });
-
+      .attr('r', function(d) { return d.data.radius; });
   nodeEnter.append('svg:text')
       .attr('font-size', '30')
       .attr('dominant-baseline', 'central')
       .attr('text-anchor', 'middle')
-      .text(function(d) { return d.name; });
+      .text(function(d) { return d.data.name; });
 
-  // Transition nodes to their new position.
-  var nodeUpdate = node.attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
-  var nodeExit = node.exit().remove();
-
-  // Update the links…
+  // Update the links.
   var link = vis.selectAll('path.link')
-      .data(tree.links(nodes), function(d) { return d.target.name; })
-      .attr('stroke-width', '1.5px');
+      .data(root.links(), function(d) { return d.target.data.name; })
+      .attr('stroke-width', '1.5px')
 
   // Enter any new links at the parent's previous position.
   link.enter().insert('svg:path', 'g')
-      .attr('class', 'link')
-      .attr('stroke', '#aaa');
-
-  // Transition links to their new position.
-  link.attr('d', diagonal);
-
-  // Transition exiting nodes to the parent's new position.
-  link.exit().remove();
+    .attr('class', 'link')
+    .attr('stroke', '#aaa')
+    .attr('d', d3.linkHorizontal().x(function(d) {
+      return d.y;
+    }).y(function(d) {
+      return d.x;
+    }));
 }
 
 TreePlotter.prototype._find_max_ssms = function(populations) {
