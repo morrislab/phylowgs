@@ -3,6 +3,9 @@ import argparse
 from pwgsresults.result_generator import ResultGenerator
 from pwgsresults.result_munger import ResultMunger
 from pwgsresults.json_writer import JsonWriter
+from pwgsresults.gmm_analysis import GMMAnalyzer
+	
+	
 
 def main():
   parser = argparse.ArgumentParser(
@@ -26,6 +29,7 @@ def main():
   args = parser.parse_args()
 
   summaries, mutlist, mutass, params = ResultGenerator().generate(args.tree_file, args.include_ssm_names)
+  gmmClusters = GMMAnalyzer().analyze(summaries) 
 
   munger = ResultMunger(summaries, mutlist, mutass)
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
@@ -33,7 +37,7 @@ def main():
   munger.remove_polyclonal_trees()
 
   writer = JsonWriter(args.dataset_name)
-  writer.write_summaries(summaries, params, args.tree_summary_output)
+  writer.write_summaries(summaries, params, args.tree_summary_output, gmmClusters)
   writer.write_mutlist(mutlist, args.mutlist_output)
   writer.write_mutass(mutass, args.mutass_output)
 

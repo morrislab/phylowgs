@@ -38,18 +38,20 @@ class JsonWriter(object):
       mutlist['dataset_name'] = self._dataset_name
       json.dump(mutlist, mutf)
 
-  def write_summaries(self, summaries, params, summaries_outfn):
-    for summary in summaries.values():
-      calculator = IndexCalculator(summary)
-      summary['linearity_index'] = calculator.calc_linearity_index()
-      summary['branching_index'] = calculator.calc_branching_index()
-      summary['clustering_index'] = calculator.calc_clustering_index()
+  def write_summaries(self, summaries, params, summaries_outfn, gmmClusters):
+    #should now be calced in gmm_analysis
+    # for summary in summaries.values():
+      # calculator = IndexCalculator(summary)
+      # summary['linearity_index'] = calculator.calc_linearity_index()
+      # summary['branching_index'] = calculator.calc_branching_index()
+      # summary['clustering_index'] = calculator.calc_clustering_index()
 
     to_dump = {
       'dataset_name': self._dataset_name,
       'params': params,
       'trees': summaries,
       'tree_densities': calc_tree_densities(summaries),
+	  'clusters': gmmClusters
     }
     with gzip.GzipFile(summaries_outfn, 'w') as summf:
       json.dump(to_dump, summf)
