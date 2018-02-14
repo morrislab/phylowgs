@@ -51,7 +51,7 @@ class JsonWriter(object):
       'params': params,
       'trees': summaries,
       'tree_densities': calc_tree_densities(summaries),
-	  'clusters': gmmClusters
+      'clusters': gmmClusters
     }
     with gzip.GzipFile(summaries_outfn, 'w') as summf:
       json.dump(to_dump, summf)

@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.mixture import GaussianMixture
 from pwgsresults.index_calculator import IndexCalculator
-
+from scipy import linalg
 
 class GMMAnalyzer:
   
@@ -14,7 +14,8 @@ class GMMAnalyzer:
     """
     indicies = self._calc_indicies(summaries)
     weights, means, covs, assignments, responsibilities = self._run_gmm(indicies);
-    clustInfo = self._generateOutput(weights, means, covs, assignments, responsibilities, summaries);
+    ellipseInfo = self._generateEllipseInfo(means,covs)
+    clustInfo = self._generateOutput(weights, means, covs, assignments, responsibilities, summaries, ellipseInfo);
     return clustInfo
   
   
@@ -69,8 +70,31 @@ class GMMAnalyzer:
       prev_bic = bic
     return bic_clusters
 
-    
-  def _generateOutput(self, weights, means, covs, assignments, responsibilities, summaries):
+  def _generateEllipseInfo(self,means,covs):
+    """
+    Take the output from GMM analysis and generate a dictionary whose elements describe an ellipse 
+    and can be used by witness to plot the clusters
+    :params means, covs: The means and covariance matrix output from gmm analysis
+    :return: dictionary containing ellipse mean, major_axis, minor_axis, and rotation
+    """
+    ellDict = [];
+    for i in range(len(means)):
+        # Note: v is the eigenvalues of the covs matrix. These two values represent the highest variance and the variance of the vector orthogonal to the vector with the highest variance (which is also the lowest variance)
+        # Note: w is the eigenvectors of the covs matrix. W[0,:] is the vector representing the direction of highest variance, and W[1,:], the lowest variance.
+        v, w = linalg.eigh(covs[i])
+        # Take 2sqrt(2v) to convert v to represent 2 standard deviations from the mean
+        v = np.multiply(2.,  np.sqrt(2.) * np.sqrt(v))
+        angle = np.arctan(w[0,1] / w[0,0])
+        ellDict.append({
+            "mean": means[i].tolist(),
+            "angle": angle,
+            "major_axis":  v[0],
+            "minor_axis": v[1]
+        })
+    return ellDict
+
+
+  def _generateOutput(self, weights, means, covs, assignments, responsibilities, summaries, ellipseInfo):
     """
     Take the results of GMM analysis and create a dictionary that can be inserted into the .summ file
     :params weights, means, covs, assignments, responsibilities: results from gmm_run
@@ -84,7 +108,8 @@ class GMMAnalyzer:
         "members": [j for j,k in zip(summaries.keys(), assignments) if k==i], 
         "responsibilities": responsibilities[:,i].tolist(),
         "mean": means[i].tolist(),
-        "covariance": covs[i].tolist() 
+        "covariance": covs[i].tolist(),
+        "ellipse": ellipseInfo[i]
         };
     return clusters
     

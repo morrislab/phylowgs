@@ -215,15 +215,19 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     var T = tree_summary.trees[tidx];
 
     labels.push('Tree ' + tidx);
-    xpoints.push(T.clustering_index);
+    //xpoints.push(T.clustering_index);
+    xpoints.push(T.linearity_index);
     // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
-    ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+    //ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+    ypoints.push(T.branching_index);
     marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
     colours.push(tree_summary.tree_densities[tidx]);
   });
-
-  var traces = [{
+  
+  var traces = this._create_cluster_contour_traces(tree_summary)
+  
+  traces.push({
     x: xpoints,
     y: ypoints,
     name: 'points',
@@ -235,21 +239,57 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
       size: marker_sizes,
       line: { width: 0 },
       colorscale: 'Viridis',
-      color: colours,
-    },
-  }];
+      color: 'yellow',
+    }
+  });
   var layout = {
     title: 'Clustering degree vs. branching degree (best tree: ' + best_tree_idx + ')',
     height: 1000,
-    xaxis: { title: 'CI'},
-    yaxis: { title: 'BI / (BI + LI)'},
+    //xaxis: { title: 'CI'},
+    //yaxis: { title: 'BI / (BI + LI)'},
+    xaxis: { title: 'LI'},
+    yaxis: { title: 'BI'},
     hovermode: 'closest',
     plot_bgcolor: '#440154',
+    showlegend: false
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
   container.appendChild(plot_container);
   Plotly.newPlot(plot_container, traces, layout);
+}
+
+TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary) {
+  if(!tree_summary.hasOwnProperty('clusters')) {
+    return;
+  }
+  
+  var traces = [];
+  
+  Object.keys(tree_summary.clusters).forEach(function(cidx) {
+    cidx = parseInt(cidx, 10);
+    var C = tree_summary.clusters[cidx];
+    var mean = C.ellipse.mean //Center of the ellipse
+    var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
+    var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian
+    var min_axis = C.ellipse.minor_axis //the distance between the center of the ellipse and the closest point, ie, the lowest variance of the gaussian
+    var xpoints = [];
+    var ypoints = [];
+    for(var theta = 0.; theta <= 2.*Math.PI + 0.05; theta+=2.*Math.PI/200.){
+      //equations for x and y values of the ellipse described by them mean, angle, major axis and minor axis, as described as a function of theta.
+      xpoints.push(mean[0] + maj_axis*Math.cos(angle)*Math.cos(theta) - min_axis*Math.sin(angle)*Math.sin(theta))
+      ypoints.push(mean[1] + maj_axis*Math.sin(angle)*Math.cos(theta) + min_axis*Math.cos(angle)*Math.sin(theta))
+    }
+    //Descriptor of traces for now. May update depending on visualization requirements.
+    traces.push({
+      x: xpoints,
+      y: ypoints,
+      type: 'scatter',
+      mode: 'lines',
+      hoverinfo: 'none'
+    })
+  });
+  return traces
 }
 
 TreeSummarizer.prototype.render = function(dataset) {
