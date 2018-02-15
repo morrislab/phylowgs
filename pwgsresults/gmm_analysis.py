@@ -17,7 +17,6 @@ class GMMAnalyzer:
 
     return clustInfo
   
-  
   def _calc_gmm_input(self,summs):
     """
     Makes use of IndexCalculator class to calculate the linear, branching and clustering indicies for use in gmm clustering.
@@ -39,7 +38,6 @@ class GMMAnalyzer:
     out["LI_BI"] = np.array(out["LI_BI"])
     out["CI_nBI"] = np.array(out["CI_nBI"])
     return out
-  
   
   def _run_gmm(self,data):
     """
@@ -86,7 +84,7 @@ class GMMAnalyzer:
         min_bic = bic
       prev_bic = bic
     return bic_clusters
-
+  
   def _generateEllipseInfo(self,means,covs):
     """
     Take the output from GMM analysis and generate a dictionary whose elements describe an ellipse 
@@ -110,7 +108,6 @@ class GMMAnalyzer:
         })
     return ellDict
 
-
   def _generateOutput(self, gmm_run_info, summaries):
     """
     Take the results of GMM analysis and create a dictionary that can be inserted into the .summ file
@@ -132,15 +129,3 @@ class GMMAnalyzer:
           "ellipse": thisrun["ellipses"][i]
           };
     return out
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-
