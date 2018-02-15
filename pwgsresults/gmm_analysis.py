@@ -4,7 +4,6 @@ from pwgsresults.index_calculator import IndexCalculator
 from scipy import linalg
 
 class GMMAnalyzer:
-  
   def analyze(self,summaries):
     """
     Takes the tree summaries from ResultGenerator().generate, calculates the linear, branching and clustering indicies
@@ -15,6 +14,7 @@ class GMMAnalyzer:
     data = self._calc_gmm_input(summaries)
     gmm_run_info = self._run_gmm(data);
     clustInfo = self._generateOutput(gmm_run_info, summaries);
+
     return clustInfo
   
   
