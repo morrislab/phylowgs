@@ -12,26 +12,33 @@ class GMMAnalyzer:
     :param summaries: the tree summaries
     :return: formated dictionary containing all relevant information for the clusters, ready to be inserted to the .summ json
     """
-    indicies = self._calc_indicies(summaries)
-    weights, means, covs, assignments, responsibilities = self._run_gmm(indicies);
-    ellipseInfo = self._generateEllipseInfo(means,covs)
-    clustInfo = self._generateOutput(weights, means, covs, assignments, responsibilities, summaries, ellipseInfo);
+    data = self._calc_gmm_input(summaries)
+    gmm_run_info = self._run_gmm(data);
+    clustInfo = self._generateOutput(gmm_run_info, summaries);
     return clustInfo
   
   
-  def _calc_indicies(self,summs):
+  def _calc_gmm_input(self,summs):
     """
     Makes use of IndexCalculator class to calculate the linear, branching and clustering indicies for use in gmm clustering.
     :param summs: the summaries of the trees as output by ResultGenerator().generate()
+    :return: two sets of inputs for gmm_run, one where we are clustering using just LI, BI, and another using BI/(LI+BI), CI
     """
-    out = [];
+    out = {
+      "LI_BI": [],  #[LI,BI]
+      "CI_nBI": [] #[BI/(LI+BI),CI],
+    }
     for summary in summs.values():
       calculator = IndexCalculator(summary)
-      summary['linearity_index'] = calculator.calc_linearity_index()
-      summary['branching_index'] = calculator.calc_branching_index()
-      summary['clustering_index'] = calculator.calc_clustering_index() 
-      out.append([summary[x] for x in ['linearity_index','branching_index']])
-    return np.array(out)
+      LI = summary['linearity_index'] = calculator.calc_linearity_index()
+      BI = summary['branching_index'] = calculator.calc_branching_index()
+      CI = summary['clustering_index'] = calculator.calc_clustering_index()
+      out["LI_BI"].append([LI, BI])
+      out["CI_nBI"].append([CI, BI/(LI+BI)])
+    
+    out["LI_BI"] = np.array(out["LI_BI"])
+    out["CI_nBI"] = np.array(out["CI_nBI"])
+    return out
   
   
   def _run_gmm(self,data):
@@ -40,10 +47,20 @@ class GMMAnalyzer:
     :param data: LI/BI coordinates for all sampled trees
     :return: Weight, mean, covariance for each cluster, and assignments for each sampled tree
     """
-    num_components = self._get_components_min_bic(data)
-    gmm = GaussianMixture(n_components=num_components, n_init=2, covariance_type="full").fit(data)
-    return gmm.weights_, gmm.means_, gmm.covariances_, gmm.predict(data), gmm.predict_proba(data)
-  
+    out = {};
+    for key in data:
+      thisdata = data[key]
+      num_components = self._get_components_min_bic(thisdata)
+      gmm = GaussianMixture(n_components=num_components, n_init=2, covariance_type="full").fit(thisdata)
+      out[key] = {
+        "weights": gmm.weights_,
+        "means": gmm.means_,
+        "covariances": gmm.covariances_,
+        "members": gmm.predict(thisdata),
+        "responsibilities": gmm.predict_proba(thisdata),
+        "ellipses": self._generateEllipseInfo(gmm.means_,gmm.covariances_)
+        };
+    return out
   
   def _get_components_min_bic(self,data, end_early=False, delta=2):
     """
@@ -94,24 +111,27 @@ class GMMAnalyzer:
     return ellDict
 
 
-  def _generateOutput(self, weights, means, covs, assignments, responsibilities, summaries, ellipseInfo):
+  def _generateOutput(self, gmm_run_info, summaries):
     """
     Take the results of GMM analysis and create a dictionary that can be inserted into the .summ file
     :params weights, means, covs, assignments, responsibilities: results from gmm_run
     :return: organized dictionary ready for output to .summ json
     """
-    nclust = len(weights);
-    clusters = {}
-    for i in range(nclust):
-      clusters[str(i)] =  {
-        "weight": weights[i],
-        "members": [j for j,k in zip(summaries.keys(), assignments) if k==i], 
-        "responsibilities": responsibilities[:,i].tolist(),
-        "mean": means[i].tolist(),
-        "covariance": covs[i].tolist(),
-        "ellipse": ellipseInfo[i]
-        };
-    return clusters
+    out = {}
+    for key in gmm_run_info:
+      thisrun = gmm_run_info[key];
+      out[key] = {};
+      nclust = len(thisrun["weights"]);
+      for i in range(nclust):
+        out[key][str(i)] =  {
+          "weight": thisrun["weights"][i],
+          "members": [j for j,k in zip(summaries.keys(), thisrun["members"]) if k==i], 
+          "responsibilities": thisrun["responsibilities"][:,i].tolist(),
+          "mean": thisrun["means"][i].tolist(),
+          "covariance": thisrun["covariances"][i].tolist(),
+          "ellipse": thisrun["ellipses"][i]
+          };
+    return out
     
     
     

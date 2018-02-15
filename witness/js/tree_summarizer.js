@@ -215,10 +215,10 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     var T = tree_summary.trees[tidx];
 
     labels.push('Tree ' + tidx);
-    //xpoints.push(T.clustering_index);
+    // xpoints.push(T.clustering_index);
     xpoints.push(T.linearity_index);
     // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
-    //ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+    // ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
     ypoints.push(T.branching_index);
     marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
     marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
@@ -245,8 +245,8 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   var layout = {
     title: 'Clustering degree vs. branching degree (best tree: ' + best_tree_idx + ')',
     height: 1000,
-    //xaxis: { title: 'CI'},
-    //yaxis: { title: 'BI / (BI + LI)'},
+    // xaxis: { title: 'CI'},
+    // yaxis: { title: 'BI / (BI + LI)'},
     xaxis: { title: 'LI'},
     yaxis: { title: 'BI'},
     hovermode: 'closest',
@@ -263,12 +263,17 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary)
   if(!tree_summary.hasOwnProperty('clusters')) {
     return;
   }
+  if(tree_summary.clusters.hasOwnProperty('LI_BI')) {
+    console.log("test")
+  }
   
   var traces = [];
   
-  Object.keys(tree_summary.clusters).forEach(function(cidx) {
+  Object.keys(tree_summary.clusters.LI_BI).forEach(function(cidx) {
+  // Object.keys(tree_summary.clusters.CI_nBI).forEach(function(cidx) {
     cidx = parseInt(cidx, 10);
-    var C = tree_summary.clusters[cidx];
+    var C = tree_summary.clusters.LI_BI[cidx];
+    // var C = tree_summary.clusters.CI_nBI[cidx];
     var mean = C.ellipse.mean //Center of the ellipse
     var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
     var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian
@@ -276,7 +281,7 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary)
     var xpoints = [];
     var ypoints = [];
     for(var theta = 0.; theta <= 2.*Math.PI + 0.05; theta+=2.*Math.PI/200.){
-      //equations for x and y values of the ellipse described by them mean, angle, major axis and minor axis, as described as a function of theta.
+      //equations for x and y values of the ellipse described by the mean, angle, major axis and minor axis, as described as a function of theta.
       xpoints.push(mean[0] + maj_axis*Math.cos(angle)*Math.cos(theta) - min_axis*Math.sin(angle)*Math.sin(theta))
       ypoints.push(mean[1] + maj_axis*Math.sin(angle)*Math.cos(theta) + min_axis*Math.cos(angle)*Math.sin(theta))
     }
