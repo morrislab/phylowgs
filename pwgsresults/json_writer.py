@@ -24,8 +24,10 @@ def calc_tree_densities(summaries):
   try:
     density = list(scipy.stats.gaussian_kde(XY)(XY))
   except (np.linalg.linalg.LinAlgError, FloatingPointError):
-    # Occurs when matrix is singular because, e.g., it's all zeros.
-    density = np.zeros(len(X))
+    # Occurs when sample covariance matrix is singular because, e.g., data lies
+    # on manifold. We see this happen when all trees are linear, implying BI=0.
+    # To overcome this error, calculate density in 1D without using the BI.
+    density = list(scipy.stats.gaussian_kde(X)(X))
 
   return dict(zip(tidxs, density))
 
