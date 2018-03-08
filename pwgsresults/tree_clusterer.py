@@ -175,7 +175,6 @@ class TreeClusterer:
   
   def _generateLinearEllipseInfo(self, xVals, yVals, ellipse_minor_axis):
     
-    print xVals
     ellipse_mean = [np.mean(xVals),0]
     ellipse_major_axis = max( [abs(max(xVals)-ellipse_mean[0]), abs(min(xVals)-ellipse_mean[0])] );
     
