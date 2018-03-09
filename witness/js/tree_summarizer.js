@@ -196,40 +196,11 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
   return parseInt(best_tidx, 10);
 }
 
-TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
-  if(!tree_summary.hasOwnProperty('tree_densities')) {
-    return;
-  }
-
-  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
-  var xpoints = [];
-  var ypoints = [];
-  var marker_symbols = [];
-  var marker_sizes = [];
-  var labels = [];
-  var colours = [];
-  var epsilon = 0.000001;
-
-  Object.keys(tree_summary.trees).forEach(function(tidx) {
-    tidx = parseInt(tidx, 10);
-    var T = tree_summary.trees[tidx];
-
-    labels.push('Tree ' + tidx);
-    // xpoints.push(T.clustering_index);
-    xpoints.push(T.linearity_index);
-    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
-    // ypoints.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
-    ypoints.push(T.branching_index);
-    marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
-    marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
-    colours.push(tree_summary.tree_densities[tidx]);
-  });
+TreeSummarizer.prototype._create_index_scatter_trace = function(xdata, ydata, labels, marker_symbols, marker_sizes, marker_colour) {
   
-  var traces = this._create_cluster_contour_traces(tree_summary)
-  
-  traces.push({
-    x: xpoints,
-    y: ypoints,
+  var trace = {
+    x: xdata,
+    y: ydata,
     name: 'points',
     mode: 'markers',
     type: 'scatter',
@@ -239,19 +210,107 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
       size: marker_sizes,
       line: { width: 0 },
       colorscale: 'Viridis',
-      color: 'yellow',
+      color: marker_colour,
     }
+  };
+
+  return trace;
+}
+
+TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
+  if(!tree_summary.hasOwnProperty('tree_densities')) {
+    return;
+  }
+
+  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
+  var BIs = [];
+  var LIs = [];
+  var CIs = [];
+  var nBIs = [];
+  var marker_symbols = [];
+  var marker_sizes = [];
+  var labels = [];
+  var marker_colour = 'yellow';
+  var epsilon = 0.000001;
+  // Get the branching, linear and clustering indexes and calculate the BI/(LI+BI) value for scatter plotting.
+  Object.keys(tree_summary.trees).forEach(function(tidx) {
+    tidx = parseInt(tidx, 10);
+    var T = tree_summary.trees[tidx];
+
+    labels.push('Tree ' + tidx);
+    BIs.push(T.branching_index);
+    LIs.push(T.linearity_index);
+    CIs.push(T.clustering_index);
+    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
+    nBIs.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+    marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
+    marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
   });
+  
+  // Determine the ellipse traces that define the cluster contours
+  var LI_BI_traces = this._create_cluster_contour_traces(tree_summary, "LI_BI")
+  var CI_nBI_traces = this._create_cluster_contour_traces(tree_summary, "CI_nBI")
+  // Create the traces for the data points
+  LI_BI_traces.push(this._create_index_scatter_trace(xdata=LIs, ydata=BIs, labels, marker_symbols, marker_sizes, marker_colour))
+  CI_nBI_traces.push(this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colour) )
+  var traces = LI_BI_traces.concat(CI_nBI_traces)
+  
+  //Create boolean arrays that will define the visibility parameters of the traces created above. 
+  var LIBI_on = new Array(LI_BI_traces.length);
+  var LIBI_off = new Array(LI_BI_traces.length);
+  var CInBI_on = new Array(CI_nBI_traces.length);
+  var CInBI_off = new Array(CI_nBI_traces.length);
+  for (var i = 0; i < LI_BI_traces.length; i++){
+    LIBI_on[i] = true
+    LIBI_off[i] = false
+    LI_BI_traces[i]["visible"] = false //default: not visible
+  }
+  for (var i = 0; i < CI_nBI_traces.length; i++){
+    CInBI_on[i] = true
+    CInBI_off[i] = false
+    CI_nBI_traces[i]["visible"] = true//default: visible
+  }
+  //Define buttons that will control what is shown in the window.
+  var update_menus = [
+  {
+    buttons: [
+       {
+        label: "[CI, BI/(LI+BI)]",
+        method: "update",
+        args: [{visible: LIBI_off.concat(CInBI_on)},
+                  {title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
+                  xaxis: {title: "CI"},
+                  yaxis: {title: "BI/(LI+BI)"}}]
+        },
+        {
+        label: "[LI, BI]",
+        method: "update",
+        args: [{visible: LIBI_on.concat(CInBI_off)},
+                  {title: "Linearity Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
+                  xaxis: {title: "LI"},
+                  yaxis: {title:"BI"}}]
+       }],
+    active: 0,
+    direction: 'down',
+    pad: {'r': 10, 't': 10},
+    showactive: true,
+    type: 'buttons',
+    x: 1.15,
+    xanchor: 'right',
+    y: 1,
+    yanchor: 'top' 
+  }]
+  
+  //Finally, use the traces, buttons and plotting options created above to actually plot our data.
   var layout = {
-    title: 'Clustering degree vs. branching degree (best tree: ' + best_tree_idx + ')',
+    title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
     height: 1000,
-    // xaxis: { title: 'CI'},
-    // yaxis: { title: 'BI / (BI + LI)'},
-    xaxis: { title: 'LI'},
-    yaxis: { title: 'BI'},
+    xaxis: { title: 'CI'},
+    yaxis: { title: 'BI/(LI+BI)'},
     hovermode: 'closest',
     plot_bgcolor: '#440154',
-    showlegend: false
+    showlegend: false,
+    updatemenus: update_menus
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
@@ -259,21 +318,16 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   Plotly.newPlot(plot_container, traces, layout);
 }
 
-TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary) {
+TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, clustering_type) {
   if(!tree_summary.hasOwnProperty('clusters')) {
     return;
-  }
-  if(tree_summary.clusters.hasOwnProperty('LI_BI')) {
-    console.log("test")
   }
   
   var traces = [];
   
-  Object.keys(tree_summary.clusters.LI_BI).forEach(function(cidx) {
-  // Object.keys(tree_summary.clusters.CI_nBI).forEach(function(cidx) {
-    cidx = parseInt(cidx, 10);
-    var C = tree_summary.clusters.LI_BI[cidx];
-    // var C = tree_summary.clusters.CI_nBI[cidx];
+  Object.keys(tree_summary.clusters[clustering_type]).forEach(function(cidx) {
+    //cidx = parseInt(cidx, 10);
+    var C = tree_summary.clusters[clustering_type][cidx];
     var mean = C.ellipse.mean //Center of the ellipse
     var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
     var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian
