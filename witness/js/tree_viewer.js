@@ -13,6 +13,22 @@ TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
   });
 }
 
+TreeViewer.prototype._find_cluster_from_treeidx = function(tree_index,cluster_information){
+  clust_count = 0;
+  in_cluster = 0;
+  Object.keys(cluster_information).forEach(function(cluster_idx){
+    clust_count = clust_count + 1;
+    var cluster = cluster_information[cluster_idx]
+    Object.keys(cluster.members).forEach(function (key) { 
+      if (cluster.members[key] == tree_index) {
+        in_cluster = clust_count;
+      };
+    });
+  });
+  //throw "ugh"
+  return in_cluster
+}
+
 TreeViewer.prototype.render = function(dataset) {
   $('#tree-list').show();
   var tree_container = $('#trees tbody');
@@ -35,10 +51,12 @@ TreeViewer.prototype.render = function(dataset) {
       var normllh_nats = -summary.trees[tidx].llh / total_ssms;
       normllh_nats /= num_samples;
       var normllh_bits = normllh_nats / Math.log(2);
+      var cluster = tplotter._find_cluster_from_treeidx(tidx,summary.clusters.CI_nBI);
 
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
-        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>';
+        + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>'
+        + '<td class="cluster">' + cluster + '</td>';
       ['linearity_index', 'branching_index', 'clustering_index'].forEach(function(idxname) {
         var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname].toFixed(2) : '&mdash;';
         row += '<td>' + val + '</td>';

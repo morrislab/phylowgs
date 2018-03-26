@@ -1,6 +1,62 @@
 function TreeSummarizer() {
 }
 
+TreeSummarizer.prototype._render_cluster_table = function(summary) {
+  //Will need to:
+  //   - Get the cluster indexes and the number of trees assigned to them
+  //   - Get the cluster mean index values?
+  //   - Alter tree_plotter.js so that I can create some typical trees within the table.
+  //      - First, find the trees that best describe each cluster, either using the highest density or one thats closest the mean or something
+  //      - Then take the 
+  var old_data = false;
+  if(!summary.hasOwnProperty('clusters') | !summary.clusters.hasOwnProperty('CI_nBI')){
+    old_data = true;
+  }
+  Object.keys(summary.clusters.CI_nBI).forEach(function(cluster_idx) {
+    if (!summary.clusters.CI_nBI[cluster_idx].hasOwnProperty('representative_tree')){
+      old_data = true;
+    }
+  });
+  if (old_data) {return};
+
+  var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
+  cluster_table = cluster_table.find('tbody');
+  
+  self = this;
+  var clust_num = 0;
+  Object.keys(summary.clusters.CI_nBI).forEach(function(cluster_idx) {
+    clust_num = clust_num+1;
+    var C = summary.clusters.CI_nBI[cluster_idx];
+    var numTree = C.members.length;
+    var mean = C.mean;
+    // Create a new container to hold the representative tree and then make the tree object. After the row is made, draw the tree in the container.
+    var rep_tree_container = document.createElement('div');
+    rep_tree_container.id = cluster_idx;
+    var rep_tree_container_id = 'rep_tree_container-' + cluster_idx;
+    var representative_tree_idx = C.representative_tree;
+
+    var entries = [clust_num].concat(numTree).concat(representative_tree_idx).concat('<div id='+rep_tree_container_id+'></div>').map(function(entry) {
+      return '<td>' + entry + '</td>';
+    }); 
+    $('<tr/>').html(entries.join('')).appendTo(cluster_table);
+    self._draw_rep_tree(summary,representative_tree_idx,'#' + rep_tree_container_id);
+  });
+}
+
+TreeSummarizer.prototype._draw_rep_tree = function(summary,tidx,container_id) {
+  var structure = summary.trees[tidx].structure;
+  var populations = summary.trees[tidx].populations;
+  var node_ids = Object.keys(populations).map(function(k) {
+      return parseInt(k, 10);
+  });
+  var root_id = Math.min.apply(Math, node_ids);
+  var tree_plotter = new TreePlotter();
+  var tree_structure = tree_plotter._generate_tree_struct(structure, populations, root_id);
+  var num_nodes = Object.keys(populations).length;
+  var node_radius = 12 - num_nodes; 
+  tree_plotter.draw_tree(tree_structure, container_id,padding = [0, 10, 0, 10], w0 = 120, h0 = 60, node_radius);
+}
+
 TreeSummarizer.prototype._render_vafs = function(dataset) {
   var muts_path = dataset.muts_path;
 
@@ -197,11 +253,10 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
 }
 
 TreeSummarizer.prototype._create_index_scatter_trace = function(xdata, ydata, labels, marker_symbols, marker_sizes, marker_colour) {
-  
   var trace = {
     x: xdata,
     y: ydata,
-    name: 'points',
+    name: 'trees',
     mode: 'markers',
     type: 'scatter',
     text: labels,
@@ -291,13 +346,13 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
                   yaxis: {title:"BI"}}]
        }],
     active: 0,
-    direction: 'down',
+    direction: 'left',
     pad: {'r': 10, 't': 10},
     showactive: true,
     type: 'buttons',
-    x: 1.15,
-    xanchor: 'right',
-    y: 1,
+    x: 0,
+    xanchor: 'left',
+    y: 1.06,
     yanchor: 'top' 
   }]
   
@@ -309,7 +364,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     yaxis: { title: 'BI/(LI+BI)'},
     hovermode: 'closest',
     plot_bgcolor: '#440154',
-    showlegend: false,
+    showlegend: true,
     updatemenus: update_menus
   };
   var container = document.querySelector('#container');
@@ -318,16 +373,17 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   Plotly.newPlot(plot_container, traces, layout);
 }
 
-TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, clustering_type) {
+TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, clustering_metric) {
   if(!tree_summary.hasOwnProperty('clusters')) {
     return;
   }
   
   var traces = [];
-  
-  Object.keys(tree_summary.clusters[clustering_type]).forEach(function(cidx) {
+  var clust_count = 0;
+  Object.keys(tree_summary.clusters[clustering_metric]).forEach(function(cidx) {
     //cidx = parseInt(cidx, 10);
-    var C = tree_summary.clusters[clustering_type][cidx];
+    clust_count = clust_count + 1;
+    var C = tree_summary.clusters[clustering_metric][cidx];
     var mean = C.ellipse.mean //Center of the ellipse
     var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
     var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian
@@ -343,6 +399,7 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
     traces.push({
       x: xpoints,
       y: ypoints,
+      name: 'cluster ' + clust_count,
       type: 'scatter',
       mode: 'lines',
       hoverinfo: 'none'
@@ -390,7 +447,8 @@ TreeSummarizer.prototype.render = function(dataset) {
         }
       }
     });
-
+    
+    self._render_cluster_table(summary);
     self._render_lin_idx_vs_branch_idx(summary);
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);

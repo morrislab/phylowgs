@@ -133,6 +133,10 @@ body {
   border-radius: 50%;
 }
 
+#cluster-table{
+    display:none;
+}
+
 #snippets {
   display: none;
 }

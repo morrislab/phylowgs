@@ -130,7 +130,7 @@ TreePlotter.prototype.draw = function(populations, structure, root_id, params) {
   }
 
   var root = this._generate_tree_struct(structure, populations, root_id);
-  this._draw_tree(root, '#container');
+  this.draw_tree(root, '#container');
   this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples, root_id);
   this._render_summary_table(structure, populations, num_samples, sample_names, root_id);
 }
@@ -165,14 +165,13 @@ TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id, root_
   return ccf;
 }
 
-TreePlotter.prototype._draw_tree = function(root, container) {
-  // horiz_padding should be set to the maximum radius of a node, so a node
+TreePlotter.prototype.draw_tree = function(root, container, padding = [10, 51, 10, 51], w0 = 800, h0 = 600, node_radius = null) {
+  // horiz_padding (padding default) should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
-  var horiz_padding = 51;
-  var m = [10, horiz_padding, 10, horiz_padding],
-      w = 800 - m[1] - m[3],
-      h = 600 - m[0] - m[2],
+  var m = padding,
+      w = w0 - m[1] - m[3],
+      h = h0 - m[0] - m[2],
       i = 0;
 
   // Compute the new tree layout.
@@ -196,13 +195,14 @@ TreePlotter.prototype._draw_tree = function(root, container) {
   nodeEnter.attr('class', 'node')
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
   nodeEnter.append('svg:circle')
-      .attr('r', function(d) { return d.data.radius; });
-  nodeEnter.append('svg:text')
-      .attr('font-size', '30')
-      .attr('dominant-baseline', 'central')
-      .attr('text-anchor', 'middle')
-      .text(function(d) { return d.data.name; });
-
+      .attr('r', function(d) { return ( node_radius === null ? d.data.radius : node_radius ) });
+  if (node_radius===null){
+    nodeEnter.append('svg:text')
+        .attr('font-size', '30')
+        .attr('dominant-baseline', 'central')
+        .attr('text-anchor', 'middle')
+        .text(function(d) { return d.data.name; });
+  }
   // Update the links.
   var link = vis.selectAll('path.link')
       .data(root.links(), function(d) { return d.target.data.name; })

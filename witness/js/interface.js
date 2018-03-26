@@ -17,7 +17,7 @@ function Interface() {
 }
 
 Interface.prototype._activate_filters = function() {
-  $('.filter').keyup(function(evt) {
+  $('.filter').keyup(function(evt) {  
     var self = $(this);
     var filter_text = self.val();
     var elems = self.parents('.sidebar').find('.nav-sidebar').find('li');

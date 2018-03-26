@@ -2,6 +2,7 @@ import numpy as np
 from sklearn.mixture import GaussianMixture
 from pwgsresults.index_calculator import IndexCalculator
 from scipy import linalg
+import scipy as sp
 
 class TreeClusterer:
   def find_clusters(self,summaries):
@@ -11,7 +12,7 @@ class TreeClusterer:
     Second, we cluster the linear trees (ie, branching index ==0) based on the number of nodes that they have.
     Third, we cluster the remaining trees based on the indexes calculated in the first step.
     Fourth, output the cluster information in a json-friendly format.
-    Note that currently we clustering using two metrics: [LI,BI] and [CI,BI/(LI+BI)], so the final output dictionary has a different entry for each metric. 
+    Note that currently we clustering using two metrics: [LI, BI] and [CI, BI/(LI+BI)], so the final output dictionary has a different entry for each metric. 
     :param summaries: the tree summaries output from ResultGenerator().generate()
     :return: formated dictionary containing all relevant information for the clusters, ready to be inserted to the .summ json
     """
@@ -93,7 +94,7 @@ class TreeClusterer:
       return {};
     
     out = {};
-    data = np.array(data)
+    data = np.array(data);
     num_components = self._get_components_min_bic(data)
     gmm = GaussianMixture(n_components=num_components, n_init=2, covariance_type="full").fit(data)
     
@@ -102,14 +103,18 @@ class TreeClusterer:
     cluster_responsibilities = gmm.predict_proba(data)
     num_clusters = len(gmm.weights_);
     for clust_idx in range(num_clusters):
+      clust_members = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==clust_idx];
+      clust_rep_tree_idx = self._determine_representative_tree(data[clust_members,0],data[clust_members,1]);
+      rep_tree_idx = clust_members[clust_rep_tree_idx];
       out[str(clust_idx)] =  {
         "num_nodes": None,
         "weight": gmm.weights_[clust_idx],
-        "members": [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==clust_idx], 
+        "members": clust_members, 
         "responsibilities": cluster_responsibilities[:,clust_idx].tolist(),
         "mean": gmm.means_[clust_idx].tolist(),
         "covariance": gmm.covariances_[clust_idx].tolist(),
-        "ellipse": self._generateGMMEllipseInfo(gmm.means_[clust_idx], gmm.covariances_[clust_idx])
+        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[clust_idx], gmm.covariances_[clust_idx]),
+        "representative_tree": rep_tree_idx
         };
     return out
   
@@ -150,12 +155,17 @@ class TreeClusterer:
     #If there are no linear trees, return an empty dictionary
     if not data:
       return {};
-    
+    data = np.array(data);
     out = {};
     
     unique_num_nodes = list(set(num_nodes));
     for this_num_nodes in unique_num_nodes:
+      #The indexes wrt all of the sampled trees, both linear and non-linear
       cluster_members = [tree_idx for tree_idx, this_tree_num_nodes in zip(tree_idxs, num_nodes) if this_tree_num_nodes==this_num_nodes];
+      #The indexes wrt to the linear trees, inserted into this function
+      this_data_member_idxs = [tree_idx for tree_idx, this_tree_num_nodes in zip(range(len(tree_idxs)), num_nodes) if this_tree_num_nodes==this_num_nodes];
+      clust_rep_tree_idx = self._determine_representative_tree(data[this_data_member_idxs,0],data[this_data_member_idxs,1]);
+      rep_tree_idx = cluster_members[clust_rep_tree_idx];
       cluster_responsibilities = [1*(this_tree_num_nodes == this_num_nodes) for this_tree_num_nodes in num_nodes]; #0 if this tree doesn't have the number of nodes, and 1s if it does
       cluster_mean = [np.mean(np.array([x[0] for x,nNodes in zip(data, num_nodes) if nNodes==this_num_nodes])), 0];
       xVals = [x[0] for x,n_nodes in zip(data, num_nodes) if n_nodes == this_num_nodes]
@@ -169,11 +179,12 @@ class TreeClusterer:
         "responsibilities": cluster_responsibilities,
         "mean": cluster_mean,
         "covariance": None,
-        "ellipse": self._generateLinearEllipseInfo(xVals,yVals,ellipse_minor_axis)
+        "ellipse": self._generate_linear_ellipse_info(xVals,yVals,ellipse_minor_axis),
+        "representative_tree": rep_tree_idx
         };
     return out
   
-  def _generateLinearEllipseInfo(self, xVals, yVals, ellipse_minor_axis):
+  def _generate_linear_ellipse_info(self, xVals, yVals, ellipse_minor_axis):
     
     ellipse_mean = [np.mean(xVals),0]
     ellipse_major_axis = max( [abs(max(xVals)-ellipse_mean[0]), abs(min(xVals)-ellipse_mean[0])] );
@@ -187,7 +198,7 @@ class TreeClusterer:
     
     return ellDict
   
-  def _generateGMMEllipseInfo(self,mean,cov):
+  def _generate_EMM_ellipse_info(self,mean,cov):
     """
     Take the output from GMM analysis and generate a dictionary whose elements describe an ellipse 
     and can be used by witness to plot the clusters
@@ -207,3 +218,15 @@ class TreeClusterer:
         "minor_axis": v[1]
     }
     return ellDict
+
+  def _determine_representative_tree(self,x,y):
+    """
+    Determine the best tree to represent the given members input (typically all tree members that belong to a cluster)
+    """
+    data = np.vstack((x,y))
+    try:
+      density = list(sp.stats.gaussian_kde(data)(data));
+    except (np.linalg.linalg.LinAlgError, FloatingPointError):
+      density = list(sp.stats.gaussian_kde(x)(y));
+    best_tree_idx = np.argmax(density);
+    return best_tree_idx;

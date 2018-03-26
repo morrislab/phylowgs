@@ -67,6 +67,7 @@
                   <th data-sort="int">Index</th>
                   <th id="tree-llh" data-sort="float" data-sort-default="desc">nlgLH</th>
                   <th data-sort="int">Nodes</th>
+                  <th data-sort="int">Cluster</th>
                   <th data-sort="float">LI</th>
                   <th data-sort="float">BI</th>
                   <th data-sort="float">CCI</th>
@@ -104,7 +105,21 @@
         </div>
       </div>
     </div>
-
+    
+    <div id="cluster-table">
+      <div class="table-responsive tree-summary">
+        <table class="table tabled-striped table-hover">
+          <thead>
+            <tr>
+              <th>Cluster</th><th>Number of Trees</th><th>Representative Tree Index</th><th>Structure</th>
+            </tr>
+          </thead>
+          <tbody>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    
     <div id="snippets">
       <div class="table-responsive tree-summary">
         <table class="table tabled-striped table-hover">
