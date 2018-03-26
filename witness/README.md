@@ -30,9 +30,9 @@ Tree viewer: here you will see information for each individual tree constructed 
 
 Description of Reported Values
 ------------------------------
-LI (linearity index): shows what proportion of mutations are in linear relations -- i.e., given mutations A and B, they're linear if A is in a population ancestral to B, or vice versa.
-BI (branching index): shows what proportion of mutation pairs occur in different branches of the tree.
-CI (clustering index): shows what proportion of mutation pairs are placed in the same cluster (i.e., population).
-Note: These indexes give a good indication for the overall structure of a tree and are used to cluster the trees together into structurally distinct groups. They are defined such that LI+BI+CI=1.
-nlgLH (normalized log likelihood). The lower this value, the better the tree fits the given data. The tree with lowest nlgLH is often considered to be the "best tree". Though keep in mind that it is important to consider the other trees reported by PhyloWGS, because while they may not be the "best", the other trees could certainly explain the true phylogeny.
+- LI (linearity index): shows what proportion of mutations are in linear relations -- i.e., given mutations A and B, they're linear if A is in a population ancestral to B, or vice versa.
+- BI (branching index): shows what proportion of mutation pairs occur in different branches of the tree.
+- CI (clustering index): shows what proportion of mutation pairs are placed in the same cluster (i.e., population).
+- Note: These indexes give a good indication for the overall structure of a tree and are used to cluster the trees together into structurally distinct groups. They are defined such that LI+BI+CI=1.
+- nlgLH (normalized log likelihood). The lower this value, the better the tree fits the given data. The tree with lowest nlgLH is often considered to be the "best tree". Though keep in mind that it is important to consider the other trees reported by PhyloWGS, because while they may not be the "best", the other trees could certainly explain the true phylogeny.
 
