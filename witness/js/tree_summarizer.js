@@ -2,31 +2,18 @@ function TreeSummarizer() {
 }
 
 TreeSummarizer.prototype._render_cluster_table = function(summary) {
-  //Will need to:
-  //   - Get the cluster indexes and the number of trees assigned to them
-  //   - Get the cluster mean index values?
-  //   - Alter tree_plotter.js so that I can create some typical trees within the table.
-  //      - First, find the trees that best describe each cluster, either using the highest density or one thats closest the mean or something
-  //      - Then take the 
-  var old_data = false;
-  if(!summary.hasOwnProperty('clusters') | !summary.clusters.hasOwnProperty('CI_nBI')){
-    old_data = true;
-  }
-  Object.keys(summary.clusters.CI_nBI).forEach(function(cluster_idx) {
-    if (!summary.clusters.CI_nBI[cluster_idx].hasOwnProperty('representative_tree')){
-      old_data = true;
-    }
-  });
-  if (old_data) {return};
+  if(!summary.hasOwnProperty('clusters')){
+    return;
+  };
 
   var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
   cluster_table = cluster_table.find('tbody');
   
   self = this;
   var clust_num = 0;
-  Object.keys(summary.clusters.CI_nBI).forEach(function(cluster_idx) {
+  Object.keys(summary.clusters).forEach(function(cluster_idx) {
     clust_num = clust_num+1;
-    var C = summary.clusters.CI_nBI[cluster_idx];
+    var C = summary.clusters[cluster_idx];
     var numTree = C.members.length;
     var mean = C.mean;
     // Create a new container to hold the representative tree and then make the tree object. After the row is made, draw the tree in the container.
@@ -303,58 +290,10 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   });
   
   // Determine the ellipse traces that define the cluster contours
-  var LI_BI_traces = this._create_cluster_contour_traces(tree_summary, "LI_BI")
-  var CI_nBI_traces = this._create_cluster_contour_traces(tree_summary, "CI_nBI")
+  var ellipse_traces = this._create_cluster_contour_traces(tree_summary)
   // Create the traces for the data points
-  LI_BI_traces.push(this._create_index_scatter_trace(xdata=LIs, ydata=BIs, labels, marker_symbols, marker_sizes, marker_colour))
-  CI_nBI_traces.push(this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colour) )
-  var traces = LI_BI_traces.concat(CI_nBI_traces)
-  
-  //Create boolean arrays that will define the visibility parameters of the traces created above. 
-  var LIBI_on = new Array(LI_BI_traces.length);
-  var LIBI_off = new Array(LI_BI_traces.length);
-  var CInBI_on = new Array(CI_nBI_traces.length);
-  var CInBI_off = new Array(CI_nBI_traces.length);
-  for (var i = 0; i < LI_BI_traces.length; i++){
-    LIBI_on[i] = true
-    LIBI_off[i] = false
-    LI_BI_traces[i]["visible"] = false //default: not visible
-  }
-  for (var i = 0; i < CI_nBI_traces.length; i++){
-    CInBI_on[i] = true
-    CInBI_off[i] = false
-    CI_nBI_traces[i]["visible"] = true//default: visible
-  }
-  //Define buttons that will control what is shown in the window.
-  var update_menus = [
-  {
-    buttons: [
-       {
-        label: "[CI, BI/(LI+BI)]",
-        method: "update",
-        args: [{visible: LIBI_off.concat(CInBI_on)},
-                  {title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
-                  xaxis: {title: "CI"},
-                  yaxis: {title: "BI/(LI+BI)"}}]
-        },
-        {
-        label: "[LI, BI]",
-        method: "update",
-        args: [{visible: LIBI_on.concat(CInBI_off)},
-                  {title: "Linearity Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
-                  xaxis: {title: "LI"},
-                  yaxis: {title:"BI"}}]
-       }],
-    active: 0,
-    direction: 'left',
-    pad: {'r': 10, 't': 10},
-    showactive: true,
-    type: 'buttons',
-    x: 0,
-    xanchor: 'left',
-    y: 1.06,
-    yanchor: 'top' 
-  }]
+  var scatter_traces = this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colour);
+  var traces = ellipse_traces.concat(scatter_traces);
   
   //Finally, use the traces, buttons and plotting options created above to actually plot our data.
   var layout = {
@@ -364,8 +303,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     yaxis: { title: 'BI/(LI+BI)'},
     hovermode: 'closest',
     plot_bgcolor: '#440154',
-    showlegend: true,
-    updatemenus: update_menus
+    showlegend: true
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
@@ -373,17 +311,17 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   Plotly.newPlot(plot_container, traces, layout);
 }
 
-TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, clustering_metric) {
+TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary) {
   if(!tree_summary.hasOwnProperty('clusters')) {
     return;
   }
   
   var traces = [];
   var clust_count = 0;
-  Object.keys(tree_summary.clusters[clustering_metric]).forEach(function(cidx) {
+  Object.keys(tree_summary.clusters).forEach(function(cidx) {
     //cidx = parseInt(cidx, 10);
     clust_count = clust_count + 1;
-    var C = tree_summary.clusters[clustering_metric][cidx];
+    var C = tree_summary.clusters[cidx];
     var mean = C.ellipse.mean //Center of the ellipse
     var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
     var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian

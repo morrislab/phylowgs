@@ -17,11 +17,8 @@ class TreeClusterer:
     :return: formated dictionary containing all relevant information for the clusters, ready to be inserted to the .summ json
     """
     self._calc_tree_structure_indexes(summaries);
-    is_linear, LI_BI, CI_nBI, tree_idx, n_nodes = self._get_tree_clustering_info(summaries);
-    clustInfo = {
-        "LI_BI": self._determine_clusters(tree_idx, LI_BI, n_nodes, is_linear),
-        "CI_nBI": self._determine_clusters(tree_idx, CI_nBI, n_nodes, is_linear)
-    };
+    is_linear, clustering_data, tree_idx, n_nodes = self._get_tree_clustering_info(summaries);
+    clustInfo = self._determine_clusters(tree_idx, clustering_data, n_nodes, is_linear);
     return clustInfo
   
   def _calc_tree_structure_indexes(self,summs):
@@ -41,41 +38,39 @@ class TreeClusterer:
     Takes the tree summaries and extracts the relevant tree information that will be used for clustering.
     :param summs:the summaries of the trees as output by ResultGenerator().generate()
     :return is_linear: list of booleans answering whether or not a tree at that index is linear or not
-    :return LI_BI: list of data points to be used for the [LI,BI] distance metric.
-    :return CI_nBI: list of data points to be used for the [CI,(BI/(LI+BI)] distance metric.
-    :return tree_idx: list of indexes assigned to each tree
+    :return clustering_data: list of data points to be used for clustering the trees. distance metric is [CI,BI/(LI+BI)]
+    :return tree_idx: list of the indexes assigned to each tree.
     :return n_nodes: list representing the number of nodes found for each tree.
     """
     
     is_linear = [summ["branching_index"]==0 for summ in summs.values()];
-    LI_BI = [[summ["linearity_index"], summ["branching_index"]] for summ in summs.values()];
-    CI_nBI = [[summ["clustering_index"], summ["branching_index"] / (summ["branching_index"] + summ["linearity_index"])] for summ in summs.values()];
+    clustering_data = [[summ["clustering_index"], summ["branching_index"] / (summ["branching_index"] + summ["linearity_index"])] for summ in summs.values()];
     tree_idx = [tree_idx for tree_idx in summs.keys()];
     n_nodes = [len(summ["populations"]) for summ in summs.values()];
     
-    return is_linear, LI_BI, CI_nBI, tree_idx, n_nodes
+    return is_linear, clustering_data, tree_idx, n_nodes;
   
-  def _determine_clusters(self, tree_idxs, data_to_cluster, num_nodes, is_linear):
+  def _determine_clusters(self, tree_idxs, clustering_data, num_nodes, is_linear):
     """
     This will split the data into trees that are linear and not-linear and then run the proper analysis for each set.
     :param tree_idxs: a list of the indexes of the trees. 
-    :param data_to_cluster: list of data points from each tree.
+    :param clustering_data: list of data points from each tree.
     :param num_nodes: list of he number of nodes associated with each tree
     :param is_linear: list of booleans answering whether or not a tree is linear.
     :return: dictionary which represents the clusters found in this anaysis. linear and non-linear trees are merged into the same dictionary.
     """
     
     #First, let's cluster the non-linear trees. 
-    non_lin_data = [x for x,this_is_lin in zip(data_to_cluster,is_linear) if not this_is_lin];
+    non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin];
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin];
     non_lin_clusters = self._run_gmm(non_lin_data, non_lin_tree_idxs);
     
     #Now cluster the linear trees based on the number of nodes they have
-    lin_data = [x for x,this_is_lin in zip(data_to_cluster, is_linear) if this_is_lin];
+    lin_data = [x for x,this_is_lin in zip(clustering_data, is_linear) if this_is_lin];
     lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs, is_linear) if this_is_lin];
     lin_num_nodes = [x for x,this_is_lin in zip(num_nodes, is_linear) if this_is_lin];
     #For linear trees the minor axis for the ellipse is arbitrary as all y values are 0. So I choose a value here.
-    ellipse_minor_axis = 1/10 * max([ datum[1] for datum in data_to_cluster ]) 
+    ellipse_minor_axis = 1/10 * max([ datum[1] for datum in clustering_data ]) 
     if ellipse_minor_axis==0: ellipse_minor_axis = 0.01;
     lin_clusters = self._calc_lin_tree_clusters(lin_data, lin_tree_idxs, lin_num_nodes, ellipse_minor_axis); 
 

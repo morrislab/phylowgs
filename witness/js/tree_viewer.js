@@ -51,7 +51,7 @@ TreeViewer.prototype.render = function(dataset) {
       var normllh_nats = -summary.trees[tidx].llh / total_ssms;
       normllh_nats /= num_samples;
       var normllh_bits = normllh_nats / Math.log(2);
-      var cluster = tplotter._find_cluster_from_treeidx(tidx,summary.clusters.CI_nBI);
+      var cluster = tplotter._find_cluster_from_treeidx(tidx,summary.clusters);
 
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
