@@ -2,10 +2,9 @@
 
 ## Description
 Witness is a web-based viewer for PhyloWGS results. It uses the JSON files
-written by `write_results.py`. Refer to steps 4 and 5 in the [PhyloWGS
-README](../README.md) for instructions on running `write_resuls.py` and
-starting Witness.
-
+written by `write_results.py`. Refer to steps 4 and 5 in the "Running PhyloWGS"
+section of the [PhyloWGS README](../README.md) for instructions on running
+`write_resuls.py` and starting Witness.
 
 ## Using Witness
 Upon opening Witness and selecting a run on the left side, you will see two
@@ -27,8 +26,8 @@ include the following:
      so is meaningless and can be misleading.
   2. Tree cluster summary table
   3. Tree structure scatter plot. Ellipses are contour plots of Gaussian
-     distributions used to cluster trees. See the "Description of Reported
-     Values" section below for how to interpret the axes.
+     distributions used to cluster trees. The CI, BI, and LI values used on the
+     axes are described below.
   4. Cellular prevalence histogram. As with the VAF histogram, for multisample
      runs, the values shown are simply the means across samples, and so can be
      misleading.
@@ -40,8 +39,8 @@ include the following:
 The tree viewer lets you examine individual trees sampled by PhyloWGS. This
 includes a rendering of the tree showing structure, in which the area of each
 tree node corresponds to the number of SSMs in the associated subpopulation.
-Moreover, you can see a line chart showing how the cancer cell fraction changes
-from sample to sample, and a table providing statistics about each
+Additionally, you can see a line chart showing how the cancer cell fraction
+changes from sample to sample, and a table providing statistics about each
 subpopulation.
 
 On the right side, you can select particular tree samples to view. For each
@@ -54,8 +53,8 @@ normalize the log likelihood, it can be understood as "average reconstruction
 error in bits per SSM, per sample". Consequently, lower nLgLH values indicate
 that a tree better fits the data. If you must pick only one tree, the tree with
 the lowest nLgLH is a good candidate; it is better, however, to examine the
-representative trees reported for each tree cluster to gain a better
-understanding of the full range of trees your data supports.
+representative trees reported for each tree cluster to understand the full
+range of trees your data supports.
 
 Tree indices
 ------------
