@@ -160,7 +160,7 @@ Running PhyloWGS
           --min-ssms MIN_SSMS  Minimum number or percent of SSMs to retain a subclone
                                (default: 0.01)
 
-5. View results.
+5. View results in Witness. More information is available in the [Witness README](witness/README.md).
 
         mv test_results /path/to/phylowgs/witness/data
         cd /path/to/phylowgs/witness
@@ -169,6 +169,23 @@ Running PhyloWGS
         python2 -m SimpleHTTPServer
         # Open http://127.0.0.1:8000 in your web browser. Note that, by
         # default, the server listens for connections from any host.
+
+PhyloWGS output
+---------------
+`write_results.py` outputs JSON files that are used by Witness. These are the
+files you should use when writing your own analysis pipelines. To see exactly
+what information these files contain, examine them in a text editor.
+Alternatively, open them in a JSON viewer such as Firefox.
+
+  * `run.summ.json`: lists tree summaries, including tree structure, likelihood
+    of that tree explaining the data, cellular prevalence of subclonal
+    populations, number of mutations per subclone, and tree clustering
+    information.
+  * `run.muts.json`: lists mutation information, such as number of variant and
+    total reads, for both SSMs and CNAs.
+  * `run.mutass.zip`: contains separate JSON files for every tree sampled via
+    MCMC. Each JSON file lists mutation assignments to subpopulations for a
+    given tree.
 
 
 Resuming a previous PhyloWGS run
