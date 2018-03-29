@@ -90,25 +90,30 @@ class TreeClusterer:
     
     out = {};
     data = np.array(data);
-    num_components = self._get_components_min_bic(data)
-    gmm = GaussianMixture(n_components=num_components, n_init=2, covariance_type="full").fit(data)
-    
+    num_clusters = self._get_components_min_bic(data)
+    gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
+    #There are instances in which gmm wil find clusters that have no hard assignements. 
+    #We should rerun gmm with one less cluster in that case as we are only interested in trees with hard assignements
+    clusters_with_hard_assignments = list(set(gmm.predict(data)));
+    if len(clusters_with_hard_assignments) != num_clusters:
+          num_clusters = num_clusters-1;
+          gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
     #Create an output dictionary that will contain all of the relevant information for each cluster
     cluster_assignments = gmm.predict(data)
     cluster_responsibilities = gmm.predict_proba(data)
-    num_clusters = len(gmm.weights_);
-    for clust_idx in range(num_clusters):
-      clust_members = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==clust_idx];
-      clust_rep_tree_idx = self._determine_representative_tree(data[clust_members,0],data[clust_members,1]);
-      rep_tree_idx = clust_members[clust_rep_tree_idx];
-      out[str(clust_idx)] =  {
-        "num_nodes": None,
-        "weight": gmm.weights_[clust_idx],
-        "members": clust_members, 
-        "responsibilities": cluster_responsibilities[:,clust_idx].tolist(),
-        "mean": gmm.means_[clust_idx].tolist(),
-        "covariance": gmm.covariances_[clust_idx].tolist(),
-        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[clust_idx], gmm.covariances_[clust_idx]),
+    for this_clust_idx in range(num_clusters):
+      this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx];
+      this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx];
+      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1]);
+      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx];
+      out[str(this_clust_idx)] =  {
+        "is_linear": False,
+        "weight": gmm.weights_[this_clust_idx],
+        "members": this_clust_members_tree_idxs, 
+        "responsibilities": cluster_responsibilities[:,this_clust_idx].tolist(),
+        "mean": gmm.means_[this_clust_idx].tolist(),
+        "covariance": gmm.covariances_[this_clust_idx].tolist(),
+        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[this_clust_idx], gmm.covariances_[this_clust_idx]),
         "representative_tree": rep_tree_idx
         };
     return out
@@ -168,7 +173,7 @@ class TreeClusterer:
       
       #Format the results to match the gmm results. For any fields that aren't necessary, set to None.
       out["linear_" + str(this_num_nodes)] =  {
-        "num_nodes": this_num_nodes,
+        "is_linear": True,
         "weight": None,
         "members": cluster_members, 
         "responsibilities": cluster_responsibilities,
