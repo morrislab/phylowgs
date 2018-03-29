@@ -3,11 +3,11 @@ PhyloWGS/witness
 
 Description
 -----------
-Witness is used to view and interpret the results output by PhyloWGS. It makes use of the json files output by write_results.py and reports information of interest in a browser friendly format. Refer to steps 4 and 5 in the PhyloWGS README for how to generate these json files and how to run witness.
+Witness is used to view and help interpret the results output by PhyloWGS. It makes use of the json files output by write_results.py and reports information of interest in a browser friendly format. Refer to steps 4 and 5 in the PhyloWGS README for how to generate these json files and how to run witness.
 
 Files Output by write_results.py
 --------------------------------
-These are the files loaded by witness. If you wish to do your own visualizations or analysis these files are a good place to start. Below is a brief description of these files. To see all information contained in these json files, open them in a json friendly application (if you are unsure of what application to use, note that Firefox is a good reader).
+These are the files loaded by witness. If you wish to do your own visualizations or analysis, these files are a good place to start. Below is a brief description of these files. To see all information contained in these json files, open them in a json friendly application (if you are unsure of what application to use, note that Firefox works as a good reader).
   - run.summ.json: this file contains tree summary information. In this file one can find tree structure, likelihood of that tree explaining the data, cellular prevalence of subclonal populations, tree clustering information, etc. 
   - run.muts.json: this file contains the ssm and cnv information input to evolve.py. 
   - run.mutass.zip: This zip file contains a json file for every tree. Every file contains which mutations have been assigned to each node in that particular tree.
