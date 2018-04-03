@@ -49,7 +49,7 @@ def create_directory(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname);   
 
-def run(args,chain_index,working_dir,output_dir):
+def run(args,chain_index,working_dir,current_dir,output_dir):
     bashCommand = working_dir + "/evolve.py" + \
         " -b " + str(args.write_backups_every) + \
         " -S " + str(args.write_state_every) + \
@@ -59,8 +59,8 @@ def run(args,chain_index,working_dir,output_dir):
         " -s " + str(args.mcmc_samples) + \
         " -i " + str(args.mh_iterations) + \
         " -r " + str(args.random_seeds[chain_index]) + \
-        " " + working_dir + "/" + args.ssm_file + \
-        " " + working_dir + "/" + args.cnv_file;
+        " " + current_dir + "/" + args.ssm_file + \
+        " " + current_dir + "/" + args.cnv_file;
     print "Starting chain " + str(chain_index);
     #Note, piping the output may be useful later if we wish to append a "run#:" to the output
     #process = subprocess.Popen(bashCommand,stdout=subprocess.PIPE, shell=True, cwd=output_dir)
@@ -68,13 +68,14 @@ def run(args,chain_index,working_dir,output_dir):
     return process
 
 def run_chains(args):
+    current_dir = os.getcwd();
     working_dir = os.path.dirname(os.path.realpath(__file__));
-    create_directory(working_dir+"/multevolve_runs");
+    create_directory(current_dir+"/multevolve_runs");
     run_subprocesses = [];
     for chain_index in range(args.num_chains):
-        output_dir = working_dir+"/multevolve_runs/run_"+str(chain_index);
+        output_dir = current_dir+"/multevolve_runs/run_"+str(chain_index);
         create_directory(output_dir);
-        process = run(args,chain_index,working_dir,output_dir);
+        process = run(args,chain_index,working_dir,current_dir,output_dir);
         run_subprocesses.append(process);
     
     while True:
