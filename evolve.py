@@ -157,6 +157,7 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 	config['tmp_dir'] = tempfile.mkdtemp(prefix='pwgsdataexchange.', dir=tmp_dir_parent)
 
 	for iteration in range(start_iter, state['num_samples']):
+		sys.stdout.flush()
 		safe_to_exit.set()
 		if iteration < 0:
 			logmsg(iteration)
