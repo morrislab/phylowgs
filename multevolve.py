@@ -19,6 +19,8 @@ def parse_args():
 		  help='Number of MCMC samples')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
 		  help='Random seeds for initializing MCMC')
+    parser.add_argument('-if', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
+		  help='Factor determining which chains will be included in the output "merged" folder. Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain much be greater than 1.5x the maximum of that value across chains. Setting this value = inf includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
 		  help='Directory where results from each chain will be saved. If directory does not exist, will attempt to create it here. (Default = "current_directory/multevolve_chains")')
     parser.add_argument('-sf','--ssm-file',dest='ssm_file',
@@ -92,19 +94,18 @@ def watch_chains(args,processes):
     are complete and if so, move on to the next step; and if not, then will
     capture their outputs and inform the user of each processes progression.
     '''
-    def stdout_read_alarm_handler(signum, frame):
+    def read_stdout_alarm_handler(signum, frame):
         raise Exception("subprocess.stdout.readline() took too long to complete.")
-    signal.signal(signal.SIGALRM,stdout_read_alarm_handler);
+    signal.signal(signal.SIGALRM,read_stdout_alarm_handler);
 
     num_chains = args['num_chains']
     progression_text = ['\n']*len(processes);
     print "".join(progression_text)
     while True:
-        #Check to see if all processes are done running and if so, exit.
+        #Check to see if all processes are done running and if so, exit the while loop
         all_dead = all([processes[i].poll()!=None for i in range(num_chains)]);
         if all_dead:
             break;
-        
         # Capture the output from each process, modify it, and output it. 
         # Note: process.stdout returns a file handle from which you can read outputs, however if you
         # call readline and there is no new information to read, it will wait until there is until
@@ -135,24 +136,37 @@ def watch_chains(args,processes):
         print " "*70
         print "".join(progression_text),
 
-def determine_each_chains_highest_likelihood(chain_dirs):
+def logsumexp(a):
     '''
-    Examines all of the trees output by each chain and reports
-    the highest likelihood of all of the trees.
+    numpy as a logaddexp() but it only takes two values and that's stupid so 
+    I'm just going to create my own logsumexp here.
     '''
-    best_likelihoods = [];
+    max_a = np.max(a);
+    result = max_a + np.log(np.sum([np.exp(i-max_a) for i in a]))
+    return result
+
+def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
+    '''
+    Examines all of the trees output by each chain and reports which chains should
+    be merged. Chains will meet the criteria if the log(sum(all_tree_likelihoods))
+    is within some factor of the maximum of that value across chains.
+    '''
+    logSumLHs = []
     for chain_dir in chain_dirs:
-        this_best_likelihood = -(2**32);
+        logLHs = [];
         tree_zip_file = zipfile.ZipFile(os.path.join(chain_dir,'trees.zip'), mode = 'r')
         for tree_name in tree_zip_file.namelist():
             if "tree" in tree_name:
-                likelihood = float(tree_name.split('_')[-1]) #likelihood is in the names of the trees, just use that.
-                if likelihood > this_best_likelihood:
-                    this_best_likelihood = likelihood;
-        best_likelihoods.append(this_best_likelihood);
-    return best_likelihoods
+                #likelihood is in the names of the trees, just use that.
+                logLHs.append(float(tree_name.split('_')[-1]))
+        logSumLHs.append(logsumexp(logLHs))
+    print logSumLHs
+    best_chain = np.argmax(logSumLHs);
+    bestLogSumLH = np.max(logSumLHs);
+    chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH > (bestLogSumLH*chain_inclusion_factor)]
+    return chains_to_merge
 
-def merge_best_chains(args,chain_dirs,best_likelihoods):
+def merge_best_chains(args,chain_dirs,chains_to_merge):
     '''
     Determines which chains are the best and merges them together into one trees.zip
     file that can be input into write_results.
@@ -160,33 +174,44 @@ def merge_best_chains(args,chain_dirs,best_likelihoods):
     of it's trees is within 10% of the highest likelihood of all of the trees calculated
     across all chains.
     '''
-    overall_best_likelihood = max(best_likelihoods);
-    #Let's say, arbitrarily for now, that any best likelihoods that are within 10% of the best best, have their chains merged into one.
-    chains_to_include = [ind for ind,bl in enumerate(best_likelihoods) if abs((bl-overall_best_likelihood)/overall_best_likelihood) < 0.1];
     out_dir = os.path.join(args['output_directory'],'merged_best_chains')
     create_directory(out_dir)
+    if os.path.isfile(os.path.join(out_dir,"trees.zip")):
+        print "Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first."
+        return
     combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True);
     print "Merging best chains:"
     tree_index = 0;
-    for chain_idx in chains_to_include:
-        print "  merging chain " + str(chain_idx) + "...";
+    for chain_idx in chains_to_merge:
+        print "  merging chain {} ...".format(chain_idx)
         chain_dir = chain_dirs[chain_idx];
         this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r');
         this_zips_files = this_zip.namelist();
         files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if "tree" in filename]
         for file in files_to_include:
+            #First we need to reindex the tree
             filename_components = file[0].split("_")
             filename_components[1] = str(tree_index)
             filename = "_".join(filename_components)
             combined_tree_zipfile.writestr(filename, file[1])
             tree_index += 1
+    #Don't forget the "params.json" and "cnv_logical_physical_mapping.json" files. They should all be the same in each
+    #chains zip file. So just take the last one used and insert it.
+    combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
+    combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
+    print "Chain merging complete."
+    print "It is recommended that individual chain runs are deleted as they occupy quite a bit of space."
+    print "To delete individual chain information, just type 'rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip'"
 
 def main():
+    #To do:
+    # - fix up helper text that goes with "inclusion_factor" in parseargs.
+    # - write a class for the multevolve chain output handler? Can input all of the processes, keep track of progression text, read from stdouts, contain the signal.alarm handler
     args,evolve_args = parse_args();
     check_args(args);
     chain_dirs = run_chains(args,evolve_args);
-    each_chains_best_likelihoods = determine_each_chains_highest_likelihood(chain_dirs);
-    merge_best_chains(args, chain_dirs, each_chains_best_likelihoods);
+    chains_to_merge = determine_chains_to_merge(chain_dirs, args['chain_inclusion_factor']);
+    merge_best_chains(args, chain_dirs, chains_to_merge);
 
 if __name__ == "__main__":
     main()
