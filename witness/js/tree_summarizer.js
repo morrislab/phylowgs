@@ -14,7 +14,7 @@ TreeSummarizer.prototype._render_cluster_table = function(summary) {
   Object.keys(summary.clusters).forEach(function(cluster_idx) {
     clust_num = clust_num+1;
     var C = summary.clusters[cluster_idx];
-    var numTree = C.members.length;
+    var propTrees = (C.members.length/Object.keys(summary.trees).length).toFixed(2);
     var mean = C.mean;
     // Create a new container to hold the representative tree and then make the tree object. After the row is made, draw the tree in the container.
     var rep_tree_container = document.createElement('div');
@@ -22,7 +22,7 @@ TreeSummarizer.prototype._render_cluster_table = function(summary) {
     var rep_tree_container_id = 'rep_tree_container-' + cluster_idx;
     var representative_tree_idx = C.representative_tree;
 
-    var entries = [clust_num].concat(numTree).concat(representative_tree_idx).concat('<div id='+rep_tree_container_id+'></div>').map(function(entry) {
+    var entries = [clust_num].concat(propTrees).concat(representative_tree_idx).concat('<div id='+rep_tree_container_id+'></div>').map(function(entry) {
       return '<td>' + entry + '</td>';
     }); 
     $('<tr/>').html(entries.join('')).appendTo(cluster_table);
@@ -247,6 +247,7 @@ TreeSummarizer.prototype._create_index_scatter_trace = function(xdata, ydata, la
     mode: 'markers',
     type: 'scatter',
     text: labels,
+    showlegend: false,
     marker: {
       symbol: marker_symbols,
       size: marker_sizes,
@@ -272,7 +273,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   var marker_symbols = [];
   var marker_sizes = [];
   var labels = [];
-  var marker_colour = 'yellow';
+  var cluster_colours = ['blue','red','magenta','orange','yellow','cyan','pink','white','green'];
   var epsilon = 0.000001;
   // Get the branching, linear and clustering indexes and calculate the BI/(LI+BI) value for scatter plotting.
   Object.keys(tree_summary.trees).forEach(function(tidx) {
@@ -290,9 +291,10 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   });
   
   // Determine the ellipse traces that define the cluster contours
-  var ellipse_traces = this._create_cluster_contour_traces(tree_summary)
+  var ellipse_traces = this._create_cluster_contour_traces(tree_summary, cluster_colours);
   // Create the traces for the data points
-  var scatter_traces = this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colour);
+  var marker_colours = this._determine_trees_colours(tree_summary,cluster_colours);
+  var scatter_traces = this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colours);
   var traces = ellipse_traces.concat(scatter_traces);
   
   //Finally, use the traces, buttons and plotting options created above to actually plot our data.
@@ -311,7 +313,19 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   Plotly.newPlot(plot_container, traces, layout);
 }
 
-TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary) {
+TreeSummarizer.prototype._determine_trees_colours = function(tree_summary,cluster_colours){
+  num_trees = tree_summary.trees.length;
+  colours = new Array(num_trees);
+  Object.keys(tree_summary.clusters).forEach(function(cidx) {
+    this_clust = tree_summary.clusters[cidx]
+    Object.keys(this_clust.members).forEach(function(memidx){
+      colours[this_clust.members[memidx]] = cluster_colours[cidx];
+    })
+  })
+  return colours
+}
+
+TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, cluster_colours) {
   if(!tree_summary.hasOwnProperty('clusters')) {
     return;
   }
@@ -340,7 +354,8 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary)
       name: 'cluster ' + clust_count,
       type: 'scatter',
       mode: 'lines',
-      hoverinfo: 'none'
+      hoverinfo: 'none',
+      line: {color: cluster_colours[cidx]}
     })
   });
   return traces
