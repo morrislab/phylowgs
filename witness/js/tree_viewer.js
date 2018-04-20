@@ -25,17 +25,40 @@ TreeViewer.prototype._find_cluster_from_treeidx = function(tree_index,cluster_in
       };
     });
   });
-  //throw "ugh"
   return in_cluster
+}
+
+TreeViewer.prototype._determine_table_trees = function(summary){
+  if (Config.show_all_trees){
+    return Util.sort_ints(Object.keys(summary.trees));
+  }else{
+    //Show up to 5 trees from each cluster. One of these should be the
+    //representative tree for that cluster, and I suppose the others
+    //will be those with the highest likelihood?
+    tree_indices = [];
+    Object.keys(summary.clusters).forEach(function(cidx){
+      if (summary.clusters[cidx].members.length<=5){
+        tree_indicies.push(summary.clusters[cidx].members)
+        return
+      }
+      rep_tree = summary.clusters[cidx].representative_tree;
+      members = summary.clusters[cidx].members.sort(function() {return 0.5 - Math.random()});
+      tree_indices.push([rep_tree]);
+      [0,1,2,3].forEach(function(idx){
+        tree_indices.push(members[idx] === rep_tree ? members[4] : members[idx]);
+      })    
+    })
+    return tree_indices
+  }
 }
 
 TreeViewer.prototype.render = function(dataset) {
   $('#tree-list').show();
   var tree_container = $('#trees tbody');
-
   var tplotter = this;
   d3.json(dataset.summary_path, function(summary) {
-    var tree_indices = Util.sort_ints(Object.keys(summary.trees));
+    //var tree_indices = Util.sort_ints(Object.keys(summary.trees));
+    var tree_indices = tplotter._determine_table_trees(summary);
     tree_container.empty();
 
     var first_tree_idx = tree_indices[0];
