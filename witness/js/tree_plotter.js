@@ -165,7 +165,7 @@ TreePlotter.prototype._calc_ccf = function(structure, populations, pop_id, root_
   return ccf;
 }
 
-TreePlotter.prototype.draw_tree = function(root, container, padding = [10, 51, 10, 51], w0 = 800, h0 = 600, node_radius = null) {
+TreePlotter.prototype.draw_tree = function(root, container, padding = [10, 51, 10, 51], w0 = 800, h0 = 600, radius_scalar = 1, include_node_identifier=true) {
   // horiz_padding (padding default) should be set to the maximum radius of a node, so a node
   // drawn on a boundry won't go over the canvas edge. Since max_area = 8000,
   // we have horiz_padding = sqrt(8000 / pi) =~ 51.
@@ -195,8 +195,8 @@ TreePlotter.prototype.draw_tree = function(root, container, padding = [10, 51, 1
   nodeEnter.attr('class', 'node')
     .attr('transform', function(d) { return 'translate(' + d.y + ',' + d.x + ')'; });
   nodeEnter.append('svg:circle')
-      .attr('r', function(d) { return ( node_radius === null ? d.data.radius : node_radius ) });
-  if (node_radius===null){
+      .attr('r', function(d) {return (radius_scalar*d.data.radius); });
+  if (include_node_identifier){
     nodeEnter.append('svg:text')
         .attr('font-size', '30')
         .attr('dominant-baseline', 'central')

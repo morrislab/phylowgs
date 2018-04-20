@@ -26,22 +26,20 @@ TreeSummarizer.prototype._render_cluster_table = function(summary) {
       return '<td>' + entry + '</td>';
     }); 
     $('<tr/>').html(entries.join('')).appendTo(cluster_table);
-    self._draw_rep_tree(summary,representative_tree_idx,'#' + rep_tree_container_id);
+    self._draw_rep_tree(summary.trees[representative_tree_idx],'#' + rep_tree_container_id);
   });
 }
 
-TreeSummarizer.prototype._draw_rep_tree = function(summary,tidx,container_id) {
-  var structure = summary.trees[tidx].structure;
-  var populations = summary.trees[tidx].populations;
+TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
+  var structure = tree.structure;
+  var populations = tree.populations;
   var node_ids = Object.keys(populations).map(function(k) {
       return parseInt(k, 10);
   });
   var root_id = Math.min.apply(Math, node_ids);
   var tree_plotter = new TreePlotter();
   var tree_structure = tree_plotter._generate_tree_struct(structure, populations, root_id);
-  var num_nodes = Object.keys(populations).length;
-  var node_radius = 12 - num_nodes; 
-  tree_plotter.draw_tree(tree_structure, container_id,padding = [0, 10, 0, 10], w0 = 120, h0 = 60, node_radius);
+  tree_plotter.draw_tree(tree_structure, container_id,padding = [0, 10, 0, 10], w0 = 150, h0 = 75, radius_scalar = 1/7, include_node_identifier=false);
 }
 
 TreeSummarizer.prototype._render_vafs = function(dataset) {
@@ -275,6 +273,10 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   var labels = [];
   var cluster_colours = ['blue','red','magenta','orange','yellow','cyan','pink','white','green'];
   var epsilon = 0.000001;
+  var representative_tree_indexes = [];
+  Object.keys(tree_summary.clusters).forEach(function(cidx){
+    representative_tree_indexes.push(tree_summary.clusters[cidx].representative_tree)
+  })
   // Get the branching, linear and clustering indexes and calculate the BI/(LI+BI) value for scatter plotting.
   Object.keys(tree_summary.trees).forEach(function(tidx) {
     tidx = parseInt(tidx, 10);
@@ -286,18 +288,18 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     CIs.push(T.clustering_index);
     // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
     nBIs.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
-    marker_symbols.push(tidx === best_tree_idx ? 'cross' : 'dot');
-    marker_sizes.push(tidx === best_tree_idx ? 30 : 6);
+    marker_symbols.push(representative_tree_indexes.includes(tidx) ? 'cross' : 'dot');
+    marker_sizes.push(representative_tree_indexes.includes(tidx) ? 30 : 6);
   });
-  
+  var marker_colours = this._determine_trees_colours(tree_summary,cluster_colours);
+
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(tree_summary, cluster_colours);
   // Create the traces for the data points
-  var marker_colours = this._determine_trees_colours(tree_summary,cluster_colours);
   var scatter_traces = this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colours);
   var traces = ellipse_traces.concat(scatter_traces);
   
-  //Finally, use the traces, buttons and plotting options created above to actually plot our data.
+  //Finally, use the traces and plotting options created above to actually plot our data.
   var layout = {
     title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
     height: 1000,
