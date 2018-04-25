@@ -92,8 +92,9 @@ class TreeClusterer:
     data = np.array(data);
     num_clusters = self._get_components_min_bic(data)
     gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
-    #There are instances in which gmm wil find clusters that have no hard assignements. 
-    #We should rerun gmm with one less cluster in that case as we are only interested in trees with hard assignements
+    #There are instances in which gmm will find clusters that have no hard assignements. 
+    #We should rerun gmm with one less cluster in that case as we are only interested in
+    #clusters with hard assignments
     clusters_with_hard_assignments = list(set(gmm.predict(data)));
     if len(clusters_with_hard_assignments) != num_clusters:
           num_clusters = num_clusters-1;
@@ -223,6 +224,14 @@ class TreeClusterer:
     """
     Determine the best tree to represent the given members input (typically all tree members that belong to a cluster)
     """
+    
+    #Testing something. Because of the post-processing of the trees (deleting subclones) sometimes all trees in a cluster
+    #will have the exact same branching, linearity and coclustering indicies. I will check for that and just say that, 
+    #arbitrarily, the rep tree is the first in the cluster. They are all the same anyways so should all be "representative".
+    #Still, should bring this up to Jeff.
+    if all(i == x[0] for i in x) and all(i == y[0] for i in y):
+      return 1;
+
     data = np.vstack((x,y))
     try:
       density = list(sp.stats.gaussian_kde(data)(data));
