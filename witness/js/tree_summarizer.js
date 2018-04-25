@@ -2,10 +2,6 @@ function TreeSummarizer() {
 }
 
 TreeSummarizer.prototype._render_cluster_table = function(summary) {
-  if(!summary.hasOwnProperty('clusters')){
-    return;
-  };
-
   var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
   cluster_table = cluster_table.find('tbody');
   
@@ -363,6 +359,21 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
   return traces
 }
 
+TreeSummarizer.prototype._is_using_old_data = function(summary){
+    // Check to see if using older data. If so, may not be able to plot some graphs.
+    var using_old_data = false;
+    if(!summary.hasOwnProperty('clusters')){
+      using_old_data = true;
+    };
+    Object.keys(summary.clusters).forEach(function(cKey){
+      if (!summary.clusters[cKey].hasOwnProperty('members')){
+        using_old_data = true;
+        return
+      }
+    })
+    return using_old_data;
+}
+
 TreeSummarizer.prototype.render = function(dataset) {
   this._render_vafs(dataset);
 
@@ -402,9 +413,12 @@ TreeSummarizer.prototype.render = function(dataset) {
         }
       }
     });
-    
-    self._render_cluster_table(summary);
-    self._render_lin_idx_vs_branch_idx(summary);
+    if(!self._is_using_old_data(summary)){
+      // These functions require that the summ file be created with the latest version of write_results.
+      // If not, then just skip these sections.
+      self._render_cluster_table(summary);
+      self._render_lin_idx_vs_branch_idx(summary);
+    }
     self._render_cell_prevs(cell_prevs);
     self._render_ssm_counts(ssm_counts);
     self._render_pop_counts(pop_counts, min_ssms);

@@ -34,19 +34,20 @@ TreeViewer.prototype._determine_table_trees = function(summary){
   }else{
     //Show up to 5 trees from each cluster. One of these should be the
     //representative tree for that cluster, and I suppose the others
-    //will be those with the highest likelihood?
-    tree_indices = [];
+    //will be picked at random?
+    var tree_indices = [];
     Object.keys(summary.clusters).forEach(function(cidx){
       if (summary.clusters[cidx].members.length<=5){
-        tree_indicies.push(summary.clusters[cidx].members)
-        return
+        tree_indices = tree_indices.concat(summary.clusters[cidx].members)
       }
-      rep_tree = summary.clusters[cidx].representative_tree;
-      members = summary.clusters[cidx].members.sort(function() {return 0.5 - Math.random()});
-      tree_indices.push([rep_tree]);
-      [0,1,2,3].forEach(function(idx){
-        tree_indices.push(members[idx] === rep_tree ? members[4] : members[idx]);
-      })    
+      else{
+        rep_tree = summary.clusters[cidx].representative_tree;
+        members = summary.clusters[cidx].members.sort(function() {return 0.5 - Math.random()});
+        tree_indices.push(rep_tree);
+        [0,1,2,3].forEach(function(idx){
+          tree_indices.push(members[idx] === rep_tree ? members[4] : members[idx]);
+        })
+      }
     })
     return tree_indices
   }
