@@ -214,6 +214,76 @@ TreeSummarizer.prototype._extract_indices = function(tree_summ) {
   this.num_trees = Object.keys(this.linearity_indices).length;
 }
 
+TreeSummarizer.prototype._determine_cluster_colour_ordering = function(summary,colors){
+  // Will set the colour of the clusters so that when a colour is repeated, 
+  // the color is such that it is farthest from other clusters of the same
+  // colour.
+  var ordered_colours = colors;
+  var cluster_xpoints = [];
+  var cluster_ypoints = [];
+  var nCol = colors.length;
+  var epsilon = 0.00001;
+  console.log('test')
+  Object.keys(summary.clusters).forEach(function(cidx){ 
+    var clust = summary.clusters[cidx];
+    cidx = parseInt(cidx,10);
+    var rep_tree = summary.trees[clust.representative_tree];
+    var this_CI = rep_tree.clustering_index;
+    var this_nBI = rep_tree.branching_index / (rep_tree.branching_index + rep_tree.linearity_index + epsilon);
+    cluster_xpoints.push(this_CI)
+    cluster_ypoints.push(this_nBI)
+    if(cidx > nCol){
+      var nRep = Math.floor(cidx/nCol);
+      // Determine minimum distance to any cluster of a specific colour.
+      var min_dist_to_col = {};
+      for(i = 0; i<cidx-1; i++){
+        var thisCol = ordered_colours[i];
+        var dist_to_clust = Math.sqrt((cluster_xpoints[i]-this_CI)**2 + (cluster_ypoints[i]-this_nBI)**2);
+        min_dist_to_col[thisCol] = min_dist_to_col[thisCol] ? Math.min.apply(null,[min_dist_to_col[thisCol], dist_to_clust]) : dist_to_clust;
+      }
+      console.log(cidx)
+      console.log(min_dist_to_col);
+      var distances = Object.keys( min_dist_to_col ).map(function ( key ) { return min_dist_to_col[key]; });
+      var colours = Object.keys( min_dist_to_col );
+      // Choose the new colour as the one that is farthest from the new clusters location.
+      var farthest_distance_idx = distances.indexOf(Math.max.apply(null,distances));
+      var new_colour = colours[farthest_distance_idx];
+      // And finally push the colour of the farthest cluster
+      ordered_colours.push(new_colour)
+    }
+  })
+  return ordered_colours;
+}
+
+TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
+  if(!tree_summary.hasOwnProperty('tree_densities')) {
+    return;
+  }
+
+  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
+  var cluster_colours = this._determine_cluster_colour_ordering(tree_summary, Config.cluster_colours);
+  // Determine the ellipse traces that define the cluster contours
+  var ellipse_traces = this._create_cluster_contour_traces(tree_summary, cluster_colours);
+  // Create the traces for the data points
+  var scatter_traces = this._create_scatter_traces(tree_summary,cluster_colours);
+  var traces = ellipse_traces.concat(scatter_traces);
+  
+  //Use the traces and plotting options to actually plot our data.
+  var layout = {
+    title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
+    height: 1000,
+    xaxis: { title: 'CI'},
+    yaxis: { title: 'BI/(LI+BI)'},
+    hovermode: 'closest',
+    plot_bgcolor: '#440154',
+    showlegend: true
+  };
+  var container = document.querySelector('#container');
+  var plot_container = document.createElement('div');
+  container.appendChild(plot_container);
+  Plotly.newPlot(plot_container, traces, layout);
+}
+
 TreeSummarizer.prototype._find_best_tree = function(densities) {
   var max_density = 0;
   var best_tidx = null;
@@ -233,94 +303,49 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
   return parseInt(best_tidx, 10);
 }
 
-TreeSummarizer.prototype._create_index_scatter_trace = function(xdata, ydata, labels, marker_symbols, marker_sizes, marker_colour) {
-  var trace = {
-    x: xdata,
-    y: ydata,
-    name: 'trees',
-    mode: 'markers',
-    type: 'scatter',
-    text: labels,
-    showlegend: false,
-    marker: {
-      symbol: marker_symbols,
-      size: marker_sizes,
-      line: { width: 0 },
-      colorscale: 'Viridis',
-      color: marker_colour,
-    }
-  };
-
-  return trace;
-}
-
-TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
-  if(!tree_summary.hasOwnProperty('tree_densities')) {
-    return;
-  }
-
-  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
-  var BIs = [];
-  var LIs = [];
-  var CIs = [];
-  var nBIs = [];
-  var marker_symbols = [];
-  var marker_sizes = [];
-  var labels = [];
-  var cluster_colours = ['blue','red','magenta','orange','yellow','cyan','pink','white','green'];
-  var epsilon = 0.000001;
-  var representative_tree_indexes = [];
+TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster_colours) {
+  var traces = [];
+  var epsilon = 0.000001
   Object.keys(tree_summary.clusters).forEach(function(cidx){
-    representative_tree_indexes.push(tree_summary.clusters[cidx].representative_tree)
-  })
-  // Get the branching, linear and clustering indexes and calculate the BI/(LI+BI) value for scatter plotting.
-  Object.keys(tree_summary.trees).forEach(function(tidx) {
-    tidx = parseInt(tidx, 10);
-    var T = tree_summary.trees[tidx];
-
-    labels.push('Tree ' + tidx);
-    BIs.push(T.branching_index);
-    LIs.push(T.linearity_index);
-    CIs.push(T.clustering_index);
-    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0).
-    nBIs.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
-    marker_symbols.push(representative_tree_indexes.includes(tidx) ? 'cross' : 'dot');
-    marker_sizes.push(representative_tree_indexes.includes(tidx) ? 30 : 6);
-  });
-  var marker_colours = this._determine_trees_colours(tree_summary,cluster_colours);
-
-  // Determine the ellipse traces that define the cluster contours
-  var ellipse_traces = this._create_cluster_contour_traces(tree_summary, cluster_colours);
-  // Create the traces for the data points
-  var scatter_traces = this._create_index_scatter_trace(xdata=CIs, ydata=nBIs, labels, marker_symbols, marker_sizes, marker_colours);
-  var traces = ellipse_traces.concat(scatter_traces);
-  
-  //Finally, use the traces and plotting options created above to actually plot our data.
-  var layout = {
-    title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
-    height: 1000,
-    xaxis: { title: 'CI'},
-    yaxis: { title: 'BI/(LI+BI)'},
-    hovermode: 'closest',
-    plot_bgcolor: '#440154',
-    showlegend: true
-  };
-  var container = document.querySelector('#container');
-  var plot_container = document.createElement('div');
-  container.appendChild(plot_container);
-  Plotly.newPlot(plot_container, traces, layout);
-}
-
-TreeSummarizer.prototype._determine_trees_colours = function(tree_summary,cluster_colours){
-  num_trees = tree_summary.trees.length;
-  colours = new Array(num_trees);
-  Object.keys(tree_summary.clusters).forEach(function(cidx) {
-    this_clust = tree_summary.clusters[cidx]
-    Object.keys(this_clust.members).forEach(function(memidx){
-      colours[this_clust.members[memidx]] = cluster_colours[cidx];
+    var label_clust_index = parseInt(cidx,10) + 1;
+    var members = tree_summary.clusters[cidx].members;
+    var xData = [];
+    var yData = [];
+    var labels = [];
+    var marker_symbols = [];
+    var marker_sizes = [];
+    var marker_colours = [];
+    var rep_tree_index = tree_summary.clusters[cidx].representative_tree;
+    Object.keys(members).forEach(function(midx){
+      var tidx = members[midx];
+      var T = tree_summary.trees[tidx];
+      xData.push(T.clustering_index)
+      // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0)
+      yData.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+      
+      labels.push('Tree ' + tidx + ' - Cluster ' + (label_clust_index));
+      marker_symbols.push(rep_tree_index === tidx ? 'cross' : 'dot');
+      marker_sizes.push(rep_tree_index === tidx ? 30 : 6);
+      marker_colours.push(cluster_colours[cidx])
+    });
+    traces.push({
+      x: xData,
+      y: yData,
+      name: 'Cluster ' + label_clust_index,
+      mode: 'markers',
+      type: 'scatter',
+      text: labels,
+      showlegend: !Config.show_tree_cluster_contours,
+      marker: {
+        symbol: marker_symbols,
+        size: marker_sizes,
+        line: { width: 0 },
+        colorscale: 'Viridis',
+        color: marker_colours,
+      }
     })
   })
-  return colours
+  return traces
 }
 
 TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary, cluster_colours) {
@@ -340,7 +365,7 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
     var min_axis = C.ellipse.minor_axis //the distance between the center of the ellipse and the closest point, ie, the lowest variance of the gaussian
     var xpoints = [];
     var ypoints = [];
-    for(var theta = 0.; theta <= 2.*Math.PI + 0.05; theta+=2.*Math.PI/200.){
+    for(var theta = 0.; theta <= 2.*Math.PI + 0.05; theta+=2.*Math.PI/360.){
       //equations for x and y values of the ellipse described by the mean, angle, major axis and minor axis, as described as a function of theta.
       xpoints.push(mean[0] + maj_axis*Math.cos(angle)*Math.cos(theta) - min_axis*Math.sin(angle)*Math.sin(theta))
       ypoints.push(mean[1] + maj_axis*Math.sin(angle)*Math.cos(theta) + min_axis*Math.cos(angle)*Math.sin(theta))
@@ -350,9 +375,10 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
       x: xpoints,
       y: ypoints,
       name: 'cluster ' + clust_count,
+      text: 'cluster ' + clust_count,
       type: 'scatter',
       mode: 'lines',
-      hoverinfo: 'none',
+      visible: Config.show_tree_cluster_contours,
       line: {color: cluster_colours[cidx]}
     })
   });
