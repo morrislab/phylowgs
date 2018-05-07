@@ -1,7 +1,3 @@
-Config = {
-  font_size: 15
-};
-
 var MARKER = '<defs><marker id="head" orient="auto" markerWidth="2" markerHeight="4" refX="0" refY="2"><path d="M0,0 V4 L2,2 Z" fill="#000" /></marker></defs>';
 
 function mean(list) {

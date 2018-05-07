@@ -32,21 +32,29 @@ TreeViewer.prototype._determine_table_trees = function(summary){
   if (Config.show_all_trees){
     return Util.sort_ints(Object.keys(summary.trees));
   }else{
-    //Show up to 5 trees from each cluster. One of these should be the
-    //representative tree for that cluster, and I suppose the others
-    //will be picked at random?
+    //Show a specified number of trees from each cluster. One of these should be the
+    //representative tree for that cluster, and the others will be picked at random.
     var tree_indices = [];
+    var rand_num_idx = 0;
     Object.keys(summary.clusters).forEach(function(cidx){
-      if (summary.clusters[cidx].members.length<=5){
-        tree_indices = tree_indices.concat(summary.clusters[cidx].members)
+      clust_members = summary.clusters[cidx].members;
+      if (clust_members.length<=Config.num_trees_to_show){
+        tree_indices = tree_indices.concat(clust_members)
       }
       else{
+        //Representative tree should always be shown
         rep_tree = summary.clusters[cidx].representative_tree;
-        members = summary.clusters[cidx].members.sort(function() {return 0.5 - Math.random()});
         tree_indices.push(rep_tree);
-        [0,1,2,3].forEach(function(idx){
-          tree_indices.push(members[idx] === rep_tree ? members[4] : members[idx]);
-        })
+        //Get the indicies of 4 other random trees. They should not repeat nor should they contain the rep_tree index
+        trees_added = 0;
+        while(trees_added < Config.num_trees_to_show-1){
+          this_mem = Math.floor( Config.tree_index_determinants[rand_num_idx] * clust_members.length );
+          if(!(tree_indices.includes(clust_members[this_mem])) && !(clust_members[this_mem] == rep_tree)){
+            tree_indices.push(clust_members[this_mem]);
+            trees_added = trees_added + 1;
+          }
+         rand_num_idx = rand_num_idx + 1;
+        }
       }
     })
     return tree_indices
