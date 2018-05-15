@@ -311,9 +311,12 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
 
 TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster_colours,xData,yData) {
   var traces = [];
+  var colour_idx = 0;
   Object.keys(tree_summary.clusters).forEach(function(cidx){
     var label_clust_index = parseInt(cidx,10) + 1;
     var members = tree_summary.clusters[cidx].members;
+    var this_xData = [];
+    var this_yData = [];
     var labels = [];
     var marker_symbols = [];
     var marker_sizes = [];
@@ -324,11 +327,14 @@ TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster
       labels.push('Tree ' + tidx + ' - Cluster ' + (label_clust_index));
       marker_symbols.push(rep_tree_index === tidx ? 'cross' : 'dot');
       marker_sizes.push(rep_tree_index === tidx ? 30 : 6);
-      marker_colours.push(cluster_colours[cidx])
+      marker_colours.push(cluster_colours[colour_idx])
+      this_xData.push(xData[tidx])
+      this_yData.push(yData[tidx])
     });
+    colour_idx = colour_idx+1;
     traces.push({
-      x: xData,
-      y: yData,
+      x: this_xData,
+      y: this_yData,
       name: 'Cluster ' + label_clust_index,
       mode: 'markers',
       type: 'scatter',
