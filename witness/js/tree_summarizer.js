@@ -214,44 +214,39 @@ TreeSummarizer.prototype._extract_indices = function(tree_summ) {
   this.num_trees = Object.keys(this.linearity_indices).length;
 }
 
-TreeSummarizer.prototype._determine_cluster_colour_ordering = function(summary,colors){
-  // Will set the colour of the clusters so that when a colour is repeated, 
-  // the color is such that it is farthest from other clusters of the same
-  // colour.
-  var ordered_colours = colors;
-  var cluster_xpoints = [];
-  var cluster_ypoints = [];
+TreeSummarizer.prototype._determine_cluster_colour_ordering = function(summary,colors,xData,yData){
+  // Will assign colours to clusters ordered from the top to the bottom.
+  // Once out of colours, assign starting in the bottom and continue to the top.
+  // Repeat.
+  var self = this;
   var nCol = colors.length;
-  var epsilon = 0.00001;
-  console.log('test')
-  Object.keys(summary.clusters).forEach(function(cidx){ 
-    var clust = summary.clusters[cidx];
-    cidx = parseInt(cidx,10);
-    var rep_tree = summary.trees[clust.representative_tree];
-    var this_CI = rep_tree.clustering_index;
-    var this_nBI = rep_tree.branching_index / (rep_tree.branching_index + rep_tree.linearity_index + epsilon);
-    cluster_xpoints.push(this_CI)
-    cluster_ypoints.push(this_nBI)
-    if(cidx > nCol){
-      var nRep = Math.floor(cidx/nCol);
-      // Determine minimum distance to any cluster of a specific colour.
-      var min_dist_to_col = {};
-      for(i = 0; i<cidx-1; i++){
-        var thisCol = ordered_colours[i];
-        var dist_to_clust = Math.sqrt((cluster_xpoints[i]-this_CI)**2 + (cluster_ypoints[i]-this_nBI)**2);
-        min_dist_to_col[thisCol] = min_dist_to_col[thisCol] ? Math.min.apply(null,[min_dist_to_col[thisCol], dist_to_clust]) : dist_to_clust;
-      }
-      console.log(cidx)
-      console.log(min_dist_to_col);
-      var distances = Object.keys( min_dist_to_col ).map(function ( key ) { return min_dist_to_col[key]; });
-      var colours = Object.keys( min_dist_to_col );
-      // Choose the new colour as the one that is farthest from the new clusters location.
-      var farthest_distance_idx = distances.indexOf(Math.max.apply(null,distances));
-      var new_colour = colours[farthest_distance_idx];
-      // And finally push the colour of the farthest cluster
-      ordered_colours.push(new_colour)
-    }
+  var nClust = Object.keys(summary.clusters).length;
+  if (nCol>nClust){
+    return colors.slice(0,nClust);
+  }
+  
+  // Order the clusters according to their center positions, starting at the top
+  var clust_ypos = [];
+  var clust_nums = [];
+  var count = 0;
+  Object.keys(summary.clusters).forEach(function(cidx){
+    clust_ypos.push(summary.clusters[cidx].mean[1]);
+    clust_nums.push(count);
+    count = count + 1;
   })
+  var ordered_colours = Array(nClust);
+  var top_ordered = true;
+  for(count=0; count<nClust; count++){
+    if(top_ordered){
+      var cidx = clust_ypos.indexOf(Math.max(...clust_ypos));
+    }else{
+      var cidx = clust_ypos.indexOf(Math.min(...clust_ypos));
+    }
+    ordered_colours[clust_nums[cidx]] = colors[count % nCol];
+    clust_ypos.splice(cidx,1)
+    clust_nums.splice(cidx,1)
+    top_ordered = (Math.floor(count/nCol) % 2) == 0;
+  }
   return ordered_colours;
 }
 
@@ -260,12 +255,23 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     return;
   }
 
+  // Calculcate the xData and yData from the indicies
+  var xData = [];
+  var yData = [];
+  var epsilon = 0.000001
+  Object.keys(tree_summary.trees).forEach(function(tidx){
+    var T = tree_summary.trees[tidx];
+    xData.push(T.clustering_index)
+    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0)
+    yData.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+  });
+
   var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
-  var cluster_colours = this._determine_cluster_colour_ordering(tree_summary, Config.cluster_colours);
+  var cluster_colours = this._determine_cluster_colour_ordering(tree_summary, Config.cluster_colours, xData, yData);
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(tree_summary, cluster_colours);
   // Create the traces for the data points
-  var scatter_traces = this._create_scatter_traces(tree_summary,cluster_colours);
+  var scatter_traces = this._create_scatter_traces(tree_summary,cluster_colours,xData,yData);
   var traces = ellipse_traces.concat(scatter_traces);
   
   //Use the traces and plotting options to actually plot our data.
@@ -303,14 +309,11 @@ TreeSummarizer.prototype._find_best_tree = function(densities) {
   return parseInt(best_tidx, 10);
 }
 
-TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster_colours) {
+TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster_colours,xData,yData) {
   var traces = [];
-  var epsilon = 0.000001
   Object.keys(tree_summary.clusters).forEach(function(cidx){
     var label_clust_index = parseInt(cidx,10) + 1;
     var members = tree_summary.clusters[cidx].members;
-    var xData = [];
-    var yData = [];
     var labels = [];
     var marker_symbols = [];
     var marker_sizes = [];
@@ -318,11 +321,6 @@ TreeSummarizer.prototype._create_scatter_traces = function(tree_summary, cluster
     var rep_tree_index = tree_summary.clusters[cidx].representative_tree;
     Object.keys(members).forEach(function(midx){
       var tidx = members[midx];
-      var T = tree_summary.trees[tidx];
-      xData.push(T.clustering_index)
-      // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0)
-      yData.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
-      
       labels.push('Tree ' + tidx + ' - Cluster ' + (label_clust_index));
       marker_symbols.push(rep_tree_index === tidx ? 'cross' : 'dot');
       marker_sizes.push(rep_tree_index === tidx ? 30 : 6);
@@ -355,6 +353,7 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
   
   var traces = [];
   var clust_count = 0;
+  var colour_idx = 0;
   Object.keys(tree_summary.clusters).forEach(function(cidx) {
     //cidx = parseInt(cidx, 10);
     clust_count = clust_count + 1;
@@ -379,8 +378,9 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(tree_summary,
       type: 'scatter',
       mode: 'lines',
       visible: Config.show_tree_cluster_contours,
-      line: {color: cluster_colours[cidx]}
+      line: {color: cluster_colours[colour_idx]}
     })
+    colour_idx = colour_idx + 1;
   });
   return traces
 }

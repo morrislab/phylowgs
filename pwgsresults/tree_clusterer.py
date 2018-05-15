@@ -1,5 +1,5 @@
 import numpy as np
-from sklearn.mixture import GaussianMixture
+from sklearn.mixture import BayesianGaussianMixture
 from pwgsresults.index_calculator import IndexCalculator
 from scipy import linalg
 import scipy as sp
@@ -90,20 +90,25 @@ class TreeClusterer:
     
     out = {};
     data = np.array(data);
-    num_clusters = self._get_components_min_bic(data)
-    gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
+
+    num_clusters = 50;
+    gmm = BayesianGaussianMixture(n_components=num_clusters, n_init=3, covariance_type="full", verbose=1, weight_concentration_prior=1e6, max_iter=500).fit(data)
+    #num_clusters = self._get_components_min_bic(data)
+    #gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
     #There are instances in which gmm will find clusters that have no hard assignements. 
     #We should rerun gmm with one less cluster in that case as we are only interested in
-    #clusters with hard assignments
-    clusters_with_hard_assignments = list(set(gmm.predict(data)));
-    if len(clusters_with_hard_assignments) != num_clusters:
-          num_clusters = num_clusters-1;
-          gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
+    #clusters with hard assignments.
+    #clusters_with_hard_assignments = list(set(gmm.predict(data)));
+    #if len(clusters_with_hard_assignments) != num_clusters:
+    #      num_clusters = num_clusters-1;
+    #      gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
     #Create an output dictionary that will contain all of the relevant information for each cluster
     cluster_assignments = gmm.predict(data)
     cluster_responsibilities = gmm.predict_proba(data)
     for this_clust_idx in range(num_clusters):
       this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx];
+      if not this_clust_member_idxs:
+            continue
       this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx];
       this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1]);
       rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx];
