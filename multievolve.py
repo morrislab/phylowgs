@@ -159,6 +159,9 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
                 #the logged likelihood is in the names of the trees, just use that.
                 logLHs.append(float(tree_name.split('_')[-1]))
         logSumLHs.append(logsumexp(logLHs))
+
+    # Check below assumes that LLH < 0, which it should always be.
+    assert np.all(logSumLHs < 0)
     bestLogSumLH = np.max(logSumLHs)
     chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH > (chain_inclusion_factor*bestLogSumLH)]
     return chains_to_merge
