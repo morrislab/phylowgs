@@ -5,6 +5,7 @@ import random
 import signal
 import zipfile
 import numpy as np
+import sys
 
 def create_directory(dirname):
     if not os.path.exists(dirname):
@@ -84,16 +85,17 @@ def run(args,evolve_args,chain_index,working_dir,current_dir,output_dir):
     Start a new subprocess for every call to evolve. Return the subprocess
     so that we can capture its outputs and see if it is complete.
     '''
-    bashCommand = ["python2", \
+    cmd = [
+        sys.executable,
         os.path.join(working_dir, "evolve.py"), \
         "-B", str(args['burnin_samples']), \
         "-s", str(args['mcmc_samples']), \
         "-r", str(args['random_seeds'][chain_index]),\
         os.path.join(current_dir,args['ssm_file']), \
         os.path.join(current_dir,args['cnv_file'])]
-    bashCommand = bashCommand + list(evolve_args)
+    cmd = cmd + list(evolve_args)
     print "Starting chain " + str(chain_index)
-    process = subprocess.Popen(bashCommand,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
+    process = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
     return process
 
 def watch_chains(args,processes):
