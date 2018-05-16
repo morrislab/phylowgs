@@ -87,14 +87,15 @@ def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
     '''
     cmd = [
         sys.executable,
-        os.path.join(app_dir, "evolve.py"), \
-        "-B", str(args['burnin_samples']), \
-        "-s", str(args['mcmc_samples']), \
-        "-r", str(args['random_seeds'][chain_index]),\
-        os.path.join(working_dir,args['ssm_file']), \
-        os.path.join(working_dir,args['cnv_file'])]
+        os.path.join(app_dir, "evolve.py"),
+        "-B", str(args['burnin_samples']),
+        "-s", str(args['mcmc_samples']),
+        "-r", str(args['random_seeds'][chain_index]),
+        os.path.join(working_dir,args['ssm_file']),
+        os.path.join(working_dir,args['cnv_file'])
+    ]
     cmd = cmd + list(evolve_args)
-    print "Starting chain " + str(chain_index)
+    print("Starting chain %s" % chain_index)
     process = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
     return process
 
@@ -110,7 +111,7 @@ def watch_chains(args,processes):
 
     num_chains = args['num_chains']
     progression_text = ['\n']*len(processes)
-    print "".join(progression_text)
+    print("".join(progression_text))
     while True:
         #Check to see if all processes are done running and if so, exit the while loop
         all_dead = all([processes[i].poll()!=None for i in range(num_chains)])
@@ -141,10 +142,11 @@ def watch_chains(args,processes):
               progression_text[chain_index] = "chain{}: {}/{} - {}% complete\n".format(chain_index, trees_done, total_trees, percent_complete)
             else:
               other_text.append("chain{}: {}".format(chain_index,new_line))
-        print "\033[F"*(num_chains+1), # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
-        print "".join(other_text),
-        print " "*70 #blank line between "other text" and progression text.
-        print "".join(progression_text),
+
+        print("\033[F"*(num_chains+1)) # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
+        print("".join(other_text))
+        print("") #blank line between "other text" and progression text.
+        print("".join(progression_text))
 
 def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     '''
@@ -179,13 +181,13 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     out_dir = os.path.join(args['output_directory'],'merged_best_chains')
     create_directory(out_dir)
     if os.path.isfile(os.path.join(out_dir,"trees.zip")):
-        print "Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first."
+        print("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
         return
     combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-    print "Merging best chains:"
+    print("Merging best chains:")
     tree_index = 0
     for chain_idx in chains_to_merge:
-        print "  merging chain {} ...".format(chain_idx)
+        print("  merging chain {} ...".format(chain_idx))
         chain_dir = chain_dirs[chain_idx]
         this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r')
         this_zips_files = this_zip.namelist()
@@ -201,9 +203,9 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     #chains zip file. So just take the last one used and insert it.
     combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
     combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
-    print "Chain merging complete."
-    print "It is recommended that individual chain runs are deleted as they occupy quite a bit of space."
-    print "To delete individual chain information, just type 'rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip'"
+    print("Chain merging complete.")
+    print("It is recommended that individual chain runs are deleted as they occupy quite a bit of space.")
+    print("To delete individual chain information, just type 'rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip'")
 
 def main():
     args,evolve_args = parse_args()
