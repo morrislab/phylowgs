@@ -37,7 +37,7 @@ def parse_args():
                'includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
           help='Directory where results from each chain will be saved. If directory does not exist, ' \
-               'will attempt to create it here. (Default = "current_directory/multevolve_chains")')
+               'will attempt to create it here. (Default = "working_directory/multevolve_chains")')
     parser.add_argument('-sf','--ssm-file',dest='ssm_file',
         help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
     parser.add_argument('-cf','--cnv-file',dest='cnv_file',
@@ -67,32 +67,32 @@ def run_chains(args,evolve_args):
     and cnv files, and create the output directories for each chain. Create a subprocess
     for each chain so that they may all run at the same time.
     '''
-    current_dir = os.getcwd()
-    working_dir = os.path.dirname(os.path.realpath(__file__))
+    working_dir = os.getcwd()
+    app_dir = os.path.dirname(os.path.realpath(__file__))
     processes = []
     out_dirs = []
     for chain_index in range(args['num_chains']):
         output_dir = os.path.join(args['output_directory'],"chain_"+str(chain_index))
         out_dirs.append(output_dir)
         create_directory(output_dir)
-        process = run(args,evolve_args,chain_index,working_dir,current_dir,output_dir)
+        process = run(args,evolve_args,chain_index,app_dir,working_dir,output_dir)
         processes.append(process)
     watch_chains(args,processes)
     return out_dirs
 
-def run(args,evolve_args,chain_index,working_dir,current_dir,output_dir):
+def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
     '''
     Start a new subprocess for every call to evolve. Return the subprocess
     so that we can capture its outputs and see if it is complete.
     '''
     cmd = [
         sys.executable,
-        os.path.join(working_dir, "evolve.py"), \
+        os.path.join(app_dir, "evolve.py"), \
         "-B", str(args['burnin_samples']), \
         "-s", str(args['mcmc_samples']), \
         "-r", str(args['random_seeds'][chain_index]),\
-        os.path.join(current_dir,args['ssm_file']), \
-        os.path.join(current_dir,args['cnv_file'])]
+        os.path.join(working_dir,args['ssm_file']), \
+        os.path.join(working_dir,args['cnv_file'])]
     cmd = cmd + list(evolve_args)
     print "Starting chain " + str(chain_index)
     process = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
