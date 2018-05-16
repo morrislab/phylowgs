@@ -8,11 +8,11 @@ import numpy as np
 
 def create_directory(dirname):
     if not os.path.exists(dirname):
-        os.makedirs(dirname);  
+        os.makedirs(dirname)
 
 def logsumexp(a):
-    #numpy has a logaddexp() but it only takes two values and that's stupid so 
-    #I'm just going to create my own logsumexp here. 
+    #numpy has a logaddexp() but it only takes two values and that's stupid so
+    #I'm just going to create my own logsumexp here.
     max_a = np.max(a)
     result = max_a + np.log(np.sum([np.exp(i-max_a) for i in a]))
     return result
@@ -50,7 +50,7 @@ def check_args(args):
         args['output_directory'] = os.path.join(os.getcwd(),"multevolve_chains")
         create_directory(args['output_directory'])
 
-    #Make sure the arguments make sense. Right now just have to check that the 
+    #Make sure the arguments make sense. Right now just have to check that the
     #list of random seeds, if this was provided by the user, has length = num_chains.
     if len(args['random_seeds']) != args['num_chains']:
         raise ValueError("Number of chains is not equal to the number of input seeds.")
@@ -62,7 +62,7 @@ def run_chains(args,evolve_args):
     and cnv files, and create the output directories for each chain. Create a subprocess
     for each chain so that they may all run at the same time.
     '''
-    current_dir = os.getcwd(); 
+    current_dir = os.getcwd()
     working_dir = os.path.dirname(os.path.realpath(__file__))
     processes = []
     out_dirs = []
@@ -77,7 +77,7 @@ def run_chains(args,evolve_args):
 
 def run(args,evolve_args,chain_index,working_dir,current_dir,output_dir):
     '''
-    Start a new subprocess for every call to evolve. Return the subprocess 
+    Start a new subprocess for every call to evolve. Return the subprocess
     so that we can capture its outputs and see if it is complete.
     '''
     bashCommand = ["python2", \
@@ -110,11 +110,11 @@ def watch_chains(args,processes):
         all_dead = all([processes[i].poll()!=None for i in range(num_chains)])
         if all_dead:
             break
-        # Capture the output from each process, modify it, and output it. 
+        # Capture the output from each process, modify it, and output it.
         # Note: process.stdout returns a file handle from which you can read outputs, however if you
         # call readline and there is no new information to read, it will wait until there is until
         # returning which is really annoying. So I set up a timer here to throw an exception if
-        # more than 0.1 seconds passes so that we can move on to read info from another process that may already 
+        # more than 0.1 seconds passes so that we can move on to read info from another process that may already
         # have output to read.
         other_text = []
         for chain_index in range(num_chains):
@@ -133,7 +133,7 @@ def watch_chains(args,processes):
               total_trees = args['burnin_samples']+args['mcmc_samples']
               percent_complete = 100*trees_done/total_trees
               progression_text[chain_index] = "chain{}: {}/{} - {}% complete\n".format(chain_index, trees_done, total_trees, percent_complete)
-            else: 
+            else:
               other_text.append("chain{}: {}".format(chain_index,new_line))
         print "\033[F"*(num_chains+1), # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
         print "".join(other_text),
@@ -163,7 +163,7 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     '''
     Determines which chains are the best and merges them together into one trees.zip
     file that can be input into write_results.
-    A chain counts, for now, as being one of the best if the highest likelihood of all 
+    A chain counts, for now, as being one of the best if the highest likelihood of all
     of it's trees is within 10% of the highest likelihood of all of the trees calculated
     across all chains.
     '''
