@@ -30,9 +30,13 @@ def parse_args():
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
 		  help='Random seeds for initializing MCMC')
     parser.add_argument('-if', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
-		  help='Factor for determining which chains will be included in the output "merged" folder. Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain much be greater than 1.5x the maximum of that value across chains. Setting this value = inf includes all chains and setting it = 1 will include only the best chain.')
+		  help='Factor for determining which chains will be included in the output "merged" folder. ' \
+                       'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
+                       'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
+                       'includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
-		  help='Directory where results from each chain will be saved. If directory does not exist, will attempt to create it here. (Default = "current_directory/multevolve_chains")')
+		  help='Directory where results from each chain will be saved. If directory does not exist, ' \
+                          'will attempt to create it here. (Default = "current_directory/multevolve_chains")')
     parser.add_argument('-sf','--ssm-file',dest='ssm_file',
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
     parser.add_argument('-cf','--cnv-file',dest='cnv_file',
