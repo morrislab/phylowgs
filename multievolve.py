@@ -13,7 +13,7 @@ def create_directory(dirname):
 def logsumexp(a):
     #numpy has a logaddexp() but it only takes two values and that's stupid so 
     #I'm just going to create my own logsumexp here. 
-    max_a = np.max(a);
+    max_a = np.max(a)
     result = max_a + np.log(np.sum([np.exp(i-max_a) for i in a]))
     return result
 
@@ -38,22 +38,22 @@ def parse_args():
     parser.add_argument('-cf','--cnv-file',dest='cnv_file',
 		help='File listing CNVs (copy number variations).')
     args, evolve_args = parser.parse_known_args()
-    args = dict(args._get_kwargs());
+    args = dict(args._get_kwargs())
     return args, evolve_args
 
 def check_args(args):
     #Set default values for arguments that require function calls to calculate
     if not args['random_seeds']:
-        random.seed(0);
-        args['random_seeds'] = [random.randint(1,2**32) for i in range(args['num_chains'])];
+        random.seed(0)
+        args['random_seeds'] = [random.randint(1,2**32) for i in range(args['num_chains'])]
     if not args['output_directory']:
-        args['output_directory'] = os.path.join(os.getcwd(),"multevolve_chains");
-        create_directory(args['output_directory']);
+        args['output_directory'] = os.path.join(os.getcwd(),"multevolve_chains")
+        create_directory(args['output_directory'])
 
     #Make sure the arguments make sense. Right now just have to check that the 
     #list of random seeds, if this was provided by the user, has length = num_chains.
     if len(args['random_seeds']) != args['num_chains']:
-        raise ValueError("Number of chains is not equal to the number of input seeds.");
+        raise ValueError("Number of chains is not equal to the number of input seeds.")
     return args
 
 def run_chains(args,evolve_args):
@@ -63,16 +63,16 @@ def run_chains(args,evolve_args):
     for each chain so that they may all run at the same time.
     '''
     current_dir = os.getcwd(); 
-    working_dir = os.path.dirname(os.path.realpath(__file__));
-    processes = [];
-    out_dirs = [];
+    working_dir = os.path.dirname(os.path.realpath(__file__))
+    processes = []
+    out_dirs = []
     for chain_index in range(args['num_chains']):
-        output_dir = os.path.join(args['output_directory'],"chain_"+str(chain_index));
-        out_dirs.append(output_dir);
-        create_directory(output_dir);
-        process = run(args,evolve_args,chain_index,working_dir,current_dir,output_dir);
-        processes.append(process);
-    watch_chains(args,processes);
+        output_dir = os.path.join(args['output_directory'],"chain_"+str(chain_index))
+        out_dirs.append(output_dir)
+        create_directory(output_dir)
+        process = run(args,evolve_args,chain_index,working_dir,current_dir,output_dir)
+        processes.append(process)
+    watch_chains(args,processes)
     return out_dirs
 
 def run(args,evolve_args,chain_index,working_dir,current_dir,output_dir):
@@ -86,9 +86,9 @@ def run(args,evolve_args,chain_index,working_dir,current_dir,output_dir):
         "-s", str(args['mcmc_samples']), \
         "-r", str(args['random_seeds'][chain_index]),\
         os.path.join(current_dir,args['ssm_file']), \
-        os.path.join(current_dir,args['cnv_file'])];
-    bashCommand = bashCommand + list(evolve_args);
-    print "Starting chain " + str(chain_index);
+        os.path.join(current_dir,args['cnv_file'])]
+    bashCommand = bashCommand + list(evolve_args)
+    print "Starting chain " + str(chain_index)
     process = subprocess.Popen(bashCommand,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
     return process
 
@@ -100,23 +100,23 @@ def watch_chains(args,processes):
     '''
     def read_stdout_alarm_handler(signum, frame):
         raise Exception("subprocess.stdout.readline() took too long to complete.")
-    signal.signal(signal.SIGALRM,read_stdout_alarm_handler);
+    signal.signal(signal.SIGALRM,read_stdout_alarm_handler)
 
     num_chains = args['num_chains']
-    progression_text = ['\n']*len(processes);
+    progression_text = ['\n']*len(processes)
     print "".join(progression_text)
     while True:
         #Check to see if all processes are done running and if so, exit the while loop
-        all_dead = all([processes[i].poll()!=None for i in range(num_chains)]);
+        all_dead = all([processes[i].poll()!=None for i in range(num_chains)])
         if all_dead:
-            break;
+            break
         # Capture the output from each process, modify it, and output it. 
         # Note: process.stdout returns a file handle from which you can read outputs, however if you
         # call readline and there is no new information to read, it will wait until there is until
         # returning which is really annoying. So I set up a timer here to throw an exception if
         # more than 0.1 seconds passes so that we can move on to read info from another process that may already 
         # have output to read.
-        other_text = [];
+        other_text = []
         for chain_index in range(num_chains):
             #If the process is finished, then will return an empty string when calling readline(), skip this.
             if processes[chain_index].poll()!=None:
@@ -172,14 +172,14 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     if os.path.isfile(os.path.join(out_dir,"trees.zip")):
         print "Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first."
         return
-    combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True);
+    combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
     print "Merging best chains:"
-    tree_index = 0;
+    tree_index = 0
     for chain_idx in chains_to_merge:
         print "  merging chain {} ...".format(chain_idx)
-        chain_dir = chain_dirs[chain_idx];
-        this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r');
-        this_zips_files = this_zip.namelist();
+        chain_dir = chain_dirs[chain_idx]
+        this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r')
+        this_zips_files = this_zip.namelist()
         files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if "tree" in filename]
         for file in files_to_include:
             #First we need to reindex the tree
@@ -197,11 +197,11 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     print "To delete individual chain information, just type 'rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip'"
 
 def main():
-    args,evolve_args = parse_args();
-    check_args(args);
-    chain_dirs = run_chains(args,evolve_args);
-    chains_to_merge = determine_chains_to_merge(chain_dirs, args['chain_inclusion_factor']);
-    merge_best_chains(args, chain_dirs, chains_to_merge);
+    args,evolve_args = parse_args()
+    check_args(args)
+    chain_dirs = run_chains(args,evolve_args)
+    chains_to_merge = determine_chains_to_merge(chain_dirs, args['chain_inclusion_factor'])
+    merge_best_chains(args, chain_dirs, chains_to_merge)
 
 if __name__ == "__main__":
     main()
