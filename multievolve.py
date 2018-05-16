@@ -22,25 +22,25 @@ def parse_args():
       description='Concurrently run multiple chains of PhyloWGS.',
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
-		  help='Number of chains to run concurrently')
+          help='Number of chains to run concurrently')
     parser.add_argument('-B', '--burnin-samples', dest='burnin_samples', default=1000, type=int,
-		  help='Number of burnin samples')
+          help='Number of burnin samples')
     parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
-		  help='Number of MCMC samples')
+          help='Number of MCMC samples')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
-		  help='Random seeds for initializing MCMC')
+          help='Random seeds for initializing MCMC')
     parser.add_argument('-if', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
-		  help='Factor for determining which chains will be included in the output "merged" folder. ' \
-                       'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
-                       'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
-                       'includes all chains and setting it = 1 will include only the best chain.')
+          help='Factor for determining which chains will be included in the output "merged" folder. ' \
+               'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
+               'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
+               'includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
-		  help='Directory where results from each chain will be saved. If directory does not exist, ' \
-                          'will attempt to create it here. (Default = "current_directory/multevolve_chains")')
+          help='Directory where results from each chain will be saved. If directory does not exist, ' \
+               'will attempt to create it here. (Default = "current_directory/multevolve_chains")')
     parser.add_argument('-sf','--ssm-file',dest='ssm_file',
-		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
+        help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
     parser.add_argument('-cf','--cnv-file',dest='cnv_file',
-		help='File listing CNVs (copy number variations).')
+        help='File listing CNVs (copy number variations).')
     args, evolve_args = parser.parse_known_args()
     args = dict(args._get_kwargs())
     return args, evolve_args
