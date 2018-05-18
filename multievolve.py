@@ -6,6 +6,7 @@ import signal
 import zipfile
 import numpy as np
 import sys
+from util2 import logmsg
 
 def create_directory(dirname):
     if not os.path.exists(dirname):
@@ -42,6 +43,7 @@ def parse_args():
         help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
     parser.add_argument('-cf','--cnv-file',dest='cnv_file',
         help='File listing CNVs (copy number variations).')
+    # Send unrecognized arguments to evolve.py.
     args, evolve_args = parser.parse_known_args()
     args = dict(args._get_kwargs())
     return args, evolve_args
@@ -95,8 +97,8 @@ def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
         os.path.join(working_dir,args['cnv_file'])
     ]
     cmd = cmd + list(evolve_args)
-    print("Starting chain %s" % chain_index)
-    process = subprocess.Popen(cmd,stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
+    logmsg("Starting chain %s" % chain_index)
+    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
     return process
 
 def watch_chains(args,processes):
@@ -159,7 +161,7 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
         logLHs = []
         tree_zip_file = zipfile.ZipFile(os.path.join(chain_dir,'trees.zip'), mode = 'r')
         for tree_name in tree_zip_file.namelist():
-            if "tree" in tree_name:
+            if tree_name.startswith("tree"):
                 #the logged likelihood is in the names of the trees, just use that.
                 logLHs.append(float(tree_name.split('_')[-1]))
         logSumLHs.append(logsumexp(logLHs))
@@ -181,17 +183,17 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     out_dir = os.path.join(args['output_directory'],'merged_best_chains')
     create_directory(out_dir)
     if os.path.isfile(os.path.join(out_dir,"trees.zip")):
-        print("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
+        logmsg("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
         return
     combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-    print("Merging best chains:")
+    logmsg("Merging best chains:")
     tree_index = 0
     for chain_idx in chains_to_merge:
-        print("  merging chain {} ...".format(chain_idx))
+        logmsg("  merging chain {} ...".format(chain_idx))
         chain_dir = chain_dirs[chain_idx]
         this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r')
         this_zips_files = this_zip.namelist()
-        files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if "tree" in filename]
+        files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if filename.startswith("tree")]
         for file in files_to_include:
             #First we need to reindex the tree
             filename_components = file[0].split("_")
@@ -203,9 +205,8 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     #chains zip file. So just take the last one used and insert it.
     combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
     combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
-    print("Chain merging complete.")
-    print("It is recommended that individual chain runs are deleted as they occupy quite a bit of space.")
-    print("To delete individual chain information, just type 'rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip'")
+    logmsg("Chain merging complete.")
+    logmsg("You can remove unneeded intermediate files via the shell command `rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip`")
 
 def main():
     args,evolve_args = parse_args()

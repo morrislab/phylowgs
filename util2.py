@@ -337,3 +337,6 @@ class TreeReader(object):
 	for tidx, llh, zinfo in trees:
 	    tree = self._parse_tree(zinfo, remove_empty_vertices)
 	    yield (tidx, llh, tree)
+
+def logmsg(msg, fd=sys.stdout):
+	  print >> fd, '[%s] %s' % (datetime.now(), msg)
