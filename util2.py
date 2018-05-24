@@ -8,6 +8,7 @@ import scipy.stats as stat
 from scipy.stats import beta, binom
 from scipy.special import gammaln
 from math import exp, log
+from datetime import datetime
 
 import csv
 # Allow long lines in .cnv files, which can potentially list thousands of SSMs

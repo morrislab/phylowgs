@@ -112,8 +112,9 @@ def watch_chains(args,processes):
     signal.signal(signal.SIGALRM,read_stdout_alarm_handler)
 
     num_chains = args['num_chains']
-    progression_text = ['\n']*len(processes)
+    progression_text = [' '*80 + '\n']*num_chains
     print("".join(progression_text))
+    print("\033[F"*(num_chains))
     while True:
         #Check to see if all processes are done running and if so, exit the while loop
         all_dead = all([processes[i].poll()!=None for i in range(num_chains)])
@@ -145,10 +146,10 @@ def watch_chains(args,processes):
             else:
               other_text.append("chain{}: {}".format(chain_index,new_line))
 
-        print("\033[F"*(num_chains+1)) # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
         print("".join(other_text))
-        print("") #blank line between "other text" and progression text.
+        print(" "*80) #Blank line between progression text and other text
         print("".join(progression_text))
+        print("\033[F"*(num_chains + 4)) # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
 
 def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     '''
