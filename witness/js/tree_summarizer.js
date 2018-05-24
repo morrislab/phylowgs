@@ -1,6 +1,21 @@
 function TreeSummarizer() {
 }
 
+TreeSummarizer.prototype._is_using_old_data = function(summary){
+  // Check to see if using older data. If so, may not be able to plot some graphs.
+  var using_old_data = false;
+  if(!summary.hasOwnProperty('clusters')){
+    using_old_data = true;
+  };
+  Object.keys(summary.clusters).forEach(function(cKey){
+    if (!summary.clusters[cKey].hasOwnProperty('members')){
+      using_old_data = true;
+      return
+    }
+  })
+  return using_old_data;
+}
+
 TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
   var structure = tree.structure;
   var populations = tree.populations;
@@ -11,6 +26,59 @@ TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
   var tree_plotter = new TreePlotter();
   var tree_structure = tree_plotter._generate_tree_struct(structure, populations, root_id);
   tree_plotter.draw_tree(tree_structure, container_id,padding = [0, 10, 0, 10], w0 = 150, h0 = 75, radius_scalar = 1/7, include_node_identifier=false);
+}
+
+TreeSummarizer.prototype.separate_clusters_by_size = function(clusters, total_num_trees, cluster_size_criteria){
+  if(!Config.group_tiny_clusters){
+    return {small: [], large: clusters};
+  }
+  var small_clusters = {};
+  var large_clusters = {};
+  Object.keys(clusters).forEach(function(cidx){
+    var C = clusters[cidx];
+    if(C.members.length < total_num_trees*cluster_size_criteria){
+      small_clusters[cidx] = C;
+    }else{
+      large_clusters[cidx] = C;
+    }
+  })
+  return {small: small_clusters, large: large_clusters};
+}
+
+TreeSummarizer.prototype._render_cluster_table = function(summary) {
+  var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
+  cluster_table = cluster_table.find('tbody');
+  var clusters = this.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length, Config.tiny_cluster_criteria)
+  self = this;
+  var clust_num = 0;
+  Object.keys(clusters.large).forEach(function(cluster_idx) {
+    clust_num = clust_num+1;
+    var C = summary.clusters[cluster_idx];
+    var propTrees = (C.members.length/Object.keys(summary.trees).length).toFixed(2);
+    // Create a new container to hold the representative tree and then make the tree object. After the row is made, draw the tree in the container.
+    var rep_tree_container = document.createElement('div');
+    rep_tree_container.id = cluster_idx;
+    var rep_tree_container_id = 'rep_tree_container-' + cluster_idx;
+    var representative_tree_idx = C.representative_tree;
+
+    var entries = [clust_num].concat(propTrees).concat(representative_tree_idx).concat('<div id='+rep_tree_container_id+'></div>').map(function(entry) {
+      return '<td>' + entry + '</td>';
+    }); 
+    $('<tr/>').html(entries.join('')).appendTo(cluster_table);
+    self._draw_rep_tree(summary.trees[representative_tree_idx],'#' + rep_tree_container_id);
+  });
+  if(Config.group_tiny_clusters & (Object.keys(clusters.small).length != 0)){
+    var num_unclustered = 0;
+    Object.keys(clusters.small).forEach(function(cluster_idx) {
+      var C = summary.clusters[cluster_idx];
+      num_unclustered = num_unclustered + C.members.length
+    })
+    var propTrees = (num_unclustered/Object.keys(summary.trees).length).toFixed(2);
+    var entries = ["Unclustered"].concat(propTrees).concat("--").map(function(entry) {
+      return '<td>' + entry + '</td>';
+    }); 
+    $('<tr/>').html(entries.join('')).appendTo(cluster_table);
+  }
 }
 
 TreeSummarizer.prototype._render_vafs = function(dataset) {
@@ -75,42 +143,6 @@ TreeSummarizer.prototype._extract_pops_with_top_cell_prevs = function(population
   while(sliced.length < desired_pops)
     sliced.push(null);
   return sliced;
-}
-
-TreeSummarizer.prototype._render_cluster_table = function(summary) {
-  var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
-  cluster_table = cluster_table.find('tbody');
-  var clusters = this._separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length, Config.tiny_cluster_criteria)
-  self = this;
-  var clust_num = 0;
-  Object.keys(clusters.large).forEach(function(cluster_idx) {
-    clust_num = clust_num+1;
-    var C = summary.clusters[cluster_idx];
-    var propTrees = (C.members.length/Object.keys(summary.trees).length).toFixed(2);
-    // Create a new container to hold the representative tree and then make the tree object. After the row is made, draw the tree in the container.
-    var rep_tree_container = document.createElement('div');
-    rep_tree_container.id = cluster_idx;
-    var rep_tree_container_id = 'rep_tree_container-' + cluster_idx;
-    var representative_tree_idx = C.representative_tree;
-
-    var entries = [clust_num].concat(propTrees).concat(representative_tree_idx).concat('<div id='+rep_tree_container_id+'></div>').map(function(entry) {
-      return '<td>' + entry + '</td>';
-    }); 
-    $('<tr/>').html(entries.join('')).appendTo(cluster_table);
-    self._draw_rep_tree(summary.trees[representative_tree_idx],'#' + rep_tree_container_id);
-  });
-  if(Config.group_tiny_clusters & (Object.keys(clusters.small).length != 0)){
-    var num_unclustered = 0;
-    Object.keys(clusters.small).forEach(function(cluster_idx) {
-      var C = summary.clusters[cluster_idx];
-      num_unclustered = num_unclustered + C.members.length
-    })
-    var propTrees = (num_unclustered/Object.keys(summary.trees).length).toFixed(2);
-    var entries = ["Unclustered"].concat(propTrees).concat("--").map(function(entry) {
-      return '<td>' + entry + '</td>';
-    }); 
-    $('<tr/>').html(entries.join('')).appendTo(cluster_table);
-  }
 }
 
 TreeSummarizer.prototype._render_cell_prevs = function(cell_prevs) {
@@ -250,23 +282,6 @@ TreeSummarizer.prototype._determine_cluster_colour_ordering = function(clusters,
     clust_nums.splice(cidx,1)
   }
   return ordered_colours;
-}
-
-TreeSummarizer.prototype._separate_clusters_by_size = function(clusters, total_num_trees, cluster_size_criteria){
-  if(!Config.group_tiny_clusters){
-    return {small: [], large: clusters};
-  }
-  var small_clusters = {};
-  var large_clusters = {};
-  Object.keys(clusters).forEach(function(cidx){
-    var C = clusters[cidx];
-    if(C.members.length < total_num_trees*cluster_size_criteria){
-      small_clusters[cidx] = C;
-    }else{
-      large_clusters[cidx] = C;
-    }
-  })
-  return {small: small_clusters, large: large_clusters};
 }
 
 TreeSummarizer.prototype._find_best_tree = function(densities) {
@@ -416,21 +431,6 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(clusters, clu
   return traces
 }
 
-TreeSummarizer.prototype._is_using_old_data = function(summary){
-    // Check to see if using older data. If so, may not be able to plot some graphs.
-    var using_old_data = false;
-    if(!summary.hasOwnProperty('clusters')){
-      using_old_data = true;
-    };
-    Object.keys(summary.clusters).forEach(function(cKey){
-      if (!summary.clusters[cKey].hasOwnProperty('members')){
-        using_old_data = true;
-        return
-      }
-    })
-    return using_old_data;
-}
-
 TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) {
   if(!tree_summary.hasOwnProperty('tree_densities') | !tree_summary.hasOwnProperty('clusters')) {
     return;
@@ -440,7 +440,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   var xyData = this._calc_xy_data(tree_summary.trees);
 
   var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
-  var clusters = this._separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length, Config.tiny_cluster_criteria);
+  var clusters = this.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length, Config.tiny_cluster_criteria);
   var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.cluster_colours, xyData.x, xyData.y);
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(clusters.large, cluster_colours);
