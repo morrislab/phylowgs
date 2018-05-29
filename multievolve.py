@@ -254,10 +254,14 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
     logmsg("Merging best chains:")
     tree_index = 0
+    zip_paths = []
+
     for chain_idx in chains_to_merge:
         logmsg("  merging chain {} ...".format(chain_idx))
         chain_dir = chain_dirs[chain_idx]
-        this_zip = zipfile.ZipFile(os.path.join(chain_dir,"trees.zip"), mode='r')
+        zip_path = os.path.abspath(os.path.join(chain_dir, 'trees.zip'))
+        zip_paths.append(zip_path)
+        this_zip = zipfile.ZipFile(zip_path, mode='r')
         this_zips_files = this_zip.namelist()
         files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if filename.startswith("tree")]
         for file in files_to_include:
@@ -269,10 +273,11 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
             tree_index += 1
     #Don't forget the "params.json" and "cnv_logical_physical_mapping.json" files. They should all be the same in each
     #chains zip file. So just take the last one used and insert it.
+    # TODO: take any unrecognized files and include them in merge, rather than just these explicit files.
     combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
     combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
     logmsg("Chain merging complete.")
-    logmsg("You can remove unneeded intermediate files via the shell command `rm /path/to/output/dir/multievolve_chains/chain_*/trees.zip`")
+    logmsg("You may remove the following unneeded intermediate files: {}".format(' '.join(zip_paths)))
 
 def main():
     args,evolve_args = parse_args()
