@@ -164,13 +164,14 @@ def watch_chains(processes):
                 if re.match(r'^\[\d{4}-', line):
                     line = line[line.index(']')+1:].strip()
                 if line.startswith('iteration='):
-                  status_line = parse_status(line)
-                  status[chain_index] = parse_status(line)
-                  status[chain_index]['status'] = 'running'
-                  status[chain_index]['percent_complete'] = '{:.2f}%'.format(100 * float(status[chain_index]['trees_sampled']) / float(status[chain_index]['total_trees']))
+                    status_line = parse_status(line)
+                    status[chain_index] = parse_status(line)
+                    status[chain_index]['status'] = 'running'
+                    status[chain_index]['percent_complete'] = '{:.2f}%'.format(100 * float(status[chain_index]['trees_sampled']) / float(status[chain_index]['total_trees']))
                 else:
-                  logmsg("chain={} {}".format(chain_index, line))
-                  last_lines_were_status = False
+                    if len(line) > 0:
+                        logmsg("chain={} {}".format(chain_index, line))
+                        last_lines_were_status = False
         chain_stdout = defaultdict(list)
 
         if last_lines_were_status and sys.stdout.isatty():
