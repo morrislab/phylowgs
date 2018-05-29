@@ -24,7 +24,8 @@ def logsumexp(a):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-      description='Concurrently run multiple MCMC chains of PhyloWGS.',
+      description='Concurrently run multiple MCMC chains of PhyloWGS. ' +
+      'All options that evolve.py accepts may also be specified here. To list those arguments, run `%s evolve.py --help`.' % sys.executable,
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
           help='Number of chains to run concurrently')
