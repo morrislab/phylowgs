@@ -2,11 +2,14 @@ import argparse
 import os
 import subprocess
 import random
-import signal
 import zipfile
 import numpy as np
 import sys
+import re
 from util2 import logmsg
+import Queue
+import threading
+from collections import defaultdict
 
 def create_directory(dirname):
     if not os.path.exists(dirname):
@@ -25,10 +28,6 @@ def parse_args():
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
           help='Number of chains to run concurrently')
-    parser.add_argument('-B', '--burnin-samples', dest='burnin_samples', default=1000, type=int,
-          help='Number of burnin samples')
-    parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
-          help='Number of MCMC samples')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
           help='Random seeds for initializing MCMC')
     parser.add_argument('-if', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
@@ -38,15 +37,11 @@ def parse_args():
                'includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
           help='Directory where results from each chain will be saved. If directory does not exist, ' \
-               'will attempt to create it here. (Default = "working_directory/multevolve_chains")')
-    parser.add_argument('-sf','--ssm-file',dest='ssm_file',
-        help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants.')
-    parser.add_argument('-cf','--cnv-file',dest='cnv_file',
-        help='File listing CNVs (copy number variations).')
+               'will attempt to create it here. (Default = "working_directory/multievolve_chains")')
     # Send unrecognized arguments to evolve.py.
-    args, evolve_args = parser.parse_known_args()
-    args = dict(args._get_kwargs())
-    return args, evolve_args
+    known_args, other_args = parser.parse_known_args()
+    known_args = dict(known_args._get_kwargs())
+    return known_args, other_args
 
 def check_args(args):
     #Set default values for arguments that require function calls to calculate
@@ -54,13 +49,13 @@ def check_args(args):
         random.seed(0)
         args['random_seeds'] = [random.randint(1,2**32) for i in range(args['num_chains'])]
     if not args['output_directory']:
-        args['output_directory'] = os.path.join(os.getcwd(),"multevolve_chains")
+        args['output_directory'] = os.path.join(os.getcwd(),"multievolve_chains")
         create_directory(args['output_directory'])
 
     #Make sure the arguments make sense. Right now just have to check that the
     #list of random seeds, if this was provided by the user, has length = num_chains.
     if len(args['random_seeds']) != args['num_chains']:
-        raise ValueError("Number of chains is not equal to the number of input seeds.")
+        raise ValueError("Must specify random seeds for every chain")
     return args
 
 def run_chains(args,evolve_args):
@@ -79,7 +74,7 @@ def run_chains(args,evolve_args):
         create_directory(output_dir)
         process = run(args,evolve_args,chain_index,app_dir,working_dir,output_dir)
         processes.append(process)
-    watch_chains(args,processes)
+    watch_chains(processes)
     return out_dirs
 
 def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
@@ -90,65 +85,105 @@ def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
     cmd = [
         sys.executable,
         os.path.join(app_dir, "evolve.py"),
-        "-B", str(args['burnin_samples']),
-        "-s", str(args['mcmc_samples']),
-        "-r", str(args['random_seeds'][chain_index]),
-        os.path.join(working_dir,args['ssm_file']),
-        os.path.join(working_dir,args['cnv_file'])
+        '--output-dir', output_dir,
     ]
     cmd = cmd + list(evolve_args)
     logmsg("Starting chain %s" % chain_index)
-    process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, cwd=output_dir, universal_newlines=True, bufsize=1)
+    # bufsize=1 and universal_newlines=True open stdout in line-buffered text
+    # mode, rather than binary stream.
+    process = subprocess.Popen(cmd,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        bufsize=1,
+        universal_newlines=True,
+        close_fds=True,
+        cwd=working_dir,
+    )
     return process
 
-def watch_chains(args,processes):
-    '''
-    This watches the subprocesses as they run. Will check to see if they
-    are complete and if so move on to the next step, and if not then will
-    capture their outputs and inform the user of each processes progression.
-    '''
-    def read_stdout_alarm_handler(signum, frame):
-        raise Exception("subprocess.stdout.readline() took too long to complete.")
-    signal.signal(signal.SIGALRM,read_stdout_alarm_handler)
+def parse_status(line):
+    status = {}
+    fields = line.split(' ')
+    for F in fields:
+        K, V = F.split('=', 1)
+        status[K] = V
+    return status
 
-    num_chains = args['num_chains']
-    progression_text = ['\n']*len(processes)
-    print("".join(progression_text))
+def enqueue_output(out, queue):
+    for line in iter(out.readline, b''):
+        queue.put(line)
+    out.close()
+
+def make_queues(processes):
+    queues = []
+
+    for P in processes:
+        Q = Queue.Queue()
+        T = threading.Thread(target=enqueue_output, args=(P.stdout, Q))
+        T.daemon = True # Thread dies with program
+        T.start()
+        queues.append(Q)
+
+    return queues
+
+def watch_chains(processes):
+    # Based on https://stackoverflow.com/a/4896288. TL;DR: non-blocking reads
+    # from stdout on subprocesses are really painful. This is the cleanest and
+    # most reliable mechanism I've come across for resolving them.
+    num_chains = len(processes)
+    last_lines_were_status = False
+    status = {idx: {'status': 'initializing'} for idx in range(num_chains)}
+    chain_stdout = defaultdict(list)
+    delay = 0.5
+
+    queues = make_queues(processes)
     while True:
-        #Check to see if all processes are done running and if so, exit the while loop
-        all_dead = all([processes[i].poll()!=None for i in range(num_chains)])
-        if all_dead:
+        # All are done.
+        if set([S['status'] for S in status.values()]) == set(['done']):
             break
-        # Capture the output from each process, modify it, and output it.
-        # Note: process.stdout returns a file handle from which you can read outputs, however if you
-        # call readline and there is no new information to read, it will wait until there is until
-        # returning which is really annoying. So I set up a timer here to throw an exception if
-        # more than 0.1 seconds passes so that we can move on to read info from another process that may already
-        # have output to read.
-        other_text = []
-        for chain_index in range(num_chains):
-            #If the process is finished, then will return an empty string when calling readline(), skip this.
-            if processes[chain_index].poll()!=None:
+        for chain_index, P, Q in zip(range(num_chains), processes, queues):
+            if status[chain_index]['status'] == 'done':
                 continue
-            try:
-              signal.setitimer(signal.ITIMER_REAL,0.1)
-              new_line = processes[chain_index].stdout.readline()
-              signal.setitimer(signal.ITIMER_REAL,0)
-            except Exception, e:
-              signal.setitimer(signal.ITIMER_REAL,0)
-              continue
-            if (len(new_line.split()) > 2) and new_line.split()[2].lstrip('-').isdigit():
-              trees_done = int(new_line.split()[2])+args['burnin_samples']
-              total_trees = args['burnin_samples']+args['mcmc_samples']
-              percent_complete = 100*trees_done/total_trees
-              progression_text[chain_index] = "chain{}: {}/{} - {}% complete\n".format(chain_index, trees_done, total_trees, percent_complete)
-            else:
-              other_text.append("chain{}: {}".format(chain_index,new_line))
+            exit_code = processes[chain_index].poll()
+            if exit_code is not None:
+                # Note we still finish the rest of this loop iteration, which
+                # lets us print the process' final output.
+                status[chain_index] = {'status': 'done', 'exit_code': exit_code}
 
-        print("\033[F"*(num_chains+1)) # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
-        print("".join(other_text))
-        print("") #blank line between "other text" and progression text.
-        print("".join(progression_text))
+            try:
+                line = Q.get(timeout=delay)
+            except Queue.Empty:
+                continue
+            else:
+                chain_stdout[chain_index].append(line.strip())
+
+        for chain_index in sorted(chain_stdout.keys()):
+            for line in chain_stdout[chain_index]:
+                # Strip existing timestamp.
+                if re.match(r'^\[\d{4}-', line):
+                    line = line[line.index(']')+1:].strip()
+                if line.startswith('iteration='):
+                  status_line = parse_status(line)
+                  status[chain_index] = parse_status(line)
+                  status[chain_index]['status'] = 'running'
+                  status[chain_index]['percent_complete'] = '{:.2f}%'.format(100 * float(status[chain_index]['trees_sampled']) / float(status[chain_index]['total_trees']))
+                else:
+                  logmsg("chain={} {}".format(chain_index, line))
+                  last_lines_were_status = False
+        chain_stdout = defaultdict(list)
+
+        if last_lines_were_status and sys.stdout.isatty():
+            print("\033[2K\033[1A" * (num_chains + 1)) # Move cursor up to line that starts telling us about chain progression. Want to overwrite those lines.
+        for cidx in sorted(status.keys()):
+            if status[cidx]['status'] == 'running':
+                keys = ('trees_sampled', 'total_trees', 'percent_complete')
+            elif status[cidx]['status'] == 'done':
+                keys = ('exit_code',)
+            else:
+                keys = tuple()
+            status_msg = ' '.join(['{}={}'.format(K, status[cidx][K]) for K in ('status',) + keys])
+            logmsg('chain={} {}'.format(cidx, status_msg))
+            last_lines_were_status = True
 
 def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     '''
@@ -167,6 +202,7 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
         logSumLHs.append(logsumexp(logLHs))
 
     # Check below assumes that LLH < 0, which it should always be.
+    logSumLHs = np.array(logSumLHs)
     assert np.all(logSumLHs < 0)
     bestLogSumLH = np.max(logSumLHs)
     chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH > (chain_inclusion_factor*bestLogSumLH)]
@@ -206,7 +242,7 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
     combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
     logmsg("Chain merging complete.")
-    logmsg("You can remove unneeded intermediate files via the shell command `rm /path/to/output/dir/multevolve_chains/chain_*/trees.zip`")
+    logmsg("You can remove unneeded intermediate files via the shell command `rm /path/to/output/dir/multievolve_chains/chain_*/trees.zip`")
 
 def main():
     args,evolve_args = parse_args()
