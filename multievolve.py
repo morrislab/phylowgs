@@ -1,7 +1,6 @@
 import argparse
 import os
 import subprocess
-import random
 import zipfile
 import numpy as np
 import sys
@@ -29,8 +28,8 @@ def parse_args():
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
           help='Number of chains to run concurrently')
-    parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
-          help='Random seeds for initializing MCMC')
+    parser.add_argument('-r', '--random-seeds', dest='random_seeds', type=int, nargs='+',
+          help='Space-separated random seeds with which to initialize each chain. Specify one for each chain.')
     parser.add_argument('-I', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
           help='Factor for determining which chains will be included in the output "merged" folder. ' \
                'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
@@ -67,17 +66,14 @@ def parse_args():
     return dict(known_args._get_kwargs()), other_args
 
 def check_args(args):
-    #Set default values for arguments that require function calls to calculate
-    if not args['random_seeds']:
-        random.seed(0)
-        args['random_seeds'] = [random.randint(1,2**32) for i in range(args['num_chains'])]
     args['output_dir'] = os.path.abspath(args['output_dir'])
     create_directory(args['output_dir'])
 
     #Make sure the arguments make sense. Right now just have to check that the
     #list of random seeds, if this was provided by the user, has length = num_chains.
-    if len(args['random_seeds']) != args['num_chains']:
-        raise ValueError("Must specify random seeds for every chain")
+    if args['random_seeds'] is not None and len(args['random_seeds']) != args['num_chains']:
+        raise ValueError("Must specify exactly one seed for each of %s chain(s). You specified %s seed(s)." % (
+            args['num_chains'], len(args['random_seeds'])))
     return args
 
 def run_chains(args, other_args):
@@ -94,12 +90,12 @@ def run_chains(args, other_args):
         output_dir = os.path.join(args['output_dir'],"chain_"+str(chain_index))
         out_dirs.append(output_dir)
         create_directory(output_dir)
-        process = run_chain(chain_index, args['ssm_file'], args['cnv_file'], app_dir, working_dir, output_dir, other_args)
+        process = run_chain(chain_index, args['ssm_file'], args['cnv_file'], app_dir, working_dir, output_dir, args['random_seeds'], other_args)
         processes.append(process)
     watch_chains(processes)
     return out_dirs
 
-def run_chain(chain_index, ssm_fn, cna_fn, app_dir, working_dir, output_dir, other_args):
+def run_chain(chain_index, ssm_fn, cna_fn, app_dir, working_dir, output_dir, seeds, other_args):
     '''
     Start a new subprocess for every call to evolve. Return the subprocess
     so that we can capture its outputs and see if it is complete.
@@ -108,10 +104,15 @@ def run_chain(chain_index, ssm_fn, cna_fn, app_dir, working_dir, output_dir, oth
         sys.executable,
         os.path.join(app_dir, "evolve.py"),
         '--output-dir', output_dir,
+    ]
+    if seeds is not None:
+        cmd += ['--random-seed', str(seeds[chain_index])]
+    cmd += [
         ssm_fn,
         cna_fn,
     ]
     cmd = cmd + list(other_args)
+
     logmsg("Starting chain %s" % chain_index)
     # bufsize=1 and universal_newlines=True open stdout in line-buffered text
     # mode, rather than binary stream.
