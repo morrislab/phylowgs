@@ -35,12 +35,35 @@ def parse_args():
                'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
                'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
                'includes all chains and setting it = 1 will include only the best chain.')
-    parser.add_argument('-O', '--output-dir', dest='output_dir', type=str, default='chains',
+    parser.add_argument('-O', '--output-dir', dest='output_dir', default='chains',
           help='Directory where results from each chain will be saved. We will create it if it does not exist.')
+    # Ideally, I wouldn't specify `ssm_file` or `cnv_file` as multievolve.py
+    # arguments, since I don't need them here -- I just want to pass them
+    # through to evolve.py. But then printing the help is confusing, as you
+    # don't realize that you should pass them as arguments to multievolve. So,
+    # I should specify them here -- otherwise, you can invoke multievolve.py
+    # with no ssm_data.txt or cnv_data.txt, and it will dutifully invoke
+    # multiple copies of evolve.py with no input files (with the evolve.py runs
+    # immediately failing.
+    #
+    # Since --ssms and --cnvs are required, it would be better to make them
+    # positional arguments. But this screws up parsing with parse_known_args()
+    # -- it mixes up unknown and known arguments if I make ssm_file and cnv_file positional, then call
+    # `python2 ../multievolve.py -n2 -s 5 -B 3 ../ssm_data.txt ../cnv_data.txt`.
+    # To fix this, just make all known arguments for multievolve (required) optional arguments.
+    #
+    # Much of this mess arises from having a wrapper script to start multiple
+    # chains. In a better world, evolve.py would natively support multiple
+    # chains, with the user able to choose to have only a single chain if she
+    # desires.
+    parser.add_argument('--ssms', dest='ssm_file', required=True,
+            help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
+    parser.add_argument('--cnvs',dest='cnv_file', required=True,
+            help='File listing CNVs (copy number variations). For proper format, see README.md.')
+
     # Send unrecognized arguments to evolve.py.
     known_args, other_args = parser.parse_known_args()
-    known_args = dict(known_args._get_kwargs())
-    return known_args, other_args
+    return dict(known_args._get_kwargs()), other_args
 
 def check_args(args):
     #Set default values for arguments that require function calls to calculate
@@ -56,7 +79,7 @@ def check_args(args):
         raise ValueError("Must specify random seeds for every chain")
     return args
 
-def run_chains(args,evolve_args):
+def run_chains(args, other_args):
     '''
     Determine location of evolve.py (same directory as this script), location of the ssm
     and cnv files, and create the output directories for each chain. Create a subprocess
@@ -70,12 +93,12 @@ def run_chains(args,evolve_args):
         output_dir = os.path.join(args['output_dir'],"chain_"+str(chain_index))
         out_dirs.append(output_dir)
         create_directory(output_dir)
-        process = run(args,evolve_args,chain_index,app_dir,working_dir,output_dir)
+        process = run_chain(chain_index, args['ssm_file'], args['cnv_file'], app_dir, working_dir, output_dir, other_args)
         processes.append(process)
     watch_chains(processes)
     return out_dirs
 
-def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
+def run_chain(chain_index, ssm_fn, cna_fn, app_dir, working_dir, output_dir, other_args):
     '''
     Start a new subprocess for every call to evolve. Return the subprocess
     so that we can capture its outputs and see if it is complete.
@@ -84,8 +107,10 @@ def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
         sys.executable,
         os.path.join(app_dir, "evolve.py"),
         '--output-dir', output_dir,
+        ssm_fn,
+        cna_fn,
     ]
-    cmd = cmd + list(evolve_args)
+    cmd = cmd + list(other_args)
     logmsg("Starting chain %s" % chain_index)
     # bufsize=1 and universal_newlines=True open stdout in line-buffered text
     # mode, rather than binary stream.
