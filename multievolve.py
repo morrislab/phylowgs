@@ -24,20 +24,19 @@ def logsumexp(a):
 
 def parse_args():
     parser = argparse.ArgumentParser(
-      description='Concurrently run multiple chains of PhyloWGS.',
+      description='Concurrently run multiple MCMC chains of PhyloWGS.',
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
     parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
           help='Number of chains to run concurrently')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', default=[], type=list,
           help='Random seeds for initializing MCMC')
-    parser.add_argument('-if', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
+    parser.add_argument('-I', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
           help='Factor for determining which chains will be included in the output "merged" folder. ' \
                'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
                'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
                'includes all chains and setting it = 1 will include only the best chain.')
-    parser.add_argument('-od', '--output-directory', dest='output_directory', default='', type=str,
-          help='Directory where results from each chain will be saved. If directory does not exist, ' \
-               'will attempt to create it here. (Default = "working_directory/multievolve_chains")')
+    parser.add_argument('-O', '--output-dir', dest='output_dir', type=str, default='chains',
+          help='Directory where results from each chain will be saved. We will create it if it does not exist.')
     # Send unrecognized arguments to evolve.py.
     known_args, other_args = parser.parse_known_args()
     known_args = dict(known_args._get_kwargs())
@@ -48,9 +47,8 @@ def check_args(args):
     if not args['random_seeds']:
         random.seed(0)
         args['random_seeds'] = [random.randint(1,2**32) for i in range(args['num_chains'])]
-    if not args['output_directory']:
-        args['output_directory'] = os.path.join(os.getcwd(),"multievolve_chains")
-        create_directory(args['output_directory'])
+    args['output_dir'] = os.path.abspath(args['output_dir'])
+    create_directory(args['output_dir'])
 
     #Make sure the arguments make sense. Right now just have to check that the
     #list of random seeds, if this was provided by the user, has length = num_chains.
@@ -69,7 +67,7 @@ def run_chains(args,evolve_args):
     processes = []
     out_dirs = []
     for chain_index in range(args['num_chains']):
-        output_dir = os.path.join(args['output_directory'],"chain_"+str(chain_index))
+        output_dir = os.path.join(args['output_dir'],"chain_"+str(chain_index))
         out_dirs.append(output_dir)
         create_directory(output_dir)
         process = run(args,evolve_args,chain_index,app_dir,working_dir,output_dir)
@@ -221,7 +219,7 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     of it's trees is within 10% of the highest likelihood of all of the trees calculated
     across all chains.
     '''
-    out_dir = os.path.join(args['output_directory'],'merged_best_chains')
+    out_dir = os.path.join(args['output_dir'],'merged_best_chains')
     create_directory(out_dir)
     if os.path.isfile(os.path.join(out_dir,"trees.zip")):
         logmsg("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
