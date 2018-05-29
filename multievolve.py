@@ -151,12 +151,15 @@ def watch_chains(processes):
                 # lets us print the process' final output.
                 status[chain_index] = {'status': 'done', 'exit_code': exit_code}
 
-            try:
-                line = Q.get(timeout=delay)
-            except Queue.Empty:
-                continue
-            else:
-                chain_stdout[chain_index].append(line.strip())
+            while True:
+                # Use loop so that we retrieve as many lines as are available
+                # from the process.
+                try:
+                    line = Q.get(timeout=delay)
+                except Queue.Empty:
+                    break
+                else:
+                    chain_stdout[chain_index].append(line.strip())
 
         for chain_index in sorted(chain_stdout.keys()):
             for line in chain_stdout[chain_index]:
