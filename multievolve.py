@@ -8,6 +8,7 @@ import re
 from util2 import logmsg
 import Queue
 import threading
+import time
 from collections import defaultdict
 
 def create_directory(dirname):
@@ -160,7 +161,7 @@ def watch_chains(processes):
     last_lines_were_status = False
     status = {idx: {'status': 'initializing'} for idx in range(num_chains)}
     chain_stdout = defaultdict(list)
-    delay = 0.5
+    delay = 0.05
 
     queues = make_queues(processes)
     while True:
@@ -214,6 +215,7 @@ def watch_chains(processes):
             status_msg = ' '.join(['{}={}'.format(K, status[cidx][K]) for K in ('status',) + keys])
             logmsg('chain={} {}'.format(cidx, status_msg))
             last_lines_were_status = True
+        time.sleep(1)
 
 def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     '''
