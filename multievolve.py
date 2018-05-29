@@ -91,7 +91,8 @@ def run(args,evolve_args,chain_index,app_dir,working_dir,output_dir):
     logmsg("Starting chain %s" % chain_index)
     # bufsize=1 and universal_newlines=True open stdout in line-buffered text
     # mode, rather than binary stream.
-    process = subprocess.Popen(cmd,
+    process = subprocess.Popen(
+        cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         bufsize=1,
