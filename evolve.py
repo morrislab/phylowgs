@@ -28,7 +28,7 @@ from collections import OrderedDict
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config, ssm_file, cnv_file, params_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config, ssm_file, cnv_file, params_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
 	state = {}
 
 	try:
@@ -56,8 +56,6 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	state['ssm_file'] = ssm_file
 	state['cnv_file'] = cnv_file
 	state['tmp_dir'] = tmp_dir
-	state['top_k_trees_file'] = top_k_trees_file
-	state['clonal_freqs_file'] = clonal_freqs_file
 	state['write_state_every'] = write_state_every
 	state['write_backups_every'] = write_backups_every
 
@@ -74,7 +72,6 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	state['dp_alpha'] = 25.0
 	state['dp_gamma'] = 1.0
 	state['alpha_decay'] = 0.25
-	state['top_k'] = 5
 
 	# Metropolis-Hastings settings
 	state['mh_burnin'] = 0
@@ -272,14 +269,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 
 	backup_manager.remove_backup()
 	safe_to_exit.clear()
-	#save the best tree
-	print_top_trees(TreeWriter.default_archive_fn, state['top_k_trees_file'], state['top_k'])
 
 	#save clonal frequencies
 	freq = dict([(g,[] )for g in state['glist']])
 	glist = array(freq.keys(),str)
 	glist.shape=(1,len(glist))
-	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 
 	safe_to_exit.set()
 	run_succeeded.set()
@@ -317,10 +311,6 @@ def parse_args():
 		help='Number of iterations to go between writing backups of program state')
 	parser.add_argument('-S', '--write-state-every', dest='write_state_every', default=10, type=int,
 		help='Number of iterations between writing program state to disk. Higher values reduce IO burden at the cost of losing progress made if program is interrupted.')
-	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
-		help='Output file to save top-k trees in text format')
-	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
-		help='Output file to save clonal frequencies')
 	parser.add_argument('-B', '--burnin-samples', dest='burnin_samples', default=1000, type=int,
 		help='Number of burnin samples')
 	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
@@ -357,8 +347,6 @@ def run(safe_to_exit, run_succeeded, config):
 			'ssm_file': args.ssm_file,
 			'cnv_file': args.cnv_file,
 			'params_file': args.params_file,
-			'top_k_trees_file': args.top_k_trees,
-			'clonal_freqs_file': args.clonal_freqs,
 			'tmp_dir': args.tmp_dir,
 		}
 		for K, V in paths.items():
@@ -384,8 +372,6 @@ def run(safe_to_exit, run_succeeded, config):
 			paths['ssm_file'],
 			paths['cnv_file'],
 			paths['params_file'],
-			top_k_trees_file=paths['top_k_trees_file'],
-			clonal_freqs_file=paths['clonal_freqs_file'],
 			burnin_samples=args.burnin_samples,
 			num_samples=args.mcmc_samples,
 			mh_itr=args.mh_iterations,
