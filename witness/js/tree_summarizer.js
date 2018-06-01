@@ -385,9 +385,8 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   // Create the traces for the data points for clustered trees
   var scatter_traces = this._create_cluster_scatter_traces(clusters.large, cluster_colours, xyData.x, xyData.y);
   // Create the trace for the data points for unclustered trees
-  scatter_traces.push(this._create_tiny_cluster_scatter_trace(clusters.small, xyData.x, xyData.y))
+  scatter_traces.push(this._create_tiny_cluster_scatter_trace(clusters.small, xyData.x, xyData.y));
   var traces = ellipse_traces.concat(scatter_traces);
-  
   //Use the traces and plotting options to actually plot our data.
   var layout = {
     title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",

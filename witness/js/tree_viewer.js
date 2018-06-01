@@ -17,7 +17,7 @@ TreeViewer.prototype._determine_table_trees = function(summary){
   var trees = summary.trees;
   var clusters = summary.clusters;
   if (Config.show_all_trees | !Util.have_cluster_data(summary)){
-    return Util.sort_ints(Object.keys(trees));
+    return Util.sort_ints(Object.keys(trees).map(function (a) {return parseInt(a,10)}));
   }
 
   //Show a specified number of trees from each cluster. One of these should be the
@@ -57,7 +57,6 @@ TreeViewer.prototype.render = function(dataset) {
     var separated_clusters = have_clust_info ? ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length*Config.tiny_cluster_criteria): -1;
     var tree_indices = tplotter._determine_table_trees(summary);
     tree_container.empty();
-
     var first_tree_idx = tree_indices[0];
     var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
     var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
