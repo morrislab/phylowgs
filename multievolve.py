@@ -22,7 +22,7 @@ def parse_args():
       description='Concurrently run multiple MCMC chains of PhyloWGS. ' +
       'All options that evolve.py accepts may also be specified here. To list those arguments, run `%s evolve.py --help`.' % sys.executable,
       formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    parser.add_argument('-n', '--num-chains', dest='num_chains', default=10, type=int,
+    parser.add_argument('-n', '--num-chains', dest='num_chains', default=4, type=int,
           help='Number of chains to run concurrently')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', type=int, nargs='+',
           help='Space-separated random seeds with which to initialize each chain. Specify one for each chain.')
