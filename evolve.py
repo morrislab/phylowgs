@@ -23,11 +23,12 @@ import traceback
 import time
 import json
 from datetime import datetime
+from collections import OrderedDict
 
 # num_samples: number of MCMC samples
 # mh_itr: number of metropolis-hasting iterations
 # rand_seed: random seed (initialization). Set to None to choose random seed automatically.
-def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config, ssm_file, cnv_file, params_file, top_k_trees_file, clonal_freqs_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
+def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config, ssm_file, cnv_file, params_file, burnin_samples, num_samples, mh_itr, mh_std, write_state_every, write_backups_every, rand_seed, tmp_dir):
 	state = {}
 
 	try:
@@ -51,11 +52,10 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	with open('random_seed.txt', 'w') as seedf:
 		seedf.write('%s\n' % state['rand_seed'])
 
+	state['working_dir'] = os.getcwd()
 	state['ssm_file'] = ssm_file
 	state['cnv_file'] = cnv_file
 	state['tmp_dir'] = tmp_dir
-	state['top_k_trees_file'] = top_k_trees_file
-	state['clonal_freqs_file'] = clonal_freqs_file
 	state['write_state_every'] = write_state_every
 	state['write_backups_every'] = write_backups_every
 
@@ -72,7 +72,6 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 	state['dp_alpha'] = 25.0
 	state['dp_gamma'] = 1.0
 	state['alpha_decay'] = 0.25
-	state['top_k'] = 5
 
 	# Metropolis-Hastings settings
 	state['mh_burnin'] = 0
@@ -81,7 +80,6 @@ def start_new_run(state_manager, backup_manager, safe_to_exit, run_succeeded, co
 
 	state['cd_llh_traces'] = zeros((state['num_samples'], 1))
 	state['burnin_cd_llh_traces'] = zeros((state['burnin'], 1))
-	state['working_directory'] = os.getcwd()
 
 	root = alleles(conc=0.1, ntps=NTPS)
 	state['tssb'] = TSSB(dp_alpha=state['dp_alpha'], dp_gamma=state['dp_gamma'], alpha_decay=state['alpha_decay'], root_node=root, data=codes)
@@ -129,6 +127,7 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 	# error is unrecoverable.
 	try:
 		state = state_manager.load_state()
+		os.chdir(state['working_dir'])
 		tree_writer = TreeWriter(resume_run = True)
 	except:
 		logmsg('Restoring state failed:', sys.stderr)
@@ -137,6 +136,7 @@ def resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeed
 		backup_manager.restore_backup()
 
 		state = state_manager.load_state()
+		os.chdir(state['working_dir'])
 		tree_writer = TreeWriter(resume_run = True)
 
 	set_state(state['rand_state']) # Restore NumPy's RNG state.
@@ -157,9 +157,13 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 	config['tmp_dir'] = tempfile.mkdtemp(prefix='pwgsdataexchange.', dir=tmp_dir_parent)
 
 	for iteration in range(start_iter, state['num_samples']):
+		sys.stdout.flush()
 		safe_to_exit.set()
-		if iteration < 0:
-			logmsg(iteration)
+
+		status = OrderedDict()
+		status['iteration'] = iteration
+		status['trees_sampled'] = state['burnin'] + iteration
+		status['total_trees'] = state['burnin'] + state['num_samples']
 
 		# Referring to tssb as local variable instead of dictionary element is much
 		# faster.
@@ -200,21 +204,28 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 		if float(state['mh_acc']) > 0.5 and float(state['mh_acc']) < 0.99:
 			state['mh_std'] = state['mh_std']/2.0
 			logmsg("Growing MH proposals. Now %f" % state['mh_std'])
-	
+
+
 		tssb.resample_sticks()
 		tssb.resample_stick_orders()
 		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
  
 		last_llh = tssb.complete_data_log_likelihood()
+		status['llh'] = last_llh
 		if iteration >= 0:
-			state['cd_llh_traces'][iteration] = last_llh
 			if True or mod(iteration, 10) == 0:
+				state['cd_llh_traces'][iteration] = last_llh
 				weights, nodes = tssb.get_mixture()
-				logmsg(' '.join([str(v) for v in (iteration, len(nodes), state['cd_llh_traces'][iteration], state['mh_acc'], tssb.dp_alpha, tssb.dp_gamma, tssb.alpha_decay)]))
-			if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
-				logmsg("%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration]))
+				status['nodes'] = len(nodes)
+				status['mh_acc'] = state['mh_acc']
+				status['dp_alpha'] = tssb.dp_alpha
+				status['dp_gamma'] = tssb.dp_gamma
+				status['alpha_decay'] = tssb.alpha_decay
+			#if argmax(state['cd_llh_traces'][:iteration+1]) == iteration:
+				#logmsg("%f is best per-data complete data likelihood so far." % (state['cd_llh_traces'][iteration]))
 		else:
 			state['burnin_cd_llh_traces'][iteration + state['burnin']] = last_llh
+		logmsg(' '.join(['%s=%s' % (K, V) for K, V in status.items()]))
 
 		# Can't just put tssb in unwritten_trees, as this object will be modified
 		# on subsequent iterations, meaning any stored references in
@@ -258,14 +269,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 
 	backup_manager.remove_backup()
 	safe_to_exit.clear()
-	#save the best tree
-	print_top_trees(TreeWriter.default_archive_fn, state['top_k_trees_file'], state['top_k'])
 
 	#save clonal frequencies
 	freq = dict([(g,[] )for g in state['glist']])
 	glist = array(freq.keys(),str)
 	glist.shape=(1,len(glist))
-	savetxt(state['clonal_freqs_file'] ,vstack((glist, array([freq[g] for g in freq.keys()]).T)), fmt='%s', delimiter=', ')
 
 	safe_to_exit.set()
 	run_succeeded.set()
@@ -276,19 +284,33 @@ def test():
 	for dat in tssb.data:
 		print [dat.id, dat.__log_likelihood__(0.5)]
 
-def parse_args():
+def create_argparser():
 	parser = argparse.ArgumentParser(
 		description='Run PhyloWGS to infer subclonal composition from SSMs and CNVs',
 		formatter_class=argparse.ArgumentDefaultsHelpFormatter
 	)
+	parser.add_argument('-O', '--output-dir', dest='output_dir',
+		help='Path to output directory')
+	return parser
+
+def switch_working_dir():
+	parser = create_argparser()
+	args, other_args = parser.parse_known_args()
+	working_dir = args.output_dir
+	orig_working_dir = os.getcwd()
+
+	if working_dir is not None:
+		if not os.path.exists(working_dir):
+			os.makedirs(working_dir)
+		os.chdir(working_dir)
+	return orig_working_dir
+
+def parse_args():
+	parser = create_argparser()
 	parser.add_argument('-b', '--write-backups-every', dest='write_backups_every', default=100, type=int,
 		help='Number of iterations to go between writing backups of program state')
 	parser.add_argument('-S', '--write-state-every', dest='write_state_every', default=10, type=int,
 		help='Number of iterations between writing program state to disk. Higher values reduce IO burden at the cost of losing progress made if program is interrupted.')
-	parser.add_argument('-k', '--top-k-trees', dest='top_k_trees', default='top_k_trees',
-		help='Output file to save top-k trees in text format')
-	parser.add_argument('-f', '--clonal-freqs', dest='clonal_freqs', default='clonalFrequencies',
-		help='Output file to save clonal frequencies')
 	parser.add_argument('-B', '--burnin-samples', dest='burnin_samples', default=1000, type=int,
 		help='Number of burnin samples')
 	parser.add_argument('-s', '--mcmc-samples', dest='mcmc_samples', default=2500, type=int,
@@ -309,18 +331,32 @@ def parse_args():
 	return args
 
 def run(safe_to_exit, run_succeeded, config):
+	orig_working_dir = switch_working_dir()
 	state_manager = StateManager()
 	backup_manager = BackupManager([StateManager.default_last_state_fn, TreeWriter.default_archive_fn])
 
 	if state_manager.state_exists():
-		logmsg('Resuming existing run. Ignoring command-line parameters.')
+		logmsg('Resuming existing run. Ignoring command-line parameters (except --output-dir).')
 		resume_existing_run(state_manager, backup_manager, safe_to_exit, run_succeeded, config)
 	else:
 		args = parse_args()
+
+		# Working directory may be different from initial directory, so
+		# make paths absolute relative to initial directory.
+		paths = {
+			'ssm_file': args.ssm_file,
+			'cnv_file': args.cnv_file,
+			'params_file': args.params_file,
+			'tmp_dir': args.tmp_dir,
+		}
+		for K, V in paths.items():
+			if V is not None:
+				paths[K] = os.path.normpath(os.path.join(orig_working_dir, V))
+
 		# Ensure input files exist and can be read.
 		try:
-			ssm_file = open(args.ssm_file)
-			cnv_file = open(args.cnv_file)
+			ssm_file = open(paths['ssm_file'])
+			cnv_file = open(paths['cnv_file'])
 			ssm_file.close()
 			cnv_file.close()
 		except IOError as e:
@@ -333,11 +369,9 @@ def run(safe_to_exit, run_succeeded, config):
 			safe_to_exit,
 			run_succeeded,
 			config,
-			args.ssm_file,
-			args.cnv_file,
-			args.params_file,
-			top_k_trees_file=args.top_k_trees,
-			clonal_freqs_file=args.clonal_freqs,
+			paths['ssm_file'],
+			paths['cnv_file'],
+			paths['params_file'],
 			burnin_samples=args.burnin_samples,
 			num_samples=args.mcmc_samples,
 			mh_itr=args.mh_iterations,
@@ -345,7 +379,7 @@ def run(safe_to_exit, run_succeeded, config):
 			write_state_every=args.write_state_every,
 			write_backups_every=args.write_backups_every,
 			rand_seed=args.random_seed,
-			tmp_dir=args.tmp_dir
+			tmp_dir=paths['tmp_dir']
 		)
 
 def remove_tmp_files(tmp_dir):
@@ -434,9 +468,6 @@ def main():
 	else:
 		logmsg('Run failed.')
 		sys.exit(1)
-
-def logmsg(msg, fd=sys.stdout):
-	  print >> fd, '[%s] %s' % (datetime.now(), msg)
 
 if __name__ == "__main__":
 	main()
