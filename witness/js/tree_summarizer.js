@@ -238,19 +238,6 @@ TreeSummarizer.prototype._determine_cluster_colour_ordering = function(clusters,
   return ordered_colours;
 }
 
-TreeSummarizer.prototype._calc_xy_data = function(trees){
-  var xData = [];
-  var yData = [];
-  var epsilon = 0.000001
-  Object.keys(trees).forEach(function(tidx){
-    var T = trees[tidx];
-    xData.push(T.clustering_index)
-    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0)
-    yData.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
-  });
-  return {x:xData,y:yData}
-}
-
 TreeSummarizer.prototype._create_tiny_cluster_scatter_trace = function(clusters, xData, yData) {
   var this_xData = [];
   var this_yData = [];
@@ -319,7 +306,7 @@ TreeSummarizer.prototype._create_cluster_scatter_traces = function(clusters, clu
       mode: 'markers',
       type: 'scatter',
       text: labels,
-      showlegend: !Config.show_tree_cluster_contours,
+      showlegend: !Config.tree_summ.draw_cluster_contours,
       marker: {
         symbol: marker_symbols,
         size: marker_sizes,
@@ -361,7 +348,7 @@ TreeSummarizer.prototype._create_cluster_contour_traces = function(clusters, clu
       text: 'cluster ' + clust_count,
       type: 'scatter',
       mode: 'lines',
-      visible: Config.show_tree_cluster_contours,
+      visible: Config.tree_summ.draw_cluster_contours,
       line: {color: cluster_colours[colour_idx]}
     })
     colour_idx = colour_idx + 1;
@@ -375,17 +362,17 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   }
 
   // Calculcate the xData and yData from the indicies
-  var xyData = this._calc_xy_data(tree_summary.trees);
+  var clust_data = TreeUtil.calc_clustering_data(tree_summary.trees);
 
   var best_tree_idx = TreeUtil.find_best_tree(tree_summary.tree_densities);
   var clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.tiny_cluster_criteria);
-  var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.cluster_colours);
+  var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.tree_summ.cluster_colours);
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(clusters.large, cluster_colours);
   // Create the traces for the data points for clustered trees
-  var scatter_traces = this._create_cluster_scatter_traces(clusters.large, cluster_colours, xyData.x, xyData.y);
+  var scatter_traces = this._create_cluster_scatter_traces(clusters.large, cluster_colours, clust_data.CI, clust_data.nBI);
   // Create the trace for the data points for unclustered trees
-  scatter_traces.push(this._create_tiny_cluster_scatter_trace(clusters.small, xyData.x, xyData.y));
+  scatter_traces.push(this._create_tiny_cluster_scatter_trace(clusters.small, clust_data.CI, clust_data.nBI));
   var traces = ellipse_traces.concat(scatter_traces);
   //Use the traces and plotting options to actually plot our data.
   var layout = {

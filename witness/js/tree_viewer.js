@@ -16,7 +16,7 @@ TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
 TreeViewer.prototype._determine_table_trees = function(summary){
   var trees = summary.trees;
   var clusters = summary.clusters;
-  if (Config.show_all_trees | !Util.have_cluster_data(summary)){
+  if (Config.tree_viewer.show_all_trees | !Util.have_cluster_data(summary)){
     return Util.sort_ints(Object.keys(trees).map(function (a) {return parseInt(a,10)}));
   }
 
@@ -26,7 +26,7 @@ TreeViewer.prototype._determine_table_trees = function(summary){
   var rand_num_idx = 0;
   Object.keys(clusters).forEach(function(cidx){
     clust_members = clusters[cidx].members;
-    if (clust_members.length<=Config.num_trees_to_show){
+    if (clust_members.length<=Config.tree_viewer.num_trees_to_show){
       tree_indices = tree_indices.concat(clust_members)
     }
     else{
@@ -35,7 +35,7 @@ TreeViewer.prototype._determine_table_trees = function(summary){
       tree_indices.push(rep_tree);
       //Get the indicies of 4 other random trees. They should not repeat nor should they contain the rep_tree index
       trees_added = 0;
-      while(trees_added < Config.num_trees_to_show-1){
+      while(trees_added < Config.tree_viewer.num_trees_to_show-1){
         this_mem = Math.floor( Config.tree_index_determinants[rand_num_idx] * clust_members.length );
         if(!(tree_indices.includes(clust_members[this_mem])) && !(clust_members[this_mem] == rep_tree)){
           tree_indices.push(clust_members[this_mem]);
@@ -60,7 +60,7 @@ TreeViewer.prototype.render = function(dataset) {
     var first_tree_idx = tree_indices[0];
     var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
     var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
-
+    // Fill in the tree table.
     tree_indices.forEach(function(tidx) {
       var total_ssms = 0;
       Object.keys(summary.trees[tidx].populations).forEach(function(pidx) {

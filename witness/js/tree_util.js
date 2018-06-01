@@ -18,7 +18,7 @@ TreeUtil.find_cluster_from_treeidx = function(tree_index, clusters){
       return;
     }
   });
-  return in_cluster
+  return in_cluster;
 }
 
 TreeUtil.find_best_tree = function(densities) {
@@ -29,10 +29,23 @@ TreeUtil.find_best_tree = function(densities) {
     if(density > max_density) {
       max_density = density;
       best_tidx = tidx;
-    }
+    };
   });
   if(best_tidx == null) {
     throw "best_tidx is null";
   }
   return parseInt(best_tidx, 10);
+}
+
+TreeUtil.calc_clustering_data = function(trees){
+  var CI = [];
+  var nBI = [];
+  var epsilon = 0.000001;
+  Object.keys(trees).forEach(function(tidx){
+    var T = trees[tidx];
+    CI.push(T.clustering_index);
+    // Epsilon prevents division by zero when CI = 1 (and so BI = LI = 0)
+    nBI.push(T.branching_index / (T.branching_index + T.linearity_index + epsilon));
+  });
+  return {CI:CI, nBI:nBI};
 }
