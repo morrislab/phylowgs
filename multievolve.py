@@ -9,18 +9,12 @@ from util2 import logmsg
 import Queue
 import threading
 import time
+import scipy.misc
 from collections import defaultdict
 
 def create_directory(dirname):
     if not os.path.exists(dirname):
         os.makedirs(dirname)
-
-def logsumexp(a):
-    #numpy has a logaddexp() but it only takes two values and that's stupid so
-    #I'm just going to create my own logsumexp here.
-    max_a = np.max(a)
-    result = max_a + np.log(np.sum([np.exp(i-max_a) for i in a]))
-    return result
 
 def parse_args():
     parser = argparse.ArgumentParser(
@@ -231,13 +225,15 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
             if tree_name.startswith("tree"):
                 #the logged likelihood is in the names of the trees, just use that.
                 logLHs.append(float(tree_name.split('_')[-1]))
-        logSumLHs.append(logsumexp(logLHs))
+        logSumLHs.append(scipy.misc.logsumexp(logLHs))
 
-    # Check below assumes that LLH < 0, which it should always be.
+    # Check below assumes that LLH < 0, which it should always be. We need this
+    # assumption for the idea that a "slightly worse" chain has a "slightly
+    # more negative" LH to work.
     logSumLHs = np.array(logSumLHs)
     assert np.all(logSumLHs < 0)
     bestLogSumLH = np.max(logSumLHs)
-    chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH > (chain_inclusion_factor*bestLogSumLH)]
+    chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH >= (chain_inclusion_factor*bestLogSumLH)]
     return chains_to_merge
 
 def merge_best_chains(args,chain_dirs,chains_to_merge):
