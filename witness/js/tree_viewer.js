@@ -74,7 +74,7 @@ TreeViewer.prototype.render = function(dataset) {
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
         + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>'
-        + (cluster==-1 ? '<td class="cluster" data-sort-calue="-1">None</td>' : '<td class="cluster">' + cluster + '</td>');
+        + (cluster==-1 ? '<td class="cluster" data-sort-value="-1">None</td>' : '<td class="cluster">' + cluster + '</td>');
       ['linearity_index', 'branching_index', 'clustering_index'].forEach(function(idxname) {
         var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname].toFixed(2) : '&mdash;';
         row += '<td>' + val + '</td>';
