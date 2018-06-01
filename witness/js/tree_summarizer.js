@@ -292,8 +292,12 @@ TreeSummarizer.prototype._create_cluster_scatter_traces = function(clusters, clu
     Object.keys(members).forEach(function(midx){
       var tidx = members[midx];
       labels.push('Tree ' + tidx + ' - Cluster ' + (label_clust_index));
-      marker_symbols.push(rep_tree_index === tidx ? 'cross' : 'dot');
-      marker_sizes.push(rep_tree_index === tidx ? 30 : 6);
+      marker_symbols.push('dot');
+      marker_sizes.push(6);
+      if(rep_tree_index === tidx){
+        marker_symbols.push('cross');
+        marker_sizes.push(30);
+      }
       marker_colours.push(cluster_colours[colour_idx])
       this_xData.push(xData[tidx])
       this_yData.push(yData[tidx])
