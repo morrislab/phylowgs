@@ -62,8 +62,8 @@ directory, the seed stored in that file will be used. This behaviour lets you
 deterministically repeat runs by copying the `random_seed.txt` files from a
 previous batch.
 
-Running PhyloWGS
-----------------
+Installing PhyloWGS
+-------------------
 
 1. Install dependencies.
 
@@ -75,19 +75,121 @@ Running PhyloWGS
 
         g++ -o mh.o -O3 mh.cpp  util.cpp `gsl-config --cflags --libs`
 
-3. Run PhyloWGS. Minimum invocation on sample data set:
+Running PhyloWGS with multiple MCMC chains (recommended)
+--------------------------------------------------------
+
+To obtain MCMC samples that better approximate the true posterior distribution
+over trees, we suggest running multiple concurrent MCMC chains using
+`multievolve.py`. To do so, run the following:
+
+        python2 multievolve.py --num-chains 4 ssm_data.txt cnv_data.txt
+
+Each chain is run as a separate process. Consequently, we suggest adjusting the
+`--num-chains` option to reflect the number of CPU cores you wish to dedicate
+to PhyloWGS. Note that increasing `--num-chains` *will not* decrease runtime,
+but *will* increase the number of samples you take, and thus *should* yield a
+better posterior approximation.
+
+Running PhyloWGS with only one MCMC chain (not recommended)
+----------------------------------------------------------
+To run only a single MCMC chain, run the following:
 
         python2 evolve.py ssm_data.txt cnv_data.txt
 
+The quality of your posterior approximation will likely suffer relative to when
+you run multiple chains.
+
+Viewing and interpreting results
+--------------------------------
+1. Generate JSON results.
+
+        mkdir test_results
+        cd test_results
+        # To work with viewer in Step 5, the naming conventions used here must be
+        # followed.
+        # "example_data" is simply the name by which you want your results to be identified.
+        python2 /path/to/phylowgs/write_results.py example_data ../trees.zip example_data.summ.json.gz example_data.muts.json.gz example_data.mutass.zip
+        cd ..
+
   All options:
+
+        usage: write_results.py [-h] [--include-ssm-names] [--min-ssms MIN_SSMS]
+                                dataset_name tree_file tree_summary_output
+                                mutlist_output mutass_output
+
+        Write JSON files describing trees
+
+        positional arguments:
+          dataset_name         Name identifying dataset
+          tree_file            File containing sampled trees
+          tree_summary_output  Output file for JSON-formatted tree summaries
+          mutlist_output       Output file for JSON-formatted list of mutations
+          mutass_output        Output file for JSON-formatted list of SSMs and CNVs
+                               assigned to each subclone
+
+        optional arguments:
+          -h, --help           show this help message and exit
+          --include-ssm-names  Include SSM names in output (which may be sensitive
+                               data) (default: False)
+          --min-ssms MIN_SSMS  Minimum number or percent of SSMs to retain a subclone
+                               (default: 0.01)
+
+2. View results.
+
+        mv test_results /path/to/phylowgs/witness/data
+        cd /path/to/phylowgs/witness
+        gunzip data/*/*.gz
+        python2 index_data.py
+        python2 -m SimpleHTTPServer
+        # Open http://127.0.0.1:8000 in your web browser. Note that, by
+        # default, the server listens for connections from any host.
+
+
+Full option listing
+-------------------
+The multi-chain executor `multievolve.py` takes the following options. Note
+that it will also accept all options that `evolve.py` takes, which are listed
+below.
+
+        usage: multievolve.py [-h] [-n NUM_CHAINS]
+                              [-r RANDOM_SEEDS [RANDOM_SEEDS ...]]
+                              [-I CHAIN_INCLUSION_FACTOR] [-O OUTPUT_DIR] --ssms
+                              SSM_FILE --cnvs CNV_FILE
+
+        optional arguments:
+          -h, --help            show this help message and exit
+          -n NUM_CHAINS, --num-chains NUM_CHAINS
+                                Number of chains to run concurrently (default: 4)
+          -r RANDOM_SEEDS [RANDOM_SEEDS ...], --random-seeds RANDOM_SEEDS [RANDOM_SEEDS ...]
+                                Space-separated random seeds with which to initialize
+                                each chain. Specify one for each chain. (default:
+                                None)
+          -I CHAIN_INCLUSION_FACTOR, --chain-inclusion-factor CHAIN_INCLUSION_FACTOR
+                                Factor for determining which chains will be included
+                                in the output "merged" folder. Default is 1.5, meaning
+                                that the sum of the likelihoods of the trees found in
+                                each chain must be greater than 1.5x the maximum of
+                                that value across chains. Setting this value = inf
+                                includes all chains and setting it = 1 will include
+                                only the best chain. (default: 1.5)
+          -O OUTPUT_DIR, --output-dir OUTPUT_DIR
+                                Directory where results from each chain will be saved.
+                                We will create it if it does not exist. (default:
+                                chains)
+          --ssms SSM_FILE       File listing SSMs (simple somatic mutations, i.e.,
+                                single nucleotide variants. For proper format, see
+                                README.md. (default: None)
+          --cnvs CNV_FILE       File listing CNVs (copy number variations). For proper
+                                format, see README.md. (default: None)
+
+The single-chain executor `evolve.py` takes the following options. Note
+that all such options can also be passed to `multievolve.py`.
 
         usage: evolve.py [-h] [-O OUTPUT_DIR] [-b WRITE_BACKUPS_EVERY]
                          [-S WRITE_STATE_EVERY] [-B BURNIN_SAMPLES] [-s MCMC_SAMPLES]
                          [-i MH_ITERATIONS] [-r RANDOM_SEED] [-t TMP_DIR]
                          [-p PARAMS_FILE]
                          ssm_file cnv_file
-
-        Run PhyloWGS to infer subclonal composition from SSMs and CNVs
 
         positional arguments:
           ssm_file              File listing SSMs (simple somatic mutations, i.e.,
@@ -124,70 +226,27 @@ Running PhyloWGS
                                 JSON file listing run parameters, generated by the
                                 parser (default: None)
 
-4. Generate JSON results.
-
-        mkdir test_results
-        cd test_results
-        # To work with viewer in Step 5, the naming conventions used here must be
-        # followed.
-        # "example_data" is simply the name by which you want your results to be identified.
-        python2 /path/to/phylowgs/write_results.py example_data ../trees.zip example_data.summ.json.gz example_data.muts.json.gz example_data.mutass.zip
-        cd ..
-
-  All options:
-
-        usage: write_results.py [-h] [--include-ssm-names] [--min-ssms MIN_SSMS]
-                                dataset_name tree_file tree_summary_output
-                                mutlist_output mutass_output
-
-        Write JSON files describing trees
-
-        positional arguments:
-          dataset_name         Name identifying dataset
-          tree_file            File containing sampled trees
-          tree_summary_output  Output file for JSON-formatted tree summaries
-          mutlist_output       Output file for JSON-formatted list of mutations
-          mutass_output        Output file for JSON-formatted list of SSMs and CNVs
-                               assigned to each subclone
-
-        optional arguments:
-          -h, --help           show this help message and exit
-          --include-ssm-names  Include SSM names in output (which may be sensitive
-                               data) (default: False)
-          --min-ssms MIN_SSMS  Minimum number or percent of SSMs to retain a subclone
-                               (default: 0.01)
-
-5. View results.
-
-        mv test_results /path/to/phylowgs/witness/data
-        cd /path/to/phylowgs/witness
-        gunzip data/*/*.gz
-        python2 index_data.py
-        python2 -m SimpleHTTPServer
-        # Open http://127.0.0.1:8000 in your web browser. Note that, by
-        # default, the server listens for connections from any host.
-
 
 Resuming a previous PhyloWGS run
 --------------------------------
-
 If PhyloWGS is interrupted for whatever reason, you can resume your existing
-run by simply running `evolve.py` from the same directory as the previous run,
-without any command-line params:
+run by simply running `multievolve.py` or `evolve.py` (depending on which you
+used to begin the run) from the same directory as the previous run, without any
+command-line params:
 
     # Start initial run.
-    python2 evolve.py ssm_data.txt cnv_data.txt
+    python2 multievolve.py ssm_data.txt cnv_data.txt
 
     # Hit CTRL+C to send SIGINT, halting run partway through.
 
     # Resume run:
-    python2 evolve.py
+    python2 multievolve.py
 
 
 License
 -------
 
-Copyright (C) 2015 Quaid Morris
+Copyright (C) 2018 Quaid Morris
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
