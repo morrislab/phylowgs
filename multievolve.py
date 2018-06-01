@@ -10,6 +10,7 @@ import Queue
 import threading
 import time
 import scipy.misc
+import hashlib
 from collections import defaultdict
 
 def create_directory(dirname):
@@ -246,13 +247,15 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     '''
     out_dir = os.path.join(args['output_dir'],'merged_best_chains')
     create_directory(out_dir)
-    if os.path.isfile(os.path.join(out_dir,"trees.zip")):
+    combined_fn = os.path.join(out_dir,"trees.zip")
+    if os.path.isfile(combined_fn):
         logmsg("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
         return
-    combined_tree_zipfile = zipfile.ZipFile(os.path.join(out_dir,"trees.zip"), mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
+    combined_tree_zipfile = zipfile.ZipFile(combined_fn, mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
     logmsg("Merging best chains:")
     tree_index = 0
     zip_paths = []
+    others = defaultdict(dict)
 
     for chain_idx in chains_to_merge:
         logmsg("  merging chain {} ...".format(chain_idx))
@@ -261,21 +264,42 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
         zip_paths.append(zip_path)
         this_zip = zipfile.ZipFile(zip_path, mode='r')
         this_zips_files = this_zip.namelist()
-        files_to_include = [(filename, this_zip.read(filename)) for filename in this_zips_files if filename.startswith("tree")]
-        for file in files_to_include:
-            #First we need to reindex the tree
-            filename_components = file[0].split("_")
+
+        is_tree_file = lambda fn: fn.startswith('tree')
+        should_include_other = lambda fn: not fn.startswith('burnin')
+        tree_fns  = [fn for fn in this_zips_files if is_tree_file(fn)]
+        other_fns = [fn for fn in this_zips_files if not is_tree_file(fn) and should_include_other(fn)]
+
+        for fn in tree_fns:
+            F = this_zip.read(fn)
+            filename_components = fn.split("_")
+            # First we need to reindex the tree
             filename_components[1] = str(tree_index)
-            filename = "_".join(filename_components)
-            combined_tree_zipfile.writestr(filename, file[1])
+            fn = "_".join(filename_components)
+            combined_tree_zipfile.writestr(fn, F)
             tree_index += 1
-    #Don't forget the "params.json" and "cnv_logical_physical_mapping.json" files. They should all be the same in each
-    #chains zip file. So just take the last one used and insert it.
-    # TODO: take any unrecognized files and include them in merge, rather than just these explicit files.
-    combined_tree_zipfile.writestr("cnv_logical_physical_mapping.json", this_zip.read("cnv_logical_physical_mapping.json"))
-    combined_tree_zipfile.writestr("params.json", this_zip.read("params.json"))
+
+        for fn in other_fns:
+            others[fn][chain_idx] = hashlib.sha256(this_zip.read(fn)).hexdigest()
+
+    # Assume that any non-tree files are identical across individual trees.zip
+    # files. But let's check this assumption.
+    for fn in others.keys():
+        assert len(set(others[fn].values())) == 1
+        combined_tree_zipfile.writestr(fn, this_zip.read(fn))
+
+    write_results_path = os.path.normpath(os.path.join(os.path.dirname(__file__), 'write_results.py'))
     logmsg("Chain merging complete.")
     logmsg("You may remove the following unneeded intermediate files: {}".format(' '.join(zip_paths)))
+    logmsg('To write JSON results, please run `{} {} {} {} {} {} {}`'.format(
+        sys.executable,
+        write_results_path,
+        'run_name',
+        combined_fn,
+        'run_name.summ.json.gz',
+        'run_name.muts.json.gz',
+        'run_name.mutass.zip'
+    ))
 
 def main():
     args,evolve_args = parse_args()
