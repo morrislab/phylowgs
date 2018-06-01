@@ -1,7 +1,7 @@
 var Config = {
     font_size: 15,
-    group_tiny_clusters: true,
-    tiny_cluster_criteria: 0.01,
+    report_small_clusters: false,
+    small_cluster_tree_prop_cutoff: 0.01,
     tree_summ: {
         draw_cluster_contours: false,
         cluster_colours: ['#1f78b4','#33a02c','#e31a1c','#ff7f00','#6a3d9a','#b15928','#a6cee3','#b2df8a','#fb9a99','#fdbf6f','#cab2d6','#ffff99']},

@@ -16,7 +16,7 @@ TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
 TreeSummarizer.prototype._render_cluster_table = function(summary) {
   var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
   cluster_table = cluster_table.find('tbody');
-  var clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length * Config.tiny_cluster_criteria)
+  var clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length * Config.small_cluster_tree_prop_cutoff)
   var self = this;
   var clust_num = 0;
   Object.keys(clusters.large).forEach(function(cluster_idx) {
@@ -35,7 +35,7 @@ TreeSummarizer.prototype._render_cluster_table = function(summary) {
     $('<tr/>').html(entries.join('')).appendTo(cluster_table);
     self._draw_rep_tree(summary.trees[representative_tree_idx],'#' + rep_tree_container_id);
   });
-  if(Config.group_tiny_clusters & (Object.keys(clusters.small).length != 0)){
+  if(!Config.report_small_clusters & (Object.keys(clusters.small).length != 0)){
     var num_unclustered = 0;
     Object.keys(clusters.small).forEach(function(cluster_idx) {
       var C = summary.clusters[cluster_idx];
@@ -365,7 +365,7 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   var clust_data = TreeUtil.calc_clustering_data(tree_summary.trees);
 
   var best_tree_idx = TreeUtil.find_best_tree(tree_summary.tree_densities);
-  var clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.tiny_cluster_criteria);
+  var clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.small_cluster_tree_prop_cutoff);
   var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.tree_summ.cluster_colours);
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(clusters.large, cluster_colours);

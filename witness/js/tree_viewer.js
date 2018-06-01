@@ -54,7 +54,7 @@ TreeViewer.prototype.render = function(dataset) {
   var tplotter = this;
   d3.json(dataset.summary_path, function(summary) {
     var have_clust_info = Util.have_cluster_data(summary);
-    var separated_clusters = have_clust_info ? ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length*Config.tiny_cluster_criteria): -1;
+    var separated_clusters = have_clust_info ? ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length*Config.small_cluster_tree_prop_cutoff): -1;
     var tree_indices = tplotter._determine_table_trees(summary);
     tree_container.empty();
     var first_tree_idx = tree_indices[0];

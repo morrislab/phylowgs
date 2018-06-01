@@ -2,7 +2,7 @@ function ClusterUtil() {
 }
 
 ClusterUtil.separate_clusters_by_size = function(clusters, cluster_size_criteria){
-    if(!Config.group_tiny_clusters){
+    if(Config.report_small_clusters){
         return {small: [], large: clusters};
     }
     var small_clusters = {};
