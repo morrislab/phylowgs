@@ -1,21 +1,6 @@
 function TreeSummarizer() {
 }
 
-TreeSummarizer.prototype._is_using_old_data = function(summary){
-  // Check to see if using older data. If so, may not be able to plot some graphs.
-  var using_old_data = false;
-  if(!summary.hasOwnProperty('clusters')){
-    using_old_data = true;
-  };
-  Object.keys(summary.clusters).forEach(function(cKey){
-    if (!summary.clusters[cKey].hasOwnProperty('members')){
-      using_old_data = true;
-      return
-    }
-  })
-  return using_old_data;
-}
-
 TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
   var structure = tree.structure;
   var populations = tree.populations;
@@ -28,28 +13,11 @@ TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
   tree_plotter.draw_tree(tree_structure, container_id,padding = [0, 10, 0, 10], w0 = 150, h0 = 75, radius_scalar = 1/7, include_node_identifier=false);
 }
 
-TreeSummarizer.prototype.separate_clusters_by_size = function(clusters, total_num_trees, cluster_size_criteria){
-  if(!Config.group_tiny_clusters){
-    return {small: [], large: clusters};
-  }
-  var small_clusters = {};
-  var large_clusters = {};
-  Object.keys(clusters).forEach(function(cidx){
-    var C = clusters[cidx];
-    if(C.members.length < total_num_trees*cluster_size_criteria){
-      small_clusters[cidx] = C;
-    }else{
-      large_clusters[cidx] = C;
-    }
-  })
-  return {small: small_clusters, large: large_clusters};
-}
-
 TreeSummarizer.prototype._render_cluster_table = function(summary) {
   var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
   cluster_table = cluster_table.find('tbody');
-  var clusters = this.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length, Config.tiny_cluster_criteria)
-  self = this;
+  var clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length * Config.tiny_cluster_criteria)
+  var self = this;
   var clust_num = 0;
   Object.keys(clusters.large).forEach(function(cluster_idx) {
     clust_num = clust_num+1;
@@ -243,21 +211,7 @@ TreeSummarizer.prototype._render_pop_counts = function(pop_counts, min_ssms) {
   chart.draw(data, options);
 }
 
-TreeSummarizer.prototype._extract_indices = function(tree_summ) {
-  this.linearity_indices = {};
-  this.branching_indices = {};
-  this.clustering_indices = {};
-
-  var self = this;
-  Object.keys(tree_summ).forEach(function(tidx) {
-    self.linearity_indices[tidx] = tree_summ[tidx].linearity_index;
-    self.branching_indices[tidx] = tree_summ[tidx].branching_index;
-    self.clustering_indices[tidx] = tree_summ[tidx].clustering_index;
-  });
-  this.num_trees = Object.keys(this.linearity_indices).length;
-}
-
-TreeSummarizer.prototype._determine_cluster_colour_ordering = function(clusters,colors,xData,yData){
+TreeSummarizer.prototype._determine_cluster_colour_ordering = function(clusters,colors){
   // Will simply assign colours to clusters ordered from the top to the bottom.
   var self = this;
   var nCol = colors.length;
@@ -282,22 +236,6 @@ TreeSummarizer.prototype._determine_cluster_colour_ordering = function(clusters,
     clust_nums.splice(cidx,1)
   }
   return ordered_colours;
-}
-
-TreeSummarizer.prototype._find_best_tree = function(densities) {
-  var max_density = 0;
-  var best_tidx = null;
-  Object.keys(densities).forEach(function(tidx) {
-    var density = densities[tidx];
-    if(density > max_density) {
-      max_density = density;
-      best_tidx = tidx;
-    }
-  });
-  if(best_tidx == null) {
-    throw "best_tidx is null";
-  }
-  return parseInt(best_tidx, 10);
 }
 
 TreeSummarizer.prototype._calc_xy_data = function(trees){
@@ -439,9 +377,9 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   // Calculcate the xData and yData from the indicies
   var xyData = this._calc_xy_data(tree_summary.trees);
 
-  var best_tree_idx = this._find_best_tree(tree_summary.tree_densities);
-  var clusters = this.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length, Config.tiny_cluster_criteria);
-  var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.cluster_colours, xyData.x, xyData.y);
+  var best_tree_idx = TreeUtil.find_best_tree(tree_summary.tree_densities);
+  var clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.tiny_cluster_criteria);
+  var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.cluster_colours);
   // Determine the ellipse traces that define the cluster contours
   var ellipse_traces = this._create_cluster_contour_traces(clusters.large, cluster_colours);
   // Create the traces for the data points for clustered trees
@@ -505,7 +443,7 @@ TreeSummarizer.prototype.render = function(dataset) {
         }
       }
     });
-    if(!self._is_using_old_data(summary)){
+    if(Util.have_cluster_data(summary)){
       // These functions require that the summ file be created with the latest version of write_results.
       // If not, then just skip these sections.
       self._render_cluster_table(summary);
