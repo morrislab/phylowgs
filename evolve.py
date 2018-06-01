@@ -305,7 +305,7 @@ def switch_working_dir():
 		os.chdir(working_dir)
 	return orig_working_dir
 
-def parse_args():
+def create_argparser_with_all_args():
 	parser = create_argparser()
 	parser.add_argument('-b', '--write-backups-every', dest='write_backups_every', default=100, type=int,
 		help='Number of iterations to go between writing backups of program state')
@@ -327,8 +327,17 @@ def parse_args():
 		help='File listing SSMs (simple somatic mutations, i.e., single nucleotide variants. For proper format, see README.md.')
 	parser.add_argument('cnv_file',
 		help='File listing CNVs (copy number variations). For proper format, see README.md.')
+	return parser
+
+def parse_args():
+	parser = create_argparser_with_all_args()
 	args = parser.parse_args()
 	return args
+
+def print_help():
+	parser = create_argparser_with_all_args()
+	parser.print_help()
+	sys.exit()
 
 def run(safe_to_exit, run_succeeded, config):
 	orig_working_dir = switch_working_dir()
@@ -397,6 +406,24 @@ def remove_tmp_files(tmp_dir):
 		pass
 
 def main():
+	# Explicitly printing help from here rather than letting argparse do so
+	# implicitly accomplishes two tasks.
+	#
+	# 1. First, it prevents printing the "Run failed" error message after
+	# the help, which otherwise happens because we spin up all the
+	# threading machinery only to have the thread to exit without
+	# indicating its success.
+	#
+	# 2. Now that we have a two-step argparsing algorithm, which permits us
+	# to set the working directory properly regardless of whether the user
+	# is resuming an existing run or starting a new one, this ensures we
+	# print the full help. If we don't do this, we end up calling
+	# parser.parse_known_args() after only the --output-dir option has been
+	# specified, meaning that argparse will print the help at that point,
+	# and no other options are included in the help output.
+	if '-h' in sys.argv or '--help' in sys.argv:
+		print_help()
+
 	# Introducing threading is necessary to allow write operations to complete
 	# when interrupts are received. As the interrupt halts execution of the main
 	# thread and immediately jumps to the interrupt handler, we must run the
