@@ -95,11 +95,11 @@ To decrease runtime, you can reduce the number of MCMC samples PhyloWGS takes as
         python2 multievolve.py --num-chains 4 --ssms ssm_data.txt --cnvs cnv_data.txt --burnin-samples 1 --mcmc-samples 1
 
 By taking only one burnin and one true sample, PhyloWGS should complete in only
-a minute or so. *This will, however, severely compromise the quality of your
+a minute or so. **This will, however, severely compromise the quality of your
 results. Use so few samples only so that you can test PhyloWGS before
 performing a proper run. To get proper results, we suggest using at least the
 number of burn-in and true samples that are specified by default (1000 and
-2500, respectively).*
+2500, respectively).**
 
 Running PhyloWGS with only one MCMC chain (not recommended)
 ----------------------------------------------------------
