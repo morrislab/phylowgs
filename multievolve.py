@@ -234,10 +234,19 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     logSumLHs = np.array(logSumLHs)
     assert np.all(logSumLHs < 0)
     bestLogSumLH = np.max(logSumLHs)
-    chains_to_merge = [i for i,logSumLH in enumerate(logSumLHs) if logSumLH >= (chain_inclusion_factor*bestLogSumLH)]
-    return chains_to_merge
 
-def merge_best_chains(args,chain_dirs,chains_to_merge):
+    included_chains = []
+    excluded_chains = []
+    for cidx, logsumlh in enumerate(logSumLHs):
+        if logsumlh >= chain_inclusion_factor * bestLogSumLH:
+            included_chains.append((cidx, logsumlh))
+        else:
+            excluded_chains.append((cidx, logsumlh))
+
+    assert len(included_chains) >= 1
+    return (included_chains, excluded_chains)
+
+def merge_best_chains(output_dir, chain_dirs, included_chains, excluded_chains):
     '''
     Determines which chains are the best and merges them together into one trees.zip
     file that can be input into write_results.
@@ -245,20 +254,24 @@ def merge_best_chains(args,chain_dirs,chains_to_merge):
     of it's trees is within 10% of the highest likelihood of all of the trees calculated
     across all chains.
     '''
-    out_dir = os.path.join(args['output_dir'],'merged_best_chains')
+    out_dir = os.path.join(output_dir, 'merged_best_chains')
     create_directory(out_dir)
     combined_fn = os.path.join(out_dir,"trees.zip")
     if os.path.isfile(combined_fn):
         logmsg("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
         return
+
     combined_tree_zipfile = zipfile.ZipFile(combined_fn, mode='w', compression=zipfile.ZIP_DEFLATED, allowZip64=True)
-    logmsg("Merging best chains:")
+    logmsg("Including chains {}".format(' '.join(['{}={}'.format(cidx, logsumlh) for cidx, logsumlh in included_chains])))
+    if len(excluded_chains) > 0:
+        logmsg("Excluding chains {}".format(' '.join(['{}={}'.format(cidx, logsumlh) for cidx, logsumlh in excluded_chains])))
+    else:
+        logmsg('Not excluding any chains')
     tree_index = 0
     zip_paths = []
     others = defaultdict(dict)
 
-    for chain_idx in chains_to_merge:
-        logmsg("  merging chain {} ...".format(chain_idx))
+    for chain_idx, _ in included_chains:
         chain_dir = chain_dirs[chain_idx]
         zip_path = os.path.abspath(os.path.join(chain_dir, 'trees.zip'))
         zip_paths.append(zip_path)
@@ -305,8 +318,8 @@ def main():
     args,evolve_args = parse_args()
     check_args(args)
     chain_dirs = run_chains(args,evolve_args)
-    chains_to_merge = determine_chains_to_merge(chain_dirs, args['chain_inclusion_factor'])
-    merge_best_chains(args, chain_dirs, chains_to_merge)
+    included_chains, excluded_chains = determine_chains_to_merge(chain_dirs, args['chain_inclusion_factor'])
+    merge_best_chains(args['output_dir'], chain_dirs, included_chains, excluded_chains)
 
 if __name__ == "__main__":
     main()
