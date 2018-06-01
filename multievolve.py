@@ -246,7 +246,7 @@ def determine_chains_to_merge(chain_dirs,chain_inclusion_factor):
     assert len(included_chains) >= 1
     return (included_chains, excluded_chains)
 
-def merge_best_chains(output_dir, chain_dirs, included_chains, excluded_chains):
+def merge_best_chains(out_dir, chain_dirs, included_chains, excluded_chains):
     '''
     Determines which chains are the best and merges them together into one trees.zip
     file that can be input into write_results.
@@ -254,8 +254,6 @@ def merge_best_chains(output_dir, chain_dirs, included_chains, excluded_chains):
     of it's trees is within 10% of the highest likelihood of all of the trees calculated
     across all chains.
     '''
-    out_dir = os.path.join(output_dir, 'merged_best_chains')
-    create_directory(out_dir)
     combined_fn = os.path.join(out_dir,"trees.zip")
     if os.path.isfile(combined_fn):
         logmsg("Merged trees.zip file already exists. To create a new merged trees.zip, remove the existing one first.")
