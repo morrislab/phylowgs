@@ -82,7 +82,7 @@ To obtain MCMC samples that better approximate the true posterior distribution
 over trees, we suggest running multiple concurrent MCMC chains using
 `multievolve.py`. To do so, run the following:
 
-        python2 multievolve.py --num-chains 4 ssm_data.txt cnv_data.txt
+        python2 multievolve.py --num-chains 4 --ssms ssm_data.txt --cnvs cnv_data.txt
 
 Each chain is run as a separate process. Consequently, we suggest adjusting the
 `--num-chains` option to reflect the number of CPU cores you wish to dedicate
@@ -235,11 +235,11 @@ used to begin the run) from the same directory as the previous run, without any
 command-line params:
 
     # Start initial run.
-    python2 multievolve.py ssm_data.txt cnv_data.txt
+    python2 multievolve.py --ssms ssm_data.txt --cnvs cnv_data.txt
 
     # Hit CTRL+C to send SIGINT, halting run partway through.
 
-    # Resume run:
+    # Resume run (must be executed from same directory as initial invocation):
     python2 multievolve.py
 
 
