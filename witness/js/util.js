@@ -38,7 +38,6 @@ Util.transpose = function(arr) {
 Util.have_cluster_data = function(summary){
   // Check to see if using older data where no clustering was done. If so, may not be able to plot some graphs.
   var have_clust_data = false;
-  console.log(summary)
   if(summary.hasOwnProperty('clusters')){
     if(summary.clusters[Object.keys(summary.clusters)[0]].hasOwnProperty('members')){
       var have_clust_data = true;

@@ -1,6 +1,25 @@
 function TreeViewer() {
 }
 
+TreeViewer.prototype._predetermined_permutation = function(arr,n) {
+  for(var idx = 0; idx < arr.length; idx++){
+    var swpIdx = idx + Math.floor(Config.tree_viewer.tree_index_determinants[idx] * (arr.length - idx));
+    // now swap elements at idx and swpIdx
+    var tmp = arr[idx];
+    arr[idx] = arr[swpIdx];
+    arr[swpIdx] = tmp;
+  }
+  if(typeof n == "undefined" | n >= arr.length){
+    return arr;
+  }else{
+    ans = [];
+    for(var idx = 0; idx < n; idx++){
+      ans.push(arr[idx]);
+    }
+    return ans;
+  }
+}
+
 TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
   if(!(dataset.hasOwnProperty('muts_path') && dataset.hasOwnProperty('mutass_path')))
     return;
@@ -13,13 +32,7 @@ TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
   });
 }
 
-TreeViewer.prototype._determine_table_trees = function(summary){
-  var trees = summary.trees;
-  var clusters = summary.clusters;
-  if (Config.tree_viewer.show_all_trees | !Util.have_cluster_data(summary)){
-    return Util.sort_ints(Object.keys(trees).map(function (a) {return parseInt(a,10)}));
-  }
-
+TreeViewer.prototype._determine_table_trees = function(trees, clusters){
   //Show a specified number of trees from each cluster. One of these should be the
   //representative tree for that cluster, and the others will be picked at random.
   var tree_indices = [];
@@ -31,12 +44,12 @@ TreeViewer.prototype._determine_table_trees = function(summary){
     }
     else{
       //Representative tree should always be shown
-      rep_tree = clusters[cidx].representative_tree;
+      var rep_tree = clusters[cidx].representative_tree;
       tree_indices.push(rep_tree);
       //Get the indicies of 4 other random trees. They should not repeat nor should they contain the rep_tree index
-      trees_added = 0;
+      var trees_added = 0;
       while(trees_added < Config.tree_viewer.num_trees_to_show-1){
-        this_mem = Math.floor( Config.tree_index_determinants[rand_num_idx] * clust_members.length );
+        this_mem = Math.floor( Config.tree_viewer.tree_index_determinants[rand_num_idx] * clust_members.length );
         if(!(tree_indices.includes(clust_members[this_mem])) && !(clust_members[this_mem] == rep_tree)){
           tree_indices.push(clust_members[this_mem]);
           trees_added = trees_added + 1;
@@ -51,12 +64,34 @@ TreeViewer.prototype._determine_table_trees = function(summary){
 TreeViewer.prototype.render = function(dataset) {
   $('#tree-list').show();
   var tree_container = $('#trees tbody');
+  tree_container.empty();
   var tplotter = this;
   d3.json(dataset.summary_path, function(summary) {
-    var have_clust_info = Util.have_cluster_data(summary);
-    var separated_clusters = have_clust_info ? ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length*Config.small_cluster_tree_prop_cutoff): -1;
-    var tree_indices = tplotter._determine_table_trees(summary);
-    tree_container.empty();
+    var have_clust_data = Util.have_cluster_data(summary);
+    var show_all_trees = Config.tree_viewer.show_all_trees;
+    var report_small_clusters = Config.report_small_clusters;
+    if(have_clust_data){
+        if(report_small_clusters){
+            var clusters = summary.clusters;
+            var tree_indices = show_all_trees | !have_clust_data
+                ? Util.sort_ints(Object.keys(summary.trees).map(function (a) {return parseInt(a,10)}))
+                : tplotter._determine_table_trees(summary.trees, clusters);
+        }else{
+            var separated_clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length*Config.small_cluster_tree_prop_cutoff);
+            var non_clusters = separated_clusters.small;
+            var clusters = separated_clusters.large;
+            if(show_all_trees){
+                var tree_indices = Util.sort_ints(Object.keys(summary.trees).map(function (a) {return parseInt(a,10)}));
+            }else{
+                var clustered_tree_indicies = tplotter._determine_table_trees(summary.trees, clusters);
+                var unclustered_tree_indicies = tplotter._determine_table_trees(summary.trees, non_clusters);
+                unclustered_tree_indicies = tplotter._predetermined_permutation(unclustered_tree_indicies,Config.tree_viewer.num_trees_to_show);
+                var tree_indices = clustered_tree_indicies.concat(unclustered_tree_indicies);
+            }
+        }
+    }else{
+        var tree_indices = Util.sort_ints(Object.keys(summary.trees).map(function (a) {return parseInt(a,10)}));
+    };
     var first_tree_idx = tree_indices[0];
     var first_pop_idx = Object.keys(summary.trees[first_tree_idx].populations)[0];
     var num_samples = summary.trees[first_tree_idx].populations[first_pop_idx].cellular_prevalence.length;
@@ -70,11 +105,11 @@ TreeViewer.prototype.render = function(dataset) {
       var normllh_nats = -summary.trees[tidx].llh / total_ssms;
       normllh_nats /= num_samples;
       var normllh_bits = normllh_nats / Math.log(2);
-      var cluster = have_clust_info ? TreeUtil.find_cluster_from_treeidx(tidx, separated_clusters.large): "-";
+      var cluster = have_clust_data ? TreeUtil.find_cluster_from_treeidx(tidx, clusters): -1;
       var row = '<td class="tree-index">' + tidx + '</td>'
         + '<td class="tree-llh">' + normllh_bits.toFixed(1) + '</td>'
         + '<td class="tree-nodes">' + Object.keys(summary.trees[tidx].populations).length + '</td>'
-        + (cluster==-1 ? '<td class="cluster" data-sort-value="-1">None</td>' : '<td class="cluster">' + cluster + '</td>');
+        + (cluster==-1 ? '<td class="cluster" data-sort-value="-1">-</td>' : '<td class="cluster">' + cluster + '</td>');
       ['linearity_index', 'branching_index', 'clustering_index'].forEach(function(idxname) {
         var val = summary.trees[tidx].hasOwnProperty(idxname) ? summary.trees[tidx][idxname].toFixed(2) : '&mdash;';
         row += '<td>' + val + '</td>';

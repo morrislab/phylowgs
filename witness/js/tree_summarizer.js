@@ -16,10 +16,11 @@ TreeSummarizer.prototype._draw_rep_tree = function(tree,container_id) {
 TreeSummarizer.prototype._render_cluster_table = function(summary) {
   var cluster_table = $('#cluster-table .tree-summary').clone().appendTo('#container');
   cluster_table = cluster_table.find('tbody');
-  var clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length * Config.small_cluster_tree_prop_cutoff)
+  var separated_clusters = ClusterUtil.separate_clusters_by_size(summary.clusters, Object.keys(summary.trees).length * Config.small_cluster_tree_prop_cutoff)
+  var clusters = Config.report_small_clusters ? summary.clusters : separated_clusters.large;
   var self = this;
   var clust_num = 0;
-  Object.keys(clusters.large).forEach(function(cluster_idx) {
+  Object.keys(clusters).forEach(function(cluster_idx) {
     clust_num = clust_num+1;
     var C = summary.clusters[cluster_idx];
     var propTrees = (C.members.length/Object.keys(summary.trees).length).toFixed(2);
@@ -35,9 +36,9 @@ TreeSummarizer.prototype._render_cluster_table = function(summary) {
     $('<tr/>').html(entries.join('')).appendTo(cluster_table);
     self._draw_rep_tree(summary.trees[representative_tree_idx],'#' + rep_tree_container_id);
   });
-  if(!Config.report_small_clusters & (Object.keys(clusters.small).length != 0)){
+  if(!Config.report_small_clusters){
     var num_unclustered = 0;
-    Object.keys(clusters.small).forEach(function(cluster_idx) {
+    Object.keys(separated_clusters.small).forEach(function(cluster_idx) {
       var C = summary.clusters[cluster_idx];
       num_unclustered = num_unclustered + C.members.length
     })
@@ -367,18 +368,23 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
 
   // Calculcate the xData and yData from the indicies
   var clust_data = TreeUtil.calc_clustering_data(tree_summary.trees);
-
   var best_tree_idx = TreeUtil.find_best_tree(tree_summary.tree_densities);
-  var clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.small_cluster_tree_prop_cutoff);
-  var cluster_colours = this._determine_cluster_colour_ordering(clusters.large, Config.tree_summ.cluster_colours);
-  // Determine the ellipse traces that define the cluster contours
-  var ellipse_traces = this._create_cluster_contour_traces(clusters.large, cluster_colours);
   // Create the traces for the data points for clustered trees
-  var scatter_traces = this._create_cluster_scatter_traces(clusters.large, cluster_colours, clust_data.CI, clust_data.nBI);
-  // Create the trace for the data points for unclustered trees
-  scatter_traces.push(this._create_tiny_cluster_scatter_trace(clusters.small, clust_data.CI, clust_data.nBI));
-  var traces = ellipse_traces.concat(scatter_traces);
+  if(Config.report_small_clusters){
+    var cluster_colours = this._determine_cluster_colour_ordering(tree_summary.clusters, Config.tree_summ.cluster_colours);
+    var scatter_traces = this._create_cluster_scatter_traces(tree_summary.clusters, cluster_colours, clust_data.CI, clust_data.nBI);
+    var ellipse_traces = this._create_cluster_contour_traces(tree_summary.clusters, cluster_colours);
+  }else{
+    var separated_clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.small_cluster_tree_prop_cutoff);
+    var cluster_colours = this._determine_cluster_colour_ordering(separated_clusters.large, Config.tree_summ.cluster_colours);
+    // Determine the ellipse traces that define the cluster contours
+    var ellipse_traces = this._create_cluster_contour_traces(separated_clusters.large, cluster_colours);
+    // Create the trace for the data points
+    var scatter_traces = this._create_cluster_scatter_traces(separated_clusters.large, cluster_colours, clust_data.CI, clust_data.nBI);
+    scatter_traces.push(this._create_tiny_cluster_scatter_trace(separated_clusters.small, clust_data.CI, clust_data.nBI));
+  }
   //Use the traces and plotting options to actually plot our data.
+  var traces = ellipse_traces.concat(scatter_traces);
   var layout = {
     title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
     height: 1000,
