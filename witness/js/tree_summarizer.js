@@ -392,7 +392,11 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
     yaxis: { title: 'BI/(LI+BI)'},
     hovermode: 'closest',
     plot_bgcolor: '#440154',
-    showlegend: true
+    showlegend: true,
+    legend: {x: 1.01,
+             bgcolor: '440154',
+             font: {size: 13, 
+                    color: 'white'}}
   };
   var container = document.querySelector('#container');
   var plot_container = document.createElement('div');
