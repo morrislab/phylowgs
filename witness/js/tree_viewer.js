@@ -47,12 +47,13 @@ TreeViewer.prototype.render = function(dataset) {
       var self = $(this);
       self.siblings().removeClass('active');
       self.addClass('active');
-
+      
       var tidx = self.find('.tree-index').text();
       StateManager.update('tidx', tidx);
       var tree_plotter = new TreePlotter();
+      var container = document.querySelector('#container');
 
-      tree_plotter.draw(summary.trees[tidx].populations, summary.trees[tidx].structure, summary.trees[tidx].root, summary.params);
+      tree_plotter.draw(tidx, summary.trees[tidx].populations, summary.trees[tidx].structure, summary.trees[tidx].root, summary.params, dataset);
       tviewer._plot_pop_vafs(dataset, tidx);
     })
     $('#tree-list').scrollTop(0);
