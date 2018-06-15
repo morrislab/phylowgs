@@ -15,6 +15,7 @@ def main():
       run = {
         'summary_path': summary_path,
         'muts_path': os.path.join(base_dir, run_name, dataset_name + '.muts.json'),
+        'mutass_path': os.path.join(base_dir, run_name, dataset_name + '.mutass.zip'),
         'name': dataset_name,
       }
 
