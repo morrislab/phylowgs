@@ -5,7 +5,7 @@ from scipy import linalg
 import scipy as sp
 
 class TreeClusterer:
-  def find_clusters(self,summaries):
+  def find_clusters(self,summaries,vbgmm_options=None):
     """
     This clusters the trees based on their structure.
     First, this takes the tree summaries from ResultGenerator().generate() and calculates the linearity, branching and clustering indexes.
@@ -18,7 +18,7 @@ class TreeClusterer:
     """
     self._calc_tree_structure_indexes(summaries)
     is_linear, clustering_data, tree_idx, n_nodes = self._get_tree_clustering_info(summaries)
-    clustInfo = self._determine_clusters(tree_idx, clustering_data, n_nodes, is_linear)
+    clustInfo = self._determine_clusters(tree_idx, clustering_data, n_nodes, is_linear, vbgmm_options)
     return clustInfo
   
   def _calc_tree_structure_indexes(self,summs):
@@ -50,7 +50,7 @@ class TreeClusterer:
     
     return is_linear, clustering_data, tree_idx, n_nodes
   
-  def _determine_clusters(self, tree_idxs, clustering_data, num_nodes, is_linear):
+  def _determine_clusters(self, tree_idxs, clustering_data, num_nodes, is_linear, vbgmm_options):
     """
     This will split the data into trees that are linear and not-linear and then run the proper analysis for each set.
     :param tree_idxs: a list of the indexes of the trees. 
@@ -61,9 +61,13 @@ class TreeClusterer:
     """
     
     #First, let's cluster the non-linear trees. 
+    
     non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin]
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin]
-    non_lin_clusters = self._run_gmm(non_lin_data, non_lin_tree_idxs)
+    if vbgmm_options != None:
+      non_lin_clusters = self._run_vbgmm(non_lin_data, non_lin_tree_idxs, vbgmm_options)
+    else:
+      non_lin_clusters = self._run_gmm(non_lin_data, non_lin_tree_idxs)
     
     #Now cluster the linear trees based on the number of nodes they have
     lin_data = [x for x,this_is_lin in zip(clustering_data, is_linear) if this_is_lin]
@@ -77,7 +81,7 @@ class TreeClusterer:
     non_lin_clusters.update(lin_clusters)
     return non_lin_clusters
   
-  def _run_vbgmm(self,data,tree_idxs):
+  def _run_vbgmm(self, data, tree_idxs, vbgmm_options):
     """
     Creates a Variational Bayesian Gaussian Mixture Model from the structural indicies of the data 
     :param data: index coordinates for all sampled trees
@@ -90,7 +94,11 @@ class TreeClusterer:
 
     data = np.array(data)
     num_clusters = 50
-    gmm = BayesianGaussianMixture(n_components=num_clusters, n_init=3, covariance_type="full", verbose=1, weight_concentration_prior=1e6, max_iter=500).fit(data)
+    gmm = BayesianGaussianMixture(n_components=num_clusters, n_init=3, covariance_type="full", verbose=1, 
+     weight_concentration_prior=vbgmm_options['weight_concentration_prior'],
+     weight_concentration_prior_type = vbgmm_options['weight_concentration_prior_type'], 
+     covariance_prior = vbgmm_options['covariance_prior'],
+     max_iter=500).fit(data)
     #Create an output dictionary that will contain all of the relevant information for each cluster.
     out = {}
     cluster_assignments = gmm.predict(data)
@@ -100,9 +108,17 @@ class TreeClusterer:
       if not this_clust_member_idxs:
         continue
       this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx]
-      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
-      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
-      out[str(this_clust_idx)] =  {
+      try:
+        this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
+        rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
+      except Exception, e:
+        print this_clust_rep_idx
+        print data
+        print this_clust_member_idxs
+        print this_clust_members_tree_idxs
+        print rep_tree_idx
+        raise(e)
+      out[str(this_clust_idx)] = {
         "is_linear": False,
         "weight": gmm.weights_[this_clust_idx],
         "members": this_clust_members_tree_idxs, 
@@ -270,7 +286,7 @@ class TreeClusterer:
     #arbitrarily, the rep tree is the first in the cluster. They are all the same anyways so should all be "representative".
     #Still, should bring this up to Jeff.
     if all(i == x[0] for i in x) and all(i == y[0] for i in y):
-      return 1
+      return 0
 
     data = np.vstack((x,y))
     try:
