@@ -2,12 +2,12 @@ function SSM_Viewer(){
 }
 
 SSM_Viewer.prototype._find_pop_with_ssm = function(mutass,ssm_id){
-  ssms_pop = -1
+  var ssms_pop = -1;
   //Search through the json for the ssm, report which pop it's in. If none, do nothing.
   Object.keys(mutass.mut_assignments).forEach(function(pop){
     if(ssms_pop !== -1)
-      return
-    this_pop = mutass.mut_assignments[pop];
+      return;
+    var this_pop = mutass.mut_assignments[pop];
     Object.keys(this_pop.ssms).forEach(function(ssm){
       //console.log(this_pop.ssms[ssm])
       if(this_pop.ssms[ssm] == ssm_id){
@@ -47,25 +47,23 @@ SSM_Viewer.prototype._setup_ssm_entry_event = function(input, tidx, dataset, ssm
           for(i=0;i<num_samples;i++)
             ssms_info_row.find('.vaf-samp' + i).text('');
         }
-        
       })
     }
   });
 }
 
 SSM_Viewer.prototype._setup_table = function(table, num_samples, sample_names, ssm_info_row){
-  table.find('.vafs-header').attr('colspan', num_samples);
-  var header = table.find('thead');
-  var body = table.find('tbody');
 
   // SET UP THE HEADER
-  // Empty cells for SSM, and node columns.
-  var samps_header = ['&mdash;', '&mdash;']
+  var header = table.find('thead');
+  // Empty cells for SSM and node columns
+  var samps_header = ['&mdash;', '&mdash;'];
   // Sample names for the rest of the columns
   samps_header = samps_header.concat(sample_names);
   var samps_header = samps_header.map(function(entry) {
     return '<th>' + entry + '</th>';
   });
+  table.find('.vafs-header').attr('colspan', num_samples);
   $('<tr/>').html(samps_header.join('')).appendTo(header);
 
   // SET UP THE BODY
@@ -76,7 +74,7 @@ SSM_Viewer.prototype._setup_table = function(table, num_samples, sample_names, s
 
 SSM_Viewer.prototype.render = function(container, num_samples, sample_names, tidx, dataset){
   var ssm_viewer_table = $('#ssm-viewer-table').clone().appendTo(container);
-  var ssm_info_row = ssm_viewer_table.find('.ssm-info')
+  var ssm_info_row = ssm_viewer_table.find('.ssm-info');
   var ssm_input = ssm_viewer_table.find('.ssm-input');
 
   this._setup_table(ssm_viewer_table, num_samples, sample_names, ssm_info_row);
