@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.mixture import BayesianGaussianMixture, GaussianMixture
 from pwgsresults.index_calculator import IndexCalculator
+from pwgsresults.spectral_clustering import SpectralClustering
 from scipy import linalg
 import scipy as sp
 
@@ -63,7 +64,7 @@ class TreeClusterer:
     #First, let's cluster the non-linear trees. 
     non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin]
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin]
-    non_lin_clusters = self._run_gmm(non_lin_data, non_lin_tree_idxs)
+    non_lin_clusters = self._run_spectra_clustering(non_lin_data, non_lin_tree_idxs)
     
     #Now cluster the linear trees based on the number of nodes they have
     lin_data = [x for x,this_is_lin in zip(clustering_data, is_linear) if this_is_lin]
@@ -77,6 +78,40 @@ class TreeClusterer:
     non_lin_clusters.update(lin_clusters)
     return non_lin_clusters
   
+  def _run_spectra_clustering(self,data,tree_idxs):
+    """
+    Clusters the given tree index data using spectral clustering. See sklearn
+    :param data: index coordinates for all sampled trees
+    :param tree_idxs: the tree indexes corresponding to each tree input into data.
+    :return: Weight, mean, covariance for each cluster, assignments for each sampled tree, and ellipse information that describes the tree and can be used for plotting.
+    """
+    #If all trees are linear then the inputs will be empty. Return an empty dictionary
+    if not data:
+      return {}
+
+    data = np.array(data)
+    max_num_clusters = 6 
+    spectral = SpectralClustering(n_clusters = range(2,max_num_clusters+1)).fit(data)
+    #Create an output dictionary that will contain all of the relevant information for each cluster.
+    out = {}
+    cluster_assignments = spectral.labels_
+    num_clusters = spectral.n_clusters
+    for this_clust_idx in range(0,num_clusters):
+      this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx]
+      this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx]
+      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
+      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
+      out[str(this_clust_idx)] =  {
+        "is_linear": False,
+        "members": this_clust_members_tree_idxs,
+        "mean": [0.5,0.5], #dummy for until witness is updated for removal of contours
+        "covariance": [[0,1],[0,1]], #dummy for until witness is updated for removal of contours
+        "ellipse": {'mean': [0.5,0.5], 'angle': 0, 'major_axis': 0.01, 'minor_axis': 0.01}, #dummy for until witness is updated for removal of contours
+        "representative_tree": rep_tree_idx
+        }
+    return out
+
+
   def _run_vbgmm(self,data,tree_idxs):
     """
     Creates a Variational Bayesian Gaussian Mixture Model from the structural indicies of the data 
