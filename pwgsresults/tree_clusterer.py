@@ -104,9 +104,6 @@ class TreeClusterer:
       out[str(this_clust_idx)] =  {
         "is_linear": False,
         "members": this_clust_members_tree_idxs,
-        "mean": [0.5,0.5], #dummy for until witness is updated for removal of contours
-        "covariance": [[0,1],[0,1]], #dummy for until witness is updated for removal of contours
-        "ellipse": {'mean': [0.5,0.5], 'angle': 0, 'major_axis': 0.01, 'minor_axis': 0.01}, #dummy for until witness is updated for removal of contours
         "representative_tree": rep_tree_idx
         }
     return out
@@ -134,20 +131,11 @@ class TreeClusterer:
       this_data_member_idxs = [tree_idx for tree_idx, this_tree_num_nodes in zip(range(len(tree_idxs)), num_nodes) if this_tree_num_nodes==this_num_nodes]
       clust_rep_tree_idx = self._determine_representative_tree(data[this_data_member_idxs,0],data[this_data_member_idxs,1])
       rep_tree_idx = cluster_members[clust_rep_tree_idx]
-      cluster_responsibilities = [1*(this_tree_num_nodes == this_num_nodes) for this_tree_num_nodes in num_nodes] #0 if this tree doesn't have the number of nodes, and 1s if it does
-      cluster_mean = [np.mean(np.array([x[0] for x,nNodes in zip(data, num_nodes) if nNodes==this_num_nodes])), 0]
-      xVals = [x[0] for x,n_nodes in zip(data, num_nodes) if n_nodes == this_num_nodes]
-      yVals = [x[1] for x,n_nodes in zip(data, num_nodes) if n_nodes == this_num_nodes]
       
       #Format the results to match the gmm results. For any fields that aren't necessary, set to None.
       out["linear_" + str(this_num_nodes)] =  {
         "is_linear": True,
-        "weight": None,
-        "members": cluster_members, 
-        "responsibilities": cluster_responsibilities,
-        "mean": cluster_mean,
-        "covariance": None,
-        "ellipse": self._generate_linear_ellipse_info(xVals,yVals,ellipse_minor_axis),
+        "members": cluster_members,
         "representative_tree": rep_tree_idx
         }
     return out
