@@ -9,7 +9,7 @@ SSM_Viewer.prototype._find_pop_with_ssm = function(mutass,ssm_id){
       return;
     var this_pop = mutass.mut_assignments[pop];
     Object.keys(this_pop.ssms).forEach(function(ssm){
-      //console.log(this_pop.ssms[ssm])
+      //Check the key and, if it exists, the name of the ssm.
       if(this_pop.ssms[ssm] == ssm_id){
         ssms_pop = pop;
         return;
@@ -28,17 +28,29 @@ SSM_Viewer.prototype._setup_ssm_entry_event = function(input, tidx, dataset, ssm
     if(key==13){
       var self = $(this);
       var ssm_text = self.val();
-      //Load in the mutass json, find which subpop the ssm belongs to, set the table text
-      var mutass_treepath = dataset.mutass_path + "/" + tidx  + '.json'
-      d3.json(mutass_treepath, function(mutass){
-        var pop = sViewer._find_pop_with_ssm(mutass, ssm_text);
-        ssms_node_txtbox.text(pop);
-      })
-      //Get the rest of the info from the muts file and fill in the row
+      //Load in the muts file
       d3.json(dataset.muts_path, function(muts){
-        if ((typeof muts.ssms[ssm_text]) !== 'undefined'){
-          var tot_reads = muts.ssms[ssm_text].total_reads;
-          var ref_reads = muts.ssms[ssm_text].ref_reads;
+        //Determine the ID of the ssm from the input. Could have input either the ID itself or the name of the ssm
+        if(ssm_text in muts.ssms){
+          ssm_id = ssm_text;
+        }else{
+          Object.keys(muts.ssms).forEach(function(sidx){
+            if(muts.ssms[sidx].hasOwnProperty("name") & (muts.ssms[sidx].name == ssm_text)){
+              ssm_id = sidx;
+              return;
+            }
+          })
+        }
+        //Load in the mutass json, find which subpopulation the ssm belongs to, set the table text
+        var mutass_treepath = dataset.mutass_path + "/" + tidx  + '.json'
+        d3.json(mutass_treepath, function(mutass){
+          var pop = sViewer._find_pop_with_ssm(mutass, ssm_id);
+          ssms_node_txtbox.text(pop);
+        })
+        //Get the rest of the info from the muts file and fill in the row
+        if ((typeof muts.ssms[ssm_id]) !== 'undefined'){
+          var tot_reads = muts.ssms[ssm_id].total_reads;
+          var ref_reads = muts.ssms[ssm_id].ref_reads;
           for(i=0;i<num_samples;i++){
             var vaf = (tot_reads[i] - ref_reads[i]) / tot_reads[i];
             ssms_info_row.find('.vaf-samp' + i).text(vaf.toFixed(3));
