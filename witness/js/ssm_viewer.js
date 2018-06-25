@@ -53,11 +53,16 @@ SSM_Viewer.prototype._setup_ssm_entry_event = function(input, tidx, dataset, ssm
           var ref_reads = muts.ssms[ssm_id].ref_reads;
           for(i=0;i<num_samples;i++){
             var vaf = (tot_reads[i] - ref_reads[i]) / tot_reads[i];
-            ssms_info_row.find('.vaf-samp' + i).text(vaf.toFixed(3));
+            var var_reads = tot_reads[i] - ref_reads[i];
+            //table entry text
+            ssms_info_row.find('#vaf-samp' + i).text(vaf.toFixed(3));
+            //Tooltip text
+            ssms_info_row.find('#vaf-samp' + i).attr("title","Variant Reads=" + var_reads + "; Total Reads=" + tot_reads[i]);
           }
         }else{
           for(i=0;i<num_samples;i++)
-            ssms_info_row.find('.vaf-samp' + i).text('');
+            ssms_info_row.find('#vaf-samp' + i).text('');
+            ssms_info_row.find('#vaf-samp' + i).attr("title",'');
         }
       })
     }
@@ -81,7 +86,8 @@ SSM_Viewer.prototype._setup_table = function(table, num_samples, sample_names, s
   // SET UP THE BODY
   // Add columns with necessary ids for each sample in Ref Reads and Tot Reads
   for(i=0;i<num_samples;i++)
-    $('<th class=vaf-samp' + i + '></th>').html('').appendTo(ssm_info_row);
+    //the title attribute can be used as a tooltip
+    $('<th id=vaf-samp' + i + ' title=""> </th>').html('').appendTo(ssm_info_row);/////
 }
 
 SSM_Viewer.prototype.render = function(container, num_samples, sample_names, tidx, dataset){
