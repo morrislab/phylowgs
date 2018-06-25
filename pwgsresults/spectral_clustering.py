@@ -2,7 +2,7 @@
 """Algorithms for spectral clustering. 
 Modified so that instead of inputing one n_clust, a range is
 input and the n_clust that results in the highest mean silhouette 
-value is usednto run spectral clustering.
+value is used to run spectral clustering.
 Taken from: https://github.com/scikit-learn/scikit-learn/blob/a24c8b46/sklearn/cluster/spectral.py#L273
 Modified by Jarry Barber, June 2018."""
 
@@ -164,6 +164,11 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
     nested circles on the 2D plan.
     If affinity is the adjacency matrix of a graph, this method can be
     used to find normalized graph cuts.
+
+    Modified so that instead of inputing one n_clust, a range is
+    input and the n_clust that results in the highest mean silhouette 
+    value is used to run spectral clustering.
+
     Read more in the :ref:`User Guide <spectral_clustering>`.
     Parameters
     -----------
@@ -176,8 +181,8 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
           - symmetric k-nearest neighbours connectivity matrix of the samples.
     n_clusters : integer array, optional
         List of number of clusters to extract. If more than one n_clust is
-        input, will choose n_clust whose solution provides the highest mean 
-        silhouette value.
+        input, will choose n_clust whose solution provides the highest or
+        second highest mean silhouette value.
     n_components : integer, optional, default is n_clusters
         Number of eigen vectors to use for the spectral embedding
     eigen_solver : {None, 'arpack', 'lobpcg', or 'amg'}
@@ -235,9 +240,15 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
   
   if isinstance(n_clusters,int):
     n_clusters = [n_clusters];
+  
+  if (len(n_cluster) >= 2) & (1 in n_clusters):
+    raise ValueError("An n_clusters value of 1 is not permitted when"
+                    "n_clusters is input as an array as there is no"
+                    "silhouette score for this, making comparisions"
+                    "to other n_cluster values impossible.")
 
   random_state = check_random_state(random_state)
-  silhouette_values = []
+  silhouette_scores = []
   labels_across_n_comp = []
   for n_clust in n_clusters:
     n_components = n_clust if n_components is None else n_components
@@ -251,12 +262,21 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
                           n_init=n_init)
     else:
       labels = discretize(maps, random_state=random_state)
+    if n_clusters == [1]:
+      return (n_clusters, labels)
     s_score = metrics.silhouette_score(maps, labels)
-    print("n_clust: {}; sil: {}".format(n_clust,s_score))
-    silhouette_values.append(s_score)
+    silhouette_scores.append(s_score)
     labels_across_n_comp.append(labels)
-  best_run = np.argmax(silhouette_values)
-  return (n_clusters[best_run],labels_across_n_comp[best_run])
+  best_ss = np.max(silhouette_scores)
+  best_run = np.argmax(silhouette_scores)
+  second_best_ss = np.partition(silhouette_scores,-2)[-2]
+  second_best_run = silhouette_scores.index(second_best_ss)
+  if (second_best_run > best_run) & (best_ss-second_best_ss < 0.1):
+    #print("Silhouette Scores are: {}; Choose second best, index: {}".format(silhouette_scores, second_best_run))
+    return (n_clusters[second_best_run],labels_across_n_comp[second_best_run])
+  else:
+    #print("Silhouette Scores are: {}; Choose first best, index: {}".format(silhouette_scores, best_run))
+    return (n_clusters[best_run],labels_across_n_comp[best_run])
 
 
 class SpectralClustering(BaseEstimator, ClusterMixin):
