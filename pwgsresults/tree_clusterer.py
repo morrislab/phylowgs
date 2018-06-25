@@ -64,7 +64,7 @@ class TreeClusterer:
     #First, let's cluster the non-linear trees. 
     non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin]
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin]
-    non_lin_clusters = self._run_spectra_clustering(non_lin_data, non_lin_tree_idxs)
+    non_lin_clusters = self._run_spectral_clustering(non_lin_data, non_lin_tree_idxs)
     
     #Now cluster the linear trees based on the number of nodes they have
     lin_data = [x for x,this_is_lin in zip(clustering_data, is_linear) if this_is_lin]
@@ -78,7 +78,7 @@ class TreeClusterer:
     non_lin_clusters.update(lin_clusters)
     return non_lin_clusters
   
-  def _run_spectra_clustering(self,data,tree_idxs):
+  def _run_spectral_clustering(self,data,tree_idxs):
     """
     Clusters the given tree index data using spectral clustering. See sklearn
     :param data: index coordinates for all sampled trees
@@ -110,114 +110,6 @@ class TreeClusterer:
         "representative_tree": rep_tree_idx
         }
     return out
-
-
-  def _run_vbgmm(self,data,tree_idxs):
-    """
-    Creates a Variational Bayesian Gaussian Mixture Model from the structural indicies of the data 
-    :param data: index coordinates for all sampled trees
-    :param tree_idxs: the tree indexes corresponding to each tree input into data.
-    :return: Weight, mean, covariance for each cluster, assignments for each sampled tree, and ellipse information that describes the tree and can be used for plotting.
-    """
-    #If all trees are linear then the inputs will be empty. Return an empty dictionary
-    if not data:
-      return {}
-
-    data = np.array(data)
-    num_clusters = 50
-    gmm = BayesianGaussianMixture(n_components=num_clusters, n_init=3, covariance_type="full", verbose=1, weight_concentration_prior=1e6, max_iter=500).fit(data)
-    #Create an output dictionary that will contain all of the relevant information for each cluster.
-    out = {}
-    cluster_assignments = gmm.predict(data)
-    cluster_responsibilities = gmm.predict_proba(data)
-    for this_clust_idx in range(0,num_clusters+0):
-      this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx]
-      if not this_clust_member_idxs:
-        continue
-      this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx]
-      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
-      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
-      out[str(this_clust_idx)] =  {
-        "is_linear": False,
-        "weight": gmm.weights_[this_clust_idx],
-        "members": this_clust_members_tree_idxs, 
-        "responsibilities": cluster_responsibilities[:,this_clust_idx].tolist(),
-        "mean": gmm.means_[this_clust_idx].tolist(),
-        "covariance": gmm.covariances_[this_clust_idx].tolist(),
-        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[this_clust_idx], gmm.covariances_[this_clust_idx]),
-        "representative_tree": rep_tree_idx
-        }
-    return out
-
-  def _run_gmm(self,data,tree_idxs):
-    """
-    Runs gmm using BIC to determine number of components, and return associated data
-    :param data: index coordinates for all sampled trees
-    :param tree_idxs: the tree indexes corresponding to each tree input into data.
-    :return: Weight, mean, covariance for each cluster, assignments for each sampled tree, and ellipse information that describes the tree and can be used for plotting.
-    """
-    #If all trees are linear then the inputs will be empty. Return an empty dictionary
-    if not data:
-      return {}
-
-    data = np.array(data)
-    #There are instances in which gmm will find clusters that have no hard assignments. 
-    #We should rerun gmm with one less cluster in that case as we are only interested in
-    #clusters with hard assignments.
-    num_clusters = self._get_components_min_bic(data)
-    clusters_with_hard_assignments = []
-    while len(clusters_with_hard_assignments) != num_clusters:
-      num_clusters = num_clusters-1
-      gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
-      clusters_with_hard_assignments = list(set(gmm.predict(data)))
-
-    #Create an output dictionary that will contain all of the relevant information for each cluster.
-    out = {}
-    cluster_assignments = gmm.predict(data)
-    cluster_responsibilities = gmm.predict_proba(data)
-    cluster_key = 1
-    for this_clust_idx in range(0,num_clusters):
-      this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx]
-      this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx]
-      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
-      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
-      out[str(cluster_key)] = {
-        "is_linear": False,
-        "weight": gmm.weights_[this_clust_idx],
-        "members": this_clust_members_tree_idxs, 
-        "responsibilities": cluster_responsibilities[:,this_clust_idx].tolist(),
-        "mean": gmm.means_[this_clust_idx].tolist(),
-        "covariance": gmm.covariances_[this_clust_idx].tolist(),
-        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[this_clust_idx], gmm.covariances_[this_clust_idx]),
-        "representative_tree": rep_tree_idx
-        }
-      cluster_key += 1
-    return out
-  
-  def _get_components_min_bic(self,data, end_early=False, delta=2):
-    """
-    Get the number of number of gmm components which result in lowest bic score
-    :param data: LI/BI coordinates of all sampled trees
-    :param end_early: End on asymptotic convergence (default False)
-    :param delta: Percent change threshold for convergence
-    :return: Number of components
-    """
-    min_bic = 0
-    prev_bic = 10000
-    bic_clusters = 1
-    size = 50 if data.size/2 > 50 else int(data.size/2 - 1)
-
-    for i in range(size):
-      gmm = GaussianMixture(n_components=i+1, n_init=2, covariance_type='full').fit(data)
-      bic = gmm.bic(data)
-      # Check for convergence
-      if end_early and (prev_bic/bic) - 1 > - delta:
-        return i + 1
-      elif bic < min_bic:
-        bic_clusters = i+1
-        min_bic = bic
-      prev_bic = bic
-    return bic_clusters
   
   def _calc_lin_tree_clusters(self, data, tree_idxs, num_nodes, ellipse_minor_axis):
     """
@@ -259,41 +151,6 @@ class TreeClusterer:
         "representative_tree": rep_tree_idx
         }
     return out
-  
-  def _generate_linear_ellipse_info(self, xVals, yVals, ellipse_minor_axis):
-    
-    ellipse_mean = [np.mean(xVals),0]
-    ellipse_major_axis = max( [abs(max(xVals)-ellipse_mean[0]), abs(min(xVals)-ellipse_mean[0])] )
-    
-    ellDict = {
-        "mean": ellipse_mean,
-        "angle": 0,
-        "major_axis": ellipse_major_axis,
-        "minor_axis": ellipse_minor_axis
-    }
-    
-    return ellDict
-  
-  def _generate_EMM_ellipse_info(self,mean,cov):
-    """
-    Take the output from GMM analysis and generate a dictionary whose elements describe an ellipse 
-    and can be used by witness to plot the clusters
-    :params means, covs: The means and covariance matrix output from gmm analysis
-    :return: dictionary containing ellipse mean, major_axis, minor_axis, and rotation
-    """
-    # Note: v is the eigenvalues of the covs matrix. These two values represent the highest variance and the variance of the vector orthogonal to the vector with the highest variance (which is also the lowest variance)
-    # Note: w is the eigenvectors of the covs matrix. W[0,:] is the vector representing the direction of highest variance, and W[1,:], the lowest variance.
-    v, w = linalg.eigh(cov)
-    # Take 2sqrt(2v) to convert v to represent 2 standard deviations from the mean
-    v = np.multiply(2.,  np.sqrt(2.) * np.sqrt(v))
-    angle = np.arctan(w[0,1] / w[0,0])
-    ellDict = {
-        "mean": mean.tolist(),
-        "angle": angle,
-        "major_axis":  v[0],
-        "minor_axis": v[1]
-    }
-    return ellDict
 
   def _determine_representative_tree(self,x,y):
     """

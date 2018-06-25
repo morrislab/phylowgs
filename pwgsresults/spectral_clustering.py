@@ -241,7 +241,7 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
   if isinstance(n_clusters,int):
     n_clusters = [n_clusters];
   
-  if (len(n_cluster) >= 2) & (1 in n_clusters):
+  if (len(n_clusters) >= 2) & (1 in n_clusters):
     raise ValueError("An n_clusters value of 1 is not permitted when"
                     "n_clusters is input as an array as there is no"
                     "silhouette score for this, making comparisions"
