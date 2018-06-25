@@ -8,6 +8,7 @@ import scipy.stats as stat
 from scipy.stats import beta, binom
 from scipy.special import gammaln
 from math import exp, log
+from datetime import datetime
 
 import csv
 # Allow long lines in .cnv files, which can potentially list thousands of SSMs
@@ -337,3 +338,6 @@ class TreeReader(object):
 	for tidx, llh, zinfo in trees:
 	    tree = self._parse_tree(zinfo, remove_empty_vertices)
 	    yield (tidx, llh, tree)
+
+def logmsg(msg, fd=sys.stdout):
+    print >> fd, '[%s] %s' % (datetime.now().strftime('%Y-%m-%d %H:%m:%S'), msg)

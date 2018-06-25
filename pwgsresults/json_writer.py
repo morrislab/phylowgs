@@ -27,7 +27,13 @@ def calc_tree_densities(summaries):
     # Occurs when sample covariance matrix is singular because, e.g., data lies
     # on manifold. We see this happen when all trees are linear, implying BI=0.
     # To overcome this error, calculate density in 1D without using the BI.
-    density = list(scipy.stats.gaussian_kde(X)(X))
+    try:
+      density = list(scipy.stats.gaussian_kde(X)(X))
+    except (np.linalg.linalg.LinAlgError, FloatingPointError):
+      # ... but an exception may still occur if all trees have the same
+      # structure, I think. This was triggered when working with Steph's trees,
+      # using PhyloSteph.
+      density = np.zeros(len(X))
 
   return dict(zip(tidxs, density))
 

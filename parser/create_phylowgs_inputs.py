@@ -338,7 +338,11 @@ class CnvFormatter(object):
     # equivalent to no more than this.
     avg_ssms_in_tumour = 3000
     D_max = np.round(avg_ssms_in_tumour * self._read_depth).astype(np.int)
-    return np.minimum(D, D_max)
+    D_min = 1
+
+    D = np.minimum(D_max, D)
+    D = np.maximum(D_min, D)
+    return D
 
   def _format_cnvs(self, cnvs, variants):
     log('Estimated read depth: %s' % self._read_depth)
