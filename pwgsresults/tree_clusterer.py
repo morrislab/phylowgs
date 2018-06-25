@@ -6,7 +6,7 @@ from scipy import linalg
 import scipy as sp
 
 class TreeClusterer:
-  def find_clusters(self,summaries,vbgmm_options=None):
+  def find_clusters(self,summaries):
     """
     This clusters the trees based on their structure.
     First, this takes the tree summaries from ResultGenerator().generate() and calculates the linearity, branching and clustering indexes.
@@ -19,7 +19,7 @@ class TreeClusterer:
     """
     self._calc_tree_structure_indexes(summaries)
     is_linear, clustering_data, tree_idx, n_nodes = self._get_tree_clustering_info(summaries)
-    clustInfo = self._determine_clusters(tree_idx, clustering_data, n_nodes, is_linear, vbgmm_options)
+    clustInfo = self._determine_clusters(tree_idx, clustering_data, n_nodes, is_linear)
     return clustInfo
   
   def _calc_tree_structure_indexes(self,summs):
@@ -51,7 +51,7 @@ class TreeClusterer:
     
     return is_linear, clustering_data, tree_idx, n_nodes
   
-  def _determine_clusters(self, tree_idxs, clustering_data, num_nodes, is_linear, vbgmm_options):
+  def _determine_clusters(self, tree_idxs, clustering_data, num_nodes, is_linear):
     """
     This will split the data into trees that are linear and not-linear and then run the proper analysis for each set.
     :param tree_idxs: a list of the indexes of the trees. 
@@ -62,7 +62,6 @@ class TreeClusterer:
     """
     
     #First, let's cluster the non-linear trees. 
-    
     non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin]
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin]
     non_lin_clusters = self._run_spectral_clustering(non_lin_data, non_lin_tree_idxs)
@@ -80,7 +79,7 @@ class TreeClusterer:
     return non_lin_clusters
   
   def _run_spectral_clustering(self,data,tree_idxs):
-        """
+    """
     Clusters the given tree index data using spectral clustering. See sklearn
     :param data: index coordinates for all sampled trees
     :param tree_idxs: the tree indexes corresponding to each tree input into data.
@@ -91,67 +90,72 @@ class TreeClusterer:
       return {}
 
     data = np.array(data)
-<<<<<<< HEAD
-    num_clusters = 50
-    gmm = BayesianGaussianMixture(n_components=num_clusters, n_init=3, covariance_type="full", verbose=1, 
-     weight_concentration_prior=vbgmm_options['weight_concentration_prior'],
-     weight_concentration_prior_type = vbgmm_options['weight_concentration_prior_type'], 
-     covariance_prior = vbgmm_options['covariance_prior'],
-     max_iter=500).fit(data)
+    max_num_clusters = 6 
+    spectral = SpectralClustering(n_clusters = range(2,max_num_clusters+1)).fit(data)
     #Create an output dictionary that will contain all of the relevant information for each cluster.
     out = {}
-    cluster_assignments = gmm.predict(data)
-    cluster_responsibilities = gmm.predict_proba(data)
-    for this_clust_idx in range(0,num_clusters+0):
+    cluster_assignments = spectral.labels_
+    num_clusters = spectral.n_clusters
+    for this_clust_idx in range(0,num_clusters):
       this_clust_member_idxs = [idx for idx, cluster_assignment in zip(range(len(tree_idxs)), cluster_assignments) if cluster_assignment==this_clust_idx]
-      if not this_clust_member_idxs:
-        continue
       this_clust_members_tree_idxs = [tree_idx for tree_idx, cluster_assignment in zip(tree_idxs, cluster_assignments) if cluster_assignment==this_clust_idx]
-      try:
-        this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
-        rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
-      except Exception, e:
-        print this_clust_rep_idx
-        print data
-        print this_clust_member_idxs
-        print this_clust_members_tree_idxs
-        print rep_tree_idx
-        raise(e)
-      out[str(this_clust_idx)] = {
+      this_clust_rep_idx = self._determine_representative_tree(data[this_clust_member_idxs,0],data[this_clust_member_idxs,1])
+      rep_tree_idx = this_clust_members_tree_idxs[this_clust_rep_idx]
+      out[str(this_clust_idx)] =  {
         "is_linear": False,
-        "weight": gmm.weights_[this_clust_idx],
-        "members": this_clust_members_tree_idxs, 
-        "responsibilities": cluster_responsibilities[:,this_clust_idx].tolist(),
-        "mean": gmm.means_[this_clust_idx].tolist(),
-        "covariance": gmm.covariances_[this_clust_idx].tolist(),
-        "ellipse": self._generate_EMM_ellipse_info(gmm.means_[this_clust_idx], gmm.covariances_[this_clust_idx]),
+        "members": this_clust_members_tree_idxs,
+        "representative_tree": rep_tree_idx
+        }
+    return out
+  
+  def _calc_lin_tree_clusters(self, data, tree_idxs, num_nodes, ellipse_minor_axis):
+    """
+    Clusters the linear trees based on the number of nodes that they have and returns a dictionary in the same format as run_gmm output
+    :param data: list of data points from each tree.
+    :param tree_idxs: a list of the indexes of the trees. 
+    :param num_nodes: list of the number of nodes associated with each tree
+    :param ellipse_minor_axis: minor axis of the ellipse that will describe the tree. Can't find this from just the linear trees as they all lie on the line y=0. Instead, calc it and input it here.
+    :return: dictionary in the same format as run_gmm output
+    """
+    #If there are no linear trees, return an empty dictionary
+    if not data:
+      return {}
+    data = np.array(data)
+    out = {}
+    
+    unique_num_nodes = list(set(num_nodes))
+    for this_num_nodes in unique_num_nodes:
+      #The indexes wrt all of the sampled trees, both linear and non-linear
+      cluster_members = [tree_idx for tree_idx, this_tree_num_nodes in zip(tree_idxs, num_nodes) if this_tree_num_nodes==this_num_nodes]
+      #The indexes wrt to the linear trees, inserted into this function
+      this_data_member_idxs = [tree_idx for tree_idx, this_tree_num_nodes in zip(range(len(tree_idxs)), num_nodes) if this_tree_num_nodes==this_num_nodes]
+      clust_rep_tree_idx = self._determine_representative_tree(data[this_data_member_idxs,0],data[this_data_member_idxs,1])
+      rep_tree_idx = cluster_members[clust_rep_tree_idx]
+      
+      #Format the results to match the gmm results. For any fields that aren't necessary, set to None.
+      out["linear_" + str(this_num_nodes)] =  {
+        "is_linear": True,
+        "members": cluster_members,
         "representative_tree": rep_tree_idx
         }
     return out
 
-  def _run_gmm(self,data,tree_idxs):
+  def _determine_representative_tree(self,x,y):
     """
-    Runs gmm using BIC to determine number of components, and return associated data
-    :param data: index coordinates for all sampled trees
-    :param tree_idxs: the tree indexes corresponding to each tree input into data.
-    :return: Weight, mean, covariance for each cluster, assignments for each sampled tree, and ellipse information that describes the tree and can be used for plotting.
+    Determine the best tree to represent the given members input (typically all tree members that belong to a cluster)
     """
-    #If all trees are linear then the inputs will be empty. Return an empty dictionary
-    if not data:
-      return {}
+    
+    #Testing something. Because of the post-processing of the trees (deleting subclones) sometimes all trees in a cluster
+    #will have the exact same branching, linearity and coclustering indicies. I will check for that and just say that, 
+    #arbitrarily, the rep tree is the first in the cluster. They are all the same anyways so should all be "representative".
+    #Still, should bring this up to Jeff.
+    if all(i == x[0] for i in x) and all(i == y[0] for i in y):
+      return 1
 
-    data = np.array(data)
-    #There are instances in which gmm will find clusters that have no hard assignments. 
-    #We should rerun gmm with one less cluster in that case as we are only interested in
-    #clusters with hard assignments.
-    num_clusters = self._get_components_min_bic(data)
-    clusters_with_hard_assignments = []
-    while len(clusters_with_hard_assignments) != num_clusters:
-      num_clusters = num_clusters-1
-      gmm = GaussianMixture(n_components=num_clusters, n_init=2, covariance_type="full").fit(data)
-      clusters_with_hard_assignments = list(set(gmm.predict(data)))
-
-    #Create an output dictionary that will contain all of the relevant information for each cluster.
-    out = {}
-    cluster_assignments = gmm.predict(data)
-    cluster_responsibilities = gmm.predict_proba(data)
+    data = np.vstack((x,y))
+    try:
+      density = list(sp.stats.gaussian_kde(data)(data))
+    except (np.linalg.linalg.LinAlgError, FloatingPointError):
+      density = list(sp.stats.gaussian_kde(x)(y))
+    best_tree_idx = np.argmax(density)
+    return best_tree_idx
