@@ -311,7 +311,7 @@ TreeSummarizer.prototype._create_cluster_scatter_traces = function(clusters, clu
       mode: 'markers',
       type: 'scatter',
       text: labels,
-      showlegend: !Config.tree_summ.draw_cluster_contours,
+      showlegend: true,
       marker: {
         symbol: marker_symbols,
         size: marker_sizes,
@@ -322,42 +322,6 @@ TreeSummarizer.prototype._create_cluster_scatter_traces = function(clusters, clu
     })
     label_clust_index = label_clust_index + 1;
   })
-  return traces
-}
-
-TreeSummarizer.prototype._create_cluster_contour_traces = function(clusters, cluster_colours) {
-
-  var traces = [];
-  var clust_count = 0;
-  var colour_idx = 0;
-  Object.keys(clusters).forEach(function(cidx) {
-    //cidx = parseInt(cidx, 10);
-    clust_count = clust_count + 1;
-    var C = clusters[cidx];
-    var mean = C.ellipse.mean //Center of the ellipse
-    var angle = C.ellipse.angle //angle of the ellipse wrt the x axis.
-    var maj_axis = C.ellipse.major_axis //the distance between the center of the ellipse and the farthest point, ie, the highest variance of the gaussian
-    var min_axis = C.ellipse.minor_axis //the distance between the center of the ellipse and the closest point, ie, the lowest variance of the gaussian
-    var xpoints = [];
-    var ypoints = [];
-    for(var theta = 0.; theta <= 2.*Math.PI + 0.05; theta+=2.*Math.PI/360.){
-      //equations for x and y values of the ellipse described by the mean, angle, major axis and minor axis, as described as a function of theta.
-      xpoints.push(mean[0] + maj_axis*Math.cos(angle)*Math.cos(theta) - min_axis*Math.sin(angle)*Math.sin(theta))
-      ypoints.push(mean[1] + maj_axis*Math.sin(angle)*Math.cos(theta) + min_axis*Math.cos(angle)*Math.sin(theta))
-    }
-    //Descriptor of traces for now. May update depending on visualization requirements.
-    traces.push({
-      x: xpoints,
-      y: ypoints,
-      name: 'cluster ' + clust_count,
-      text: 'cluster ' + clust_count,
-      type: 'scatter',
-      mode: 'lines',
-      visible: Config.tree_summ.draw_cluster_contours,
-      line: {color: cluster_colours[colour_idx]}
-    })
-    colour_idx = colour_idx + 1;
-  });
   return traces
 }
 
@@ -372,19 +336,15 @@ TreeSummarizer.prototype._render_lin_idx_vs_branch_idx = function(tree_summary) 
   // Create the traces for the data points for clustered trees
   if(Config.report_small_clusters){
     var cluster_colours = this._determine_cluster_colour_ordering(tree_summary.clusters, Config.tree_summ.cluster_colours);
-    var scatter_traces = this._create_cluster_scatter_traces(tree_summary.clusters, cluster_colours, clust_data.CI, clust_data.nBI);
-    var ellipse_traces = this._create_cluster_contour_traces(tree_summary.clusters, cluster_colours);
+    var traces = this._create_cluster_scatter_traces(tree_summary.clusters, cluster_colours, clust_data.CI, clust_data.nBI);
   }else{
     var separated_clusters = ClusterUtil.separate_clusters_by_size(tree_summary.clusters, Object.keys(tree_summary.trees).length*Config.small_cluster_tree_prop_cutoff);
     var cluster_colours = this._determine_cluster_colour_ordering(separated_clusters.large, Config.tree_summ.cluster_colours);
-    // Determine the ellipse traces that define the cluster contours
-    var ellipse_traces = this._create_cluster_contour_traces(separated_clusters.large, cluster_colours);
     // Create the trace for the data points
-    var scatter_traces = this._create_cluster_scatter_traces(separated_clusters.large, cluster_colours, clust_data.CI, clust_data.nBI);
-    scatter_traces.push(this._create_tiny_cluster_scatter_trace(separated_clusters.small, clust_data.CI, clust_data.nBI));
+    var traces = this._create_cluster_scatter_traces(separated_clusters.large, cluster_colours, clust_data.CI, clust_data.nBI);
+    traces.push(this._create_tiny_cluster_scatter_trace(separated_clusters.small, clust_data.CI, clust_data.nBI));
   }
   //Use the traces and plotting options to actually plot our data.
-  var traces = ellipse_traces.concat(scatter_traces);
   var layout = {
     title: "Clustering Degree vs. Branching Degree (best tree: " + best_tree_idx + ")",
     height: 1000,
