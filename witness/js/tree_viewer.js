@@ -15,6 +15,7 @@ TreeViewer.prototype._plot_pop_vafs = function(dataset, tidx) {
 
 TreeViewer.prototype.render = function(dataset) {
   var tviewer = this;
+  var ssm_viewer = new SSM_Viewer(dataset);
   d3.json(dataset.summary_path, function(summary) {
     //Fill in tree table.
     $('#tree-list').show();
@@ -52,8 +53,8 @@ TreeViewer.prototype.render = function(dataset) {
       StateManager.update('tidx', tidx);
       var tree_plotter = new TreePlotter();
       var container = document.querySelector('#container');
-
-      tree_plotter.draw(tidx, summary.trees[tidx].populations, summary.trees[tidx].structure, summary.trees[tidx].root, summary.params, dataset);
+      
+      tree_plotter.draw(tidx, summary.trees[tidx].populations, summary.trees[tidx].structure, summary.trees[tidx].root, summary.params, ssm_viewer);
       tviewer._plot_pop_vafs(dataset, tidx);
     })
     $('#tree-list').scrollTop(0);

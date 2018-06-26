@@ -100,7 +100,7 @@ TreePlotter.prototype._plot_pop_trajectories = function(structure, populations, 
   chart.draw(data, options);
 }
 
-TreePlotter.prototype.draw = function(tidx, populations, structure, root_id, params, dataset) {
+TreePlotter.prototype.draw = function(tidx, populations, structure, root_id, params, ssm_viewer) {
   if(params !== undefined) { }
 
   var pop_ids = Util.sort_ints(Object.keys(populations));
@@ -131,8 +131,7 @@ TreePlotter.prototype.draw = function(tidx, populations, structure, root_id, par
 
   var root = this._generate_tree_struct(structure, populations, root_id);
   this.draw_tree(root, '#container');
-  var ssm_viewer = new SSM_Viewer();
-  ssm_viewer.render('#container', num_samples, sample_names, tidx, dataset);
+  ssm_viewer.render('#container', num_samples, sample_names, tidx);
   this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples, root_id);
   this._render_summary_table(structure, populations, num_samples, sample_names, root_id);
 }
