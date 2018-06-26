@@ -13,7 +13,6 @@ class TreeClusterer:
     Second, we cluster the linear trees (ie, branching index ==0) based on the number of nodes that they have.
     Third, we cluster the remaining trees based on the indexes calculated in the first step.
     Fourth, output the cluster information in a json-friendly format.
-    Note that currently we clustering using two metrics: [LI, BI] and [CI, BI/(LI+BI)], so the final output dictionary has a different entry for each metric. 
     :param summaries: the tree summaries output from ResultGenerator().generate()
     :return: formated dictionary containing all relevant information for the clusters, ready to be inserted to the .summ json
     """
@@ -24,9 +23,9 @@ class TreeClusterer:
   
   def _calc_tree_structure_indexes(self,summs):
     """
-    Makes use of IndexCalculator class to calculate the linear, branching and clustering indexes and saves the indexes in the summary dictionary. Returns None
+    Makes use of IndexCalculator class to calculate the linear, branching and clustering indexes and saves the indexes in the summary dictionary.
     :param summs: the summaries of the trees as output by ResultGenerator().generate()
-    "return: none
+    :return: none
     """
     for summary in summs.values():
       calculator = IndexCalculator(summary)
@@ -38,8 +37,8 @@ class TreeClusterer:
     """
     Takes the tree summaries and extracts the relevant tree information that will be used for clustering.
     :param summs:the summaries of the trees as output by ResultGenerator().generate()
-    :return is_linear: list of booleans answering whether or not a tree at that index is linear or not
-    :return clustering_data: list of data points to be used for clustering the trees. distance metric is [CI,BI/(LI+BI)]
+    :return is_linear: list of booleans answering whether or not a tree at that index is linear.
+    :return clustering_data: list of data points to be used for clustering the trees. Distance metric is [CI,BI/(LI+BI)].
     :return tree_idx: list of the indexes assigned to each tree.
     :return n_nodes: list representing the number of nodes found for each tree.
     """
@@ -56,7 +55,7 @@ class TreeClusterer:
     This will split the data into trees that are linear and not-linear and then run the proper analysis for each set.
     :param tree_idxs: a list of the indexes of the trees. 
     :param clustering_data: list of data points from each tree.
-    :param num_nodes: list of he number of nodes associated with each tree
+    :param num_nodes: list of the number of nodes associated with each tree
     :param is_linear: list of booleans answering whether or not a tree is linear.
     :return: dictionary which represents the clusters found in this anaysis. linear and non-linear trees are merged into the same dictionary.
     """
@@ -70,20 +69,17 @@ class TreeClusterer:
     lin_data = [x for x,this_is_lin in zip(clustering_data, is_linear) if this_is_lin]
     lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs, is_linear) if this_is_lin]
     lin_num_nodes = [x for x,this_is_lin in zip(num_nodes, is_linear) if this_is_lin]
-    #For linear trees the minor axis for the ellipse is arbitrary as all y values are 0. So I choose a value here.
-    ellipse_minor_axis = 1/10 * max([ datum[1] for datum in clustering_data ]) 
-    if ellipse_minor_axis==0: ellipse_minor_axis = 0.01
-    lin_clusters = self._calc_lin_tree_clusters(lin_data, lin_tree_idxs, lin_num_nodes, ellipse_minor_axis) 
+    lin_clusters = self._calc_lin_tree_clusters(lin_data, lin_tree_idxs, lin_num_nodes) 
 
     non_lin_clusters.update(lin_clusters)
     return non_lin_clusters
   
   def _run_spectral_clustering(self,data,tree_idxs):
     """
-    Clusters the given tree index data using spectral clustering. See sklearn
-    :param data: index coordinates for all sampled trees
+    Clusters the given tree index data using spectral clustering. See sklearn for more details.
+    :param data: index coordinates for all sampled trees.
     :param tree_idxs: the tree indexes corresponding to each tree input into data.
-    :return: Weight, mean, covariance for each cluster, assignments for each sampled tree, and ellipse information that describes the tree and can be used for plotting.
+    :return: members and the representative tree of each cluster.
     """
     #If all trees are linear then the inputs will be empty. Return an empty dictionary
     if not data:
@@ -108,14 +104,13 @@ class TreeClusterer:
         }
     return out
   
-  def _calc_lin_tree_clusters(self, data, tree_idxs, num_nodes, ellipse_minor_axis):
+  def _calc_lin_tree_clusters(self, data, tree_idxs, num_nodes):
     """
-    Clusters the linear trees based on the number of nodes that they have and returns a dictionary in the same format as run_gmm output
+    Clusters the linear trees based on the number of nodes that they have and returns a dictionary in the same format as run_spectral_clustering output
     :param data: list of data points from each tree.
     :param tree_idxs: a list of the indexes of the trees. 
     :param num_nodes: list of the number of nodes associated with each tree
-    :param ellipse_minor_axis: minor axis of the ellipse that will describe the tree. Can't find this from just the linear trees as they all lie on the line y=0. Instead, calc it and input it here.
-    :return: dictionary in the same format as run_gmm output
+    :return: dictionary in the same format as run_spectral_clustering output
     """
     #If there are no linear trees, return an empty dictionary
     if not data:
@@ -132,7 +127,7 @@ class TreeClusterer:
       clust_rep_tree_idx = self._determine_representative_tree(data[this_data_member_idxs,0],data[this_data_member_idxs,1])
       rep_tree_idx = cluster_members[clust_rep_tree_idx]
       
-      #Format the results to match the gmm results. For any fields that aren't necessary, set to None.
+      #Format the results to match the spectral clustering.
       out["linear_" + str(this_num_nodes)] =  {
         "is_linear": True,
         "members": cluster_members,
@@ -142,7 +137,11 @@ class TreeClusterer:
 
   def _determine_representative_tree(self,x,y):
     """
-    Determine the best tree to represent the given members input (typically all tree members that belong to a cluster)
+    Determine the best tree to represent the given members input (typically all tree members that belong to a cluster).
+    The representative tree is defined as the tree with the highest density of trees around it.
+    :param x: x values used to describe the tree
+    :param y: y values used to describe the tree
+    :return: index in x and y which represents the representative tree.
     """
     
     #Testing something. Because of the post-processing of the trees (deleting subclones) sometimes all trees in a cluster
