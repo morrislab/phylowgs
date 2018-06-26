@@ -262,11 +262,14 @@ def spectral_clustering(affinity, n_clusters=[8], n_components=None,
                           n_init=n_init)
     else:
       labels = discretize(maps, random_state=random_state)
+
     if n_clusters == [1]:
       return (n_clusters, labels)
+
     s_score = metrics.silhouette_score(maps, labels)
     silhouette_scores.append(s_score)
     labels_across_n_comp.append(labels)
+    
   best_ss = np.max(silhouette_scores)
   best_run = np.argmax(silhouette_scores)
   second_best_ss = np.partition(silhouette_scores,-2)[-2]

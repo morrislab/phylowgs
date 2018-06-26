@@ -16,25 +16,29 @@ class WitnessServerHandler(SimpleHTTPRequestHandler):
     if('summ.json' in pathToFile) | ('muts.json' in  pathToFile):
       f = file(pathToFile[1:], 'r')
       fdat = f.read();
-      self._SendData(fdat)
+      if '.gz' in pathToFile:
+        toSend = fdat
+      else:
+        toSend = self._GzipEncode(fdat)
+      self._SendData(toSend)
     elif 'mutass.zip' in pathToFile:
       #Extract the file of interest, gzip encode it, and send it.
       fileToExtract = pathToFile.split('/')[-1]
       zipPath = pathToFile[1:len(pathToFile)-len(fileToExtract) - 1]
       mutassZip = zipfile.ZipFile(zipPath, mode='r')
       fdat = mutassZip.read(fileToExtract)
-      self._SendData(fdat)
+      toSend = self._GzipEncode(fdat)
+      self._SendData(toSend)
     else:
       SimpleHTTPRequestHandler.do_GET(self)
   
-  def _SendData(self,dat):
-    tosend = self._GzipEncode(dat)
+  def _SendData(self,toSend):
     self.send_response(200)
     self.send_header("Content-type", "text/html")
-    self.send_header("Content-length", len(str(tosend)))
+    self.send_header("Content-length", len(str(toSend)))
     self.send_header("Content-Encoding", "gzip")
     self.end_headers()
-    self.wfile.write(tosend)
+    self.wfile.write(toSend)
     self.wfile.flush()
 
   def _GzipEncode(self, content):
@@ -46,7 +50,7 @@ class WitnessServerHandler(SimpleHTTPRequestHandler):
 
 def parse_args():
   parser = argparse.ArgumentParser(
-    description='Run a server to run witness on.',
+    description='Create a server on which to run witness.',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
   parser.add_argument('-p', '--port', dest='port', default=8000, type=int,
@@ -58,6 +62,7 @@ def main():
   args = parse_args()
   httpd = SocketServer.TCPServer(("", args.port), WitnessServerHandler)
   print("Serving at port " + str(args.port))
+  
   httpd.serve_forever()
 
 if __name__ == "__main__":
