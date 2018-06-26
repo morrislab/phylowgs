@@ -18,9 +18,9 @@ def main():
         'mutass_path': os.path.join(base_dir, run_name, dataset_name + '.mutass.zip'),
         'name': dataset_name,
       }
-      if ".gz" in summary_path:
+      if ".gz" == summary_path[-3:]:
         run['muts_path'] = run['muts_path'] + ".gz"
-        
+
       clusters_path = os.path.join(base_dir, run_name, dataset_name + '.clusters.json')
       if os.path.isfile(clusters_path):
         run['clusters_path'] = clusters_path
