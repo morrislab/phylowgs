@@ -16,7 +16,7 @@ class WitnessServerHandler(SimpleHTTPRequestHandler):
     if('summ.json' in pathToFile) | ('muts.json' in  pathToFile):
       f = file(pathToFile[1:], 'r')
       fdat = f.read();
-      if '.gz' in pathToFile:
+      if pathToFile.endswith('.gz'):
         toSend = fdat
       else:
         toSend = self._GzipEncode(fdat)
