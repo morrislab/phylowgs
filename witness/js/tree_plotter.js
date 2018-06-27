@@ -131,7 +131,7 @@ TreePlotter.prototype.draw = function(tidx, populations, structure, root_id, par
 
   var root = this._generate_tree_struct(structure, populations, root_id);
   this.draw_tree(root, '#container');
-  ssm_viewer.render('#container', num_samples, sample_names, tidx);
+  ssm_viewer.render('#container', tidx, num_samples, sample_names);
   this._plot_pop_trajectories(structure, populations, num_samples, sample_names, hidden_samples, root_id);
   this._render_summary_table(structure, populations, num_samples, sample_names, root_id);
 }
