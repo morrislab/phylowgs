@@ -12,7 +12,7 @@ function Interface() {
   this._available_renderers = {
     'summarizer': new TreeSummarizer(),
     'tree_viewer': new TreeViewer(),
-    'cluster_plotter': new ClusterPlotter()
+    'cluster_viewer': new ClusterViewer()
   };
 }
 
@@ -38,7 +38,7 @@ Interface.prototype._activate_navbar = function() {
     var mapping = {
       'nav-tree-summaries': 'summarizer',
       'nav-tree-viewer': 'tree_viewer',
-      'nav-clustered-trees': 'cluster_plotter'
+      'nav-cluster-viewer': 'cluster_viewer'
     };
     iface._renderer = null;
     for(var nav_class in mapping) {
@@ -65,8 +65,8 @@ Interface.prototype._load_samples = function() {
   var run_container = $('#runs');
   var sample_container = $('#samples');
   //
-  // Show tree summaries by default.
-  this._renderer = 'summarizer';
+  // Show cluster viewer by default.
+  this._renderer = 'cluster_viewer';
   this._dataset = null;
 
   var iface = this;
