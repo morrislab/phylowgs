@@ -26,10 +26,10 @@ def parse_args():
           help='Number of chains to run concurrently')
     parser.add_argument('-r', '--random-seeds', dest='random_seeds', type=int, nargs='+',
           help='Space-separated random seeds with which to initialize each chain. Specify one for each chain.')
-    parser.add_argument('-I', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.5, type=float,
+    parser.add_argument('-I', '--chain-inclusion-factor', dest='chain_inclusion_factor', default=1.1, type=float,
           help='Factor for determining which chains will be included in the output "merged" folder. ' \
-               'Default is 1.5, meaning that the sum of the likelihoods of the trees found in each chain must ' \
-               'be greater than 1.5x the maximum of that value across chains. Setting this value = inf ' \
+               'Default is 1.1, meaning that the sum of the likelihoods of the trees found in each chain must ' \
+               'be greater than 1.1x the maximum of that value across chains. Setting this value = inf ' \
                'includes all chains and setting it = 1 will include only the best chain.')
     parser.add_argument('-O', '--output-dir', dest='output_dir', default='chains',
           help='Directory where results from each chain will be saved. We will create it if it does not exist.')
