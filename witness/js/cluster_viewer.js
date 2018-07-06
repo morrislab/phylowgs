@@ -6,7 +6,7 @@ ClusterViewer.prototype.render = function(dataset){
   d3.json(dataset.summary_path, function(summary) {
     if(Util.have_cluster_data(summary)){
       // These functions require that the summ file be created with the latest version of write_results.
-      // If not, report in container that there is no cluster data and that write_results should berun again
+      // If not, report in container that there is no cluster data and that write_results should be run again
       self._render_lin_idx_vs_branch_idx(summary);
       self._render_cluster_table(summary);
     }else{

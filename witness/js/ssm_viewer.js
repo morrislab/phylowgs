@@ -1,9 +1,4 @@
 function SSM_Viewer(dataset){
-  //TODO:
-  // - just calc num_samples from sample_names
-  // - Leave original input in place, hide any others from future rows.
-  // - When new information is input, just add a new row (unless ssm already exists?!?)
-  // - 
   this._muts = null;
   this._ssm_ids = [];
   this._ssm_names = [];
