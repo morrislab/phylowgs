@@ -64,9 +64,9 @@ class TreeClusterer:
     non_lin_data = [x for x,this_is_lin in zip(clustering_data,is_linear) if not this_is_lin]
     non_lin_tree_idxs = [x for x,this_is_lin in zip(tree_idxs,is_linear) if not this_is_lin]
     if clustering_method == "gmm":
-      non_lin_clusters = self._run_gmm_clustering(non_lin_data, non_lin_tree_idxs)
+      clusters = self._run_gmm_clustering(non_lin_data, non_lin_tree_idxs)
     elif clustering_method == "spectral":
-      non_lin_clusters = self._run_spectral_clustering(non_lin_data, non_lin_tree_idxs)
+      clusters = self._run_spectral_clustering(non_lin_data, non_lin_tree_idxs)
     else:
       raise ValueError("Unrecognized clustering method input: {}".format(clustering_method))
     
@@ -76,8 +76,9 @@ class TreeClusterer:
     lin_num_nodes = [x for x,this_is_lin in zip(num_nodes, is_linear) if this_is_lin]
     lin_clusters = self._calc_lin_tree_clusters(lin_data, lin_tree_idxs, lin_num_nodes) 
 
-    non_lin_clusters.update(lin_clusters)
-    return non_lin_clusters
+    clusters.update(lin_clusters)
+    clusters = self._sort_clusters(clusters)
+    return clusters
   
   def _run_spectral_clustering(self,data,tree_idxs):
     """
@@ -205,6 +206,7 @@ class TreeClusterer:
       
       #Format the results to match the spectral clustering.
       out["linear_" + str(this_num_nodes)] =  {
+        "clustering_method": "n_nodes",
         "is_linear": True,
         "members": cluster_members,
         "representative_tree": rep_tree_idx
@@ -219,11 +221,7 @@ class TreeClusterer:
     :param y: y values used to describe the tree
     :return: index in x and y which represents the representative tree.
     """
-    
-    #Testing something. Because of the post-processing of the trees (deleting subclones) sometimes all trees in a cluster
-    #will have the exact same branching, linearity and coclustering indicies. I will check for that and just say that, 
-    #arbitrarily, the rep tree is the first in the cluster. They are all the same anyways so should all be "representative".
-    #Still, should bring this up to Jeff.
+    #If all of the trees in a cluster are the same, then just select the first tree in the cluster
     if all(i == x[0] for i in x) and all(i == y[0] for i in y):
       return 1
 
@@ -234,3 +232,21 @@ class TreeClusterer:
       density = list(sp.stats.gaussian_kde(x)(y))
     best_tree_idx = np.argmax(density)
     return best_tree_idx
+
+  def _sort_clusters(self,clusters):
+    """
+    The clustering methods return clusters in a seemingly random order. For our purposes
+    it is better to have them sorted by the number of members in each cluster, as the 
+    clusters with more members are more likely to represent the actual tree.
+    """
+    out = {}
+    ckeys = clusters.keys()
+    n_mems = np.array([len(clusters[ckey]['members']) for ckey in clusters])
+    sorted_idxs = np.argsort(n_mems)
+    for ckey in range(1,len(clusters)+1):
+      out[ckey] = clusters[ckeys[sorted_idxs[-ckey]]]
+      ckey += 1
+    print("Length clusters: {}".format(len(clusters)))
+    print("Length out: {}".format(len(out)))
+    return out
+   
