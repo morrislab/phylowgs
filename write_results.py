@@ -16,6 +16,8 @@ def main():
     help='Include SSM names in output (which may be sensitive data)')
   parser.add_argument('--min-ssms', dest='min_ssms', type=float, default=0.01,
     help='Minimum number or percent of SSMs to retain a subclone')
+  parser.add_argument('--clust-method', dest='clust_method', type=str, default="spectral",
+    help='Which method to use when clustering sampled trees. Options are "gmm" and "spectral"(default)')
   parser.add_argument('dataset_name',
     help='Name identifying dataset')
   parser.add_argument('tree_file',
@@ -35,7 +37,7 @@ def main():
   munger.remove_superclones()
   munger.remove_polyclonal_trees()
   
-  tree_clusters = TreeClusterer().find_clusters(summaries) 
+  tree_clusters = TreeClusterer().find_clusters(summaries,args.clust_method) 
   
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, params, args.tree_summary_output, tree_clusters)
