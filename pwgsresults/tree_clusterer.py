@@ -246,7 +246,5 @@ class TreeClusterer:
     for ckey in range(1,len(clusters)+1):
       out[ckey] = clusters[ckeys[sorted_idxs[-ckey]]]
       ckey += 1
-    print("Length clusters: {}".format(len(clusters)))
-    print("Length out: {}".format(len(out)))
     return out
    
