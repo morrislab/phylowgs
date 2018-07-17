@@ -4,7 +4,7 @@ from pwgsresults.result_generator import ResultGenerator
 from pwgsresults.result_munger import ResultMunger
 from pwgsresults.json_writer import JsonWriter
 from pwgsresults.tree_clusterer import TreeClusterer
-	
+from pwgsresults.ssm_analyser import SSM_Analyser
 	
 
 def main():
@@ -37,8 +37,9 @@ def main():
   munger.remove_superclones()
   munger.remove_polyclonal_trees()
   
-  tree_clusters = TreeClusterer().find_clusters(summaries,args.clust_method) 
-  
+  clusters = TreeClusterer().find_clusters(summaries,args.clust_method) 
+  temp = SSM_Analyser().analyse(clusters, summaries, mutlist, mutass)
+
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, params, args.tree_summary_output, tree_clusters)
   writer.write_mutlist(mutlist, args.mutlist_output)
