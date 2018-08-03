@@ -6,8 +6,6 @@
 #include <gsl/gsl_randist.h>
 #include <gsl/gsl_rng.h>
 
-#include <boost/math/special_functions/beta.hpp>
-
 #include "util.hpp"
 
 void sample_cons_params(struct node nodes[],struct config conf,gsl_rng *rand,int tp);
@@ -24,9 +22,6 @@ void load_tree(char fname[], struct node nodes[], struct config conf);
 void write_params(char fname[], struct node nodes[], struct config conf);
 
 void mh_loop(struct node nodes[], struct datum data[], char* fname, struct config conf);
-
-void map_datum_to_node(struct node nodes[], struct datum data[],  struct config conf);
-void load_data_params(char fname[], struct datum data[], struct config conf);
 
 struct config{
 	int MH_ITR;
@@ -53,8 +48,7 @@ struct node{
 	vector<int> dids;	
 	int nchild;
 	vector<int> cids; // children ids	
-	int ht;
-	double p_selec;	
+	int ht;	
 };
 
 
@@ -71,12 +65,7 @@ struct datum{
 	
 	// this is used to compute the binomial parameter
 	vector <struct state> states1, states2, states3, states4; // maternal and paternal state
-
-	double selec_resp;
-	double fmin; // this is constant?
 	
-	struct node* nd; // pointer to the node where the datum resides
-
 	double log_ll1111(vector<double> phi, int old){
 		double llh = 0.0;
 		for(int tp=0; tp<phi.size();tp++)
@@ -87,38 +76,8 @@ struct datum{
 	double log_ll(double phi, int old, int tp){
 		return log_complete_ll(phi,mu_r,mu_v,old,tp);
 	}
-
-	double log_complete_ll(double phi, double mu_r, double mu_v, int old, int tp){
-		double llh = 0;
-		double ll[2];
-		ll[0] = log(nd->p_selec) + selec_ll(phi, mu_r, mu_v, old, tp);
-		ll[1] = log(1-nd->p_selec) + ne_ll(old, tp);
-		llh = logsumexp(ll,2);
-		return llh;
-	}
 	
-	double ne_ll(int old, int tp){
-		double llh = 0;
-		double eta;
-		if(old==0)
-			eta = nd->pi1[tp];
-		else
-			eta = nd->pi[tp];
-		if(eta<fmin)
-			llh = log(pow(10,-99));
-		else{
-			double v = d[tp] - a[tp];
-			double c_avg = 2.0;
-
-			llh = log((fmin * eta)/((eta-fmin)*c_avg*c_avg)) + log_bin_coeff(d[tp], v) + log_beta(v-1,a[tp]+1);
-			llh += log(boost::math::ibeta(v-1,a[tp]+1,eta) - boost::math::ibeta(v-1,a[tp]+1,fmin));
-			if(llh<log(pow(10,-99)))
-				llh = log(pow(10,-99));
-		}
-		return llh;
-	}
-
-	double selec_ll(double phi, double mu_r, double mu_v, int old, int tp){
+	double log_complete_ll(double phi, double mu_r, double mu_v, int old, int tp){
 		double nr=0;
 		double nv=0;
 		double mu = 0;

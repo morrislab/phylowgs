@@ -35,14 +35,6 @@ class alleles(Node):
 			self.pi = rand(1)*parent.pi
 			parent.pi = parent.pi - self.pi
 			self.params = self.pi
-		self.p_selec = 0.5
-	
-	def update_resps(self):
-		for d in self.get_data():
-			d.update_resp()
-
-	def update_p_selec(self):
-		self.p_selec = mean([x.selec_resp for x in self.get_data()]+[1.0,0.0])
 			
 	def conc(self):
 		if self.parent() is None:

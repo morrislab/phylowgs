@@ -1,7 +1,6 @@
 from numpy import *
 import scipy.stats as stat
 from scipy.special import gammaln
-from scipy import special
 import util2 as u
 
 class Datum(object):
@@ -21,8 +20,7 @@ class Datum(object):
 		self.cnv = [] # for SSM, this is [(cnv,cp,cm)]
 		
 		self.tssb = None # this is just a pointer to tssb (tree object), gets initialized in evolve.py
-		self.selec_resp = 0.5
-		self.fmin = 0.0001
+	
 	
 	# for multiple samples
 	def _log_likelihood(self, phi,update_tree=True,new_state=0):
@@ -46,36 +44,7 @@ class Datum(object):
 	def _log_complete_likelihood(self, phi, mu_r, mu_v):
 		ntps = len(self.a)
 		return sum([self.__log_complete_likelihood__(phi, mu_r, mu_v,tp) for tp in arange(ntps)])
-	
-	def __log_complete_likelihood__(self, phi, mu_r, mu_v, tp, new_state=0):
-		selec = log(self.node.p_selec) + self.selec_llh(phi, mu_r, mu_v, tp, new_state)
-		ne = log(1-self.node.p_selec) + self.ne_llh(tp)
-		return u.logsumexp([selec,ne])
-
-	def ne_llh(self,tp):
-		## TODO(add real c_avg later)
-		if self.cnv:
-			print "Neutral LLH does not yet support CNVs"
-		eta = self.node.pi[tp]
-		if eta < self.fmin:
-			return log(1e-99)
-		d = self.d[tp]
-		r = self.a[tp]
-		v = d -r 
-		c_avg = 2.0
-		llh = log( (self.fmin * eta)/(((eta-self.fmin)*c_avg*c_avg))) + u.log_bin_coeff(d, v) + special.betaln(v-1,r+1)
-		llh = llh + log(special.betainc(v-1,r+1,eta) - special.betainc(v-1,r+1,self.fmin))
-		if llh < log(1e-99):
-			llh = log(1e-99)
-		
-		return llh		
-	
-	def update_resp(self):
-		selec = log(self.node.p_selec) + self.selec_llh(self.node.params[0],self.mu_r,self.mu_v,0)
-		ne = log(1-self.node.p_selec) + self.ne_llh(0)
-		self.selec_resp = exp(selec - u.logsumexp(array([selec,ne])))
-
-	def selec_llh(self, phi, mu_r, mu_v, tp, new_state=0):	
+	def __log_complete_likelihood__(self, phi, mu_r, mu_v, tp, new_state=0):	
 		
 		if self.cnv:
 			ll = []

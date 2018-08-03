@@ -4,7 +4,7 @@ from tssb		import *
 from util		import *
 from util2 import *
 
-#from ete2 import *
+from ete2 import *
 
 from subprocess import call
 import sys

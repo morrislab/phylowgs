@@ -23,9 +23,8 @@ def get_c_fnames(tmp_dir):
 	FNAME_C_DATA_STATES = _make_c_fname('data_states')
 	FNAME_C_PARAMS = _make_c_fname('params')
 	FNAME_C_MH_ARATIO = _make_c_fname('mh_ar')
-	FNAME_C_DATA_PARAMS = _make_c_fname('data_params')
 
-	return (FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO,FNAME_C_DATA_PARAMS)
+	return (FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO)
 
 # done for multi-sample
 def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2='',rseed=1, ntps=5, tmp_dir='.'):
@@ -35,7 +34,7 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	FNAME_SSM_DATA = fin1
 	FNAME_CNV_DATA = fin2
 	NTPS = str(ntps)
-	FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO,FNAME_C_DATA_PARAMS = get_c_fnames(tmp_dir)
+	FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS, FNAME_C_MH_ARATIO = get_c_fnames(tmp_dir)
 
 	## initialize the MH sampler###########
 	#for tp in arange(ntps): 
@@ -49,7 +48,6 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	u2.map_datum_to_node(tssb)
 	
 	write_data_state(tssb,FNAME_C_DATA_STATES) # this is need for binomial parameter computations
-	write_data_params(tssb,n_ssms, FNAME_C_DATA_PARAMS) # this is needed for the neutral evolution model
 	###########################################
 	
 	MH_ITR = str(iters)
@@ -60,31 +58,11 @@ def metropolis(tssb,iters=1000,std=0.01,burnin=0,n_ssms=0,n_cnvs=0,fin1='',fin2=
 	TREE_HEIGHT = str(max([node.ht for node in nodes])+1)
 	
 	script_dir = os.path.dirname(os.path.realpath(__file__))
-	sp.check_call(['%s/mh.o' % script_dir, MH_ITR, MH_STD, N_SSM_DATA, N_CNV_DATA, NNODES, TREE_HEIGHT, FNAME_SSM_DATA, FNAME_CNV_DATA, FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS,FNAME_C_MH_ARATIO, NTPS, FNAME_C_DATA_PARAMS])
+	sp.check_call(['%s/mh.o' % script_dir, MH_ITR, MH_STD, N_SSM_DATA, N_CNV_DATA, NNODES, TREE_HEIGHT, FNAME_SSM_DATA, FNAME_CNV_DATA, FNAME_C_TREE, FNAME_C_DATA_STATES, FNAME_C_PARAMS,FNAME_C_MH_ARATIO, NTPS])
 	ar = str(loadtxt(FNAME_C_MH_ARATIO,dtype='string'))
 	update_tree_params(tssb,FNAME_C_PARAMS) # update the tree with the new parameters sampled using the c++ code
 	
 	return ar
-
-
-def write_data_params(tssb, n_ssms,fname):
-
-	did_int_dict=dict()
-	for dat in tssb.data:
-		if dat.id[0]=='s':
-			did_int_dict[dat.id]=int(dat.id[1:])
-		else:
-			did_int_dict[dat.id]=n_ssms+int(dat.id[1:])
-	
-	fh=open(fname,'w')
-	wts,nodes=tssb.get_mixture()
-	for node in nodes:
-		for datum in node.get_data():
-			line = str(did_int_dict[datum.id]) + '\t' + str(datum.selec_resp)
-			fh.write(line)
-			fh.write('\n')
-	fh.flush()
-	fh.close()
 
 # done for multi-sample
 def write_tree(tssb,n_ssms,fname):
