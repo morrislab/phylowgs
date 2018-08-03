@@ -205,7 +205,11 @@ def do_mcmc(state_manager, backup_manager, safe_to_exit, run_succeeded, config, 
 			state['mh_std'] = state['mh_std']/2.0
 			logmsg("Growing MH proposals. Now %f" % state['mh_std'])
 
-
+		for node in tssb.get_nodes(): 
+			node.update_resps()
+			node.update_p_selec()
+			node.update_resps()
+			node.update_p_selec()
 		tssb.resample_sticks()
 		tssb.resample_stick_orders()
 		tssb.resample_hypers(dp_alpha=True, alpha_decay=True, dp_gamma=True)
