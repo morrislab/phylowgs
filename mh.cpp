@@ -40,6 +40,8 @@ int main(int argc, char* argv[]){
 
 	conf.NTPS = atoi(argv[13]); // no. of samples 
 	
+	char* FNAME_C_DATA_PARAMS = argv[14];
+
 	struct datum *data = new datum[conf.N_SSM_DATA+conf.N_CNV_DATA];
 	load_ssm_data(FNAME_SSM_DATA, data,conf);
 	if (conf.N_CNV_DATA>0)
@@ -51,6 +53,9 @@ int main(int argc, char* argv[]){
 	
 	load_data_states(FNAME_C_DATA_STATES,data, nodes, conf);
 	
+	map_datum_to_node(nodes, data, conf);
+	load_data_params(FNAME_C_DATA_PARAMS, data, conf);
+
 	//start MH loop
 	mh_loop(nodes,data,FNAME_C_MH_AR,conf);
 	
@@ -355,7 +360,10 @@ void load_tree(char fname[], struct node *nodes, struct config conf){
 			}
 			else if(ctr==7){
 				nodes->ht=atoi(token.c_str());		
-			}			
+			}
+			else if (ctr==8){
+				nodes->p_selec = atof(token.c_str());
+			}	
 			ctr+=1;
 		}
 		nodes++;
@@ -460,4 +468,46 @@ void load_data_states(char fname[], struct datum* data, struct node* nodes, stru
 		}		
 	}	
 	dfile.close();
+}
+
+void map_datum_to_node(struct node nodes[], struct datum data[], struct config conf){
+	
+	map <int, struct datum*> id_datum_map;
+	for(int i=0;i<conf.N_SSM_DATA+conf.N_CNV_DATA;i++){
+		id_datum_map[data[i].id]=&data[i];
+	}
+
+	for(int i=0;i<conf.NNODES;i++){
+		for(int did=0; did<nodes[i].dids.size();did++)			
+			id_datum_map[nodes[i].dids.at(did)]->nd=&nodes[i];
+	}
+}
+
+void load_data_params(char fname[],struct datum *data, struct config conf){
+
+	map <int, struct datum*> id_datum_map;
+	for(int i=0;i<conf.N_SSM_DATA+conf.N_CNV_DATA;i++){
+		id_datum_map[data[i].id]=&data[i];
+	}
+
+	string line,token;
+	ifstream dfile (fname);
+	int ctr=0;
+	while (getline (dfile,line,'\n')){
+		struct datum *dat;
+		
+		istringstream iss(line);
+		ctr=0;
+		while(getline(iss,token,'\t')){
+			if(ctr==0){
+				dat = id_datum_map[atoi(token.c_str())];
+			}
+			else if(ctr==1){
+				dat->selec_resp = atof(token.c_str());
+				dat->fmin = 0.0001; // constant?
+			}
+			ctr+=1;			
+		}		
+	}	
+	dfile.close();	
 }
