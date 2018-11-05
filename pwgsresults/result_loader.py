@@ -15,10 +15,13 @@ class ResultLoader(object):
     self._load_tree_data()
 
   def _convert_keys_to_ints(self, dic):
-    keys = dic.keys()
-    for key in dic.keys():
-      dic[int(key)] = dic[key]
-      del dic[key]
+    for key in list(dic.keys()):
+      newK = int(key)
+      if newK in dic:
+        continue
+      else:
+        dic[newK] = dic[key]
+        del dic[key]
 
   def _load_tree_data(self):
     with gzip.GzipFile(self._tree_summary_fn) as treesummf:
