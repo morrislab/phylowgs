@@ -92,23 +92,21 @@ class FacetsParser(CnvParser):
       reader = csv.DictReader(facetf)
       for record in reader:
         cnv = {}
-        try:
-          cnv['cellular_prevalence'] = float(record['cf.em'])
-        except:
-          cnv['cellular_prevalence'] = self._cellularity
-        
+	#cf.em is the fraction of cells in a sample with copy number, copy neutral are assigned 1 by FACETS
+        cnv['cellular_prevalence'] = float(record['cf.em'])
+
+        #FACETS does not always assign a major and minor copy number, if the number of hetroz. snps are too low, only assigns
+	#a total copy number
+	#if a minor copy is not called, skip this section
         if (str.isdigit(record['tcn.em']) and str.isdigit(record['lcn.em'])):
           cnv['major_cn'] = int(record['tcn.em']) - int(record['lcn.em'])
           cnv['minor_cn'] = int(record['lcn.em'])
           chrom = record['chrom']
 
           cnv['start'] = int(record['start'])
-          try:
-		        cnv['end'] = int(float(record['end']))
-          except:
-            print(record['end'])
-            print(int(float(record['end'])))
-          
+		#int float call because FACETS was occasionally writing out .csv pipeline with 2e+0.7 or something as a chrom end, maybe have been a bug in my pipeline could be removed
+	  cnv['end'] = int(float(record['end']))
+	
           cn_regions[chrom].append(cnv)
         else:
           next
