@@ -25,7 +25,7 @@ def main():
       if os.path.isfile(clusters_path):
         run['clusters_path'] = clusters_path
 
-      mutass_path = os.path.join('base_dir', run_name, dataset_name + '.mutass')
+      mutass_path = os.path.join('data', run_name, dataset_name + '.mutass')
       if os.path.isdir(mutass_path):
         run['mutass_path'] = mutass_path
 
