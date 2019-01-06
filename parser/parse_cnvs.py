@@ -45,6 +45,7 @@ class CopyNumberWriter(object):
         region['copy_number'] = region['major_cn'] + region['minor_cn']
         self._write_cn_record(region)
 
+
     self._cn_output.close()
 
 class CnvParser(object):
@@ -76,6 +77,42 @@ class TitanParser(CnvParser):
           cnv['cellular_prevalence'] = float(clonal_freq) * self._cellularity
 
         cn_regions[chrom].append(cnv)
+
+    return cn_regions
+
+class FacetsParser(CnvParser):
+  def __init__(self, fc_filename, cellularity):
+    self._fc_filename = fc_filename
+    self._cellularity = cellularity
+
+  def parse(self):
+    cn_regions = defaultdict(list)
+
+    with open(self._fc_filename) as facetf:
+      reader = csv.DictReader(facetf)
+      for record in reader:
+        cnv = {}
+        try:
+          cnv['cellular_prevalence'] = float(record['cf.em'])
+        except:
+          cnv['cellular_prevalence'] = self._cellularity
+        
+        if (str.isdigit(record['tcn.em']) and str.isdigit(record['lcn.em'])):
+          cnv['major_cn'] = int(record['tcn.em']) - int(record['lcn.em'])
+          cnv['minor_cn'] = int(record['lcn.em'])
+          chrom = record['chrom']
+
+          cnv['start'] = int(record['start'])
+          try:
+		        cnv['end'] = int(float(record['end']))
+          except:
+            print(record['end'])
+            print(int(float(record['end'])))
+          
+          cn_regions[chrom].append(cnv)
+        else:
+          next
+
 
     return cn_regions
 
@@ -162,7 +199,7 @@ def main():
     description='Create CNV input file for parser from Battenberg or TITAN data',
     formatter_class=argparse.ArgumentDefaultsHelpFormatter
   )
-  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'battenberg-smchet', 'titan'),
+  parser.add_argument('-f', '--cnv-format', dest='input_type', required=True, choices=('battenberg', 'battenberg-smchet', 'titan','facets'),
     help='Type of CNV input')
   parser.add_argument('-c', '--cellularity', dest='cellularity', type=float, required=True,
     help='Fraction of sample that is cancerous rather than somatic. Used only for estimating CNV confidence -- if no CNVs, need not specify argument.')
@@ -184,6 +221,8 @@ def main():
     parser = BattenbergSmchetParser(args.cnv_file, cellularity)
   elif args.input_type == 'titan':
     parser = TitanParser(args.cnv_file, cellularity)
+  elif args.input_type == 'facets':
+    parser = FacetsParser(args.cnv_file, cellularity)
   else:
     raise Exception('Unknown input type')
 
