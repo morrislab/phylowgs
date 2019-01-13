@@ -20,14 +20,14 @@ def main():
     help='Include SSM names in output (which may be sensitive data)')
   parser.add_argument('--min-ssms', dest='min_ssms', type=float, default=0.01,
     help='Minimum number or percent of SSMs to retain a subclone')
-  parser.add_argument('--allow-polyclonal', dest='allow_polyclonal', action='store_true',
+  parser.add_argument('--allow-multiprimary', dest='allow_multiprimary', action='store_true',
     help='Minimum number or percent of SSMs to retain a subclone')
-  parser.add_argument('--include-polyclonal', dest='include_polyclonal', action='store_true',
-    help='Whether to include polyclonal trees in result')
-  parser.add_argument('--max-polyclonal', dest='max_polyclonal', type=restricted_float, default=0.8,
-    help='Maximum proportion of trees that may be polyclonal if ' \
-    '--include=polyclonal=False. In that case, An exception will be thrown if ' \
-    'the proportion of polyclonal trees exceeds this value.')
+  parser.add_argument('--include-multiprimary', dest='include_multiprimary', action='store_true',
+    help='Whether to include multiprimary trees in result')
+  parser.add_argument('--max-multiprimary', dest='max_multiprimary', type=restricted_float, default=0.8,
+    help='Maximum proportion of trees that may be multiprimary if ' \
+    '--include=multiprimary=False. In that case, An exception will be thrown if ' \
+    'the proportion of multiprimary trees exceeds this value.')
   parser.add_argument('dataset_name',
     help='Name identifying dataset')
   parser.add_argument('tree_file',
@@ -45,8 +45,8 @@ def main():
   munger = ResultMunger(summaries, mutlist, mutass)
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
   munger.remove_superclones()
-  if not args.include_polyclonal:
-    munger.remove_polyclonal_trees(args.max_polyclonal)
+  if not args.include_multiprimary:
+    munger.remove_multiprimary_trees(args.max_multiprimary)
 
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, params, args.tree_summary_output)

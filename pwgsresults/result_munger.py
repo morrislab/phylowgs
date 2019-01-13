@@ -28,7 +28,7 @@ class ResultMunger(object):
       root_idx = 0
       assert len(structure[root_idx]) > 0
       if len(structure[root_idx]) != 1:
-        # Ignore polyclonal trees, since it's not clear how to handle them.
+        # Ignore multiprimary trees, since it's not clear how to handle them.
         continue
       clonal_idx = structure[root_idx][0]
       # Check assumption about node numbering (which isn't really important).
@@ -77,27 +77,27 @@ class ResultMunger(object):
       self._remove_nodes([child_idx], tree_idx, mut_destination='clonal')
       print(tree_idx, 'New clonal node:', clone)
 
-  def remove_polyclonal_trees(self, max_polyclonal_prop):
+  def remove_multiprimary_trees(self, max_multiprimary_prop):
     polyidxs = set()
 
     for tidx in self._tree_summaries.keys():
       structure = self._tree_summaries[tidx]['structure']
       assert len(structure[0]) > 0
       if len(structure[0]) == 1:
-        # Not polyclonal.
+        # Not multiprimary.
         continue
       polyidxs.add(tidx)
 
-    polyclonal_frac = len(polyidxs) / float(len(self._tree_summaries))
-    if polyclonal_frac >= max_polyclonal_prop:
-      raise Exception('%d%% of trees are polyclonal (%s of %s), so not enough to report good posterior.' % (
-        100 * polyclonal_frac,
+    multiprimary_frac = len(polyidxs) / float(len(self._tree_summaries))
+    if multiprimary_frac >= max_multiprimary_prop:
+      raise Exception('%d%% of trees are multiprimary (%s of %s), so not enough to report good posterior.' % (
+        100 * multiprimary_frac,
         len(polyidxs),
         len(self._tree_summaries)
       ))
 
     for pidx in sorted(polyidxs):
-      print(pidx, 'polyclonal tree at idx=%s' % pidx)
+      print(pidx, 'multiprimary tree at idx=%s' % pidx)
       del self._tree_summaries[pidx]
       del self._mutass[pidx]
 
