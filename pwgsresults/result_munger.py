@@ -77,7 +77,7 @@ class ResultMunger(object):
       self._remove_nodes([child_idx], tree_idx, mut_destination='clonal')
       print(tree_idx, 'New clonal node:', clone)
 
-  def remove_polyclonal_trees(self):
+  def remove_polyclonal_trees(self, max_polyclonal_prop):
     polyidxs = set()
 
     for tidx in self._tree_summaries.keys():
@@ -89,7 +89,7 @@ class ResultMunger(object):
       polyidxs.add(tidx)
 
     polyclonal_frac = len(polyidxs) / float(len(self._tree_summaries))
-    if polyclonal_frac >= 0.8:
+    if polyclonal_frac >= max_polyclonal_prop:
       raise Exception('%d%% of trees are polyclonal (%s of %s), so not enough to report good posterior.' % (
         100 * polyclonal_frac,
         len(polyidxs),

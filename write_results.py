@@ -4,6 +4,13 @@ from pwgsresults.result_generator import ResultGenerator
 from pwgsresults.result_munger import ResultMunger
 from pwgsresults.json_writer import JsonWriter
 
+def restricted_float(X):
+  X = float(X)
+  L, U = 0, 1
+  if not (L <= X <= U):
+    raise argparse.ArgumentTypeError('%s outside range [%s, %s]' % (X, L, U))
+  return X
+
 def main():
   parser = argparse.ArgumentParser(
     description='Write JSON files describing trees',
@@ -13,6 +20,14 @@ def main():
     help='Include SSM names in output (which may be sensitive data)')
   parser.add_argument('--min-ssms', dest='min_ssms', type=float, default=0.01,
     help='Minimum number or percent of SSMs to retain a subclone')
+  parser.add_argument('--allow-polyclonal', dest='allow_polyclonal', action='store_true',
+    help='Minimum number or percent of SSMs to retain a subclone')
+  parser.add_argument('--include-polyclonal', dest='include_polyclonal', action='store_true',
+    help='Whether to include polyclonal trees in result')
+  parser.add_argument('--max-polyclonal', dest='max_polyclonal', type=restricted_float, default=0.8,
+    help='Maximum proportion of trees that may be polyclonal if ' \
+    '--include=polyclonal=False. In that case, An exception will be thrown if ' \
+    'the proportion of polyclonal trees exceeds this value.')
   parser.add_argument('dataset_name',
     help='Name identifying dataset')
   parser.add_argument('tree_file',
@@ -30,7 +45,8 @@ def main():
   munger = ResultMunger(summaries, mutlist, mutass)
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
   munger.remove_superclones()
-  munger.remove_polyclonal_trees()
+  if not args.include_polyclonal:
+    munger.remove_polyclonal_trees(args.max_polyclonal)
 
   writer = JsonWriter(args.dataset_name)
   writer.write_summaries(summaries, params, args.tree_summary_output)
