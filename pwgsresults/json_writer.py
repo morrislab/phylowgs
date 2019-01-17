@@ -63,7 +63,7 @@ class JsonWriter(object):
       json.dump(to_dump, summf)
 
   def write_mutass(self, mutass, mutass_outfn):
-    with zipfile.ZipFile(mutass_outfn, 'w', compression=zipfile.ZIP_DEFLATED) as muts_file:
+    with zipfile.ZipFile(mutass_outfn, 'w', compression=zipfile.ZIP_DEFLATED, allowZip64=True) as muts_file:
       for tree_idx, tree_mutass in mutass.items():
         to_dump = {
           'mut_assignments': tree_mutass,
