@@ -92,7 +92,7 @@ class SSM_Analyser:
     ssm_info['cluster'] = {}
     for cidx in clusters.keys():
       cluster = clusters[cidx]
-      nTrees = len(clusters[i]['members'])
+      nTrees = len(clusters[cidx]['members'])
       ssm_info['cluster'][cidx] = {}
       for ssm in mutlist['ssms'].keys():
         ssm_info['cluster'][cidx][ssm] = {}

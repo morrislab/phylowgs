@@ -38,10 +38,10 @@ def main():
   munger.remove_polyclonal_trees()
   
   clusters = TreeClusterer().find_clusters(summaries,args.clust_method) 
-  temp = SSM_Analyser().analyse(clusters, summaries, mutlist, mutass)
+  SSM_Analyser().analyse(clusters, summaries, mutlist, mutass)
 
   writer = JsonWriter(args.dataset_name)
-  writer.write_summaries(summaries, params, args.tree_summary_output, tree_clusters)
+  writer.write_summaries(summaries, params, args.tree_summary_output, clusters)
   writer.write_mutlist(mutlist, args.mutlist_output)
   writer.write_mutass(mutass, args.mutass_output)
 
