@@ -2,6 +2,7 @@ from __future__ import print_function
 import argparse
 import csv
 import sys
+import warnings
 from collections import defaultdict
 
 def chrom_key(chrom):
@@ -62,6 +63,9 @@ class TitanParser(CnvParser):
     with open(self._titan_filename) as titanf:
       reader = csv.DictReader(titanf, delimiter='\t')
       for record in reader:
+        if int(record['Length(bp)']) < 10000:
+          warnings.warn('There exist CNAs in the data which are of length <10000. These will be ignored.')
+          continue
         chrom = record['Chromosome'].lower()
         cnv = {}
         cnv['start'] = int(record['Start_Position(bp)'])
