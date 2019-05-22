@@ -340,4 +340,4 @@ class TreeReader(object):
 	    yield (tidx, llh, tree)
 
 def logmsg(msg, fd=sys.stdout):
-    print >> fd, '[%s] %s' % (datetime.now().strftime('%Y-%m-%d %H:%m:%S'), msg)
+    print >> fd, '[%s] %s' % (datetime.now().strftime('%Y-%m-%d %H:%M:%S'), msg)
