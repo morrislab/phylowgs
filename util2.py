@@ -281,8 +281,11 @@ class TreeReader(object):
 	    self._trees.append((idx, llh, info))
 	for info in burnin_info:
 	    idx = self._extract_burnin_idx(info)
-	    assert len(burnin_info) + idx == len(self._burnin_trees)
+	    if not len(burnin_info) + idx == len(self._burnin_trees):
+		print >>sys.stderr, 'Burnin not finished, exiting'
+	        sys.exit(1)
 	    self._burnin_trees.append((idx, info))
+	assert len(tree_info) > 0
 
     def read_extra_file(self, filename):
 	return self._archive.read(filename)

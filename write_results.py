@@ -22,6 +22,8 @@ def main():
     help='Minimum number or percent of SSMs to retain a subclone')
   parser.add_argument('--include-multiprimary', dest='include_multiprimary', action='store_true',
     help='Whether to include multiprimary trees in result')
+  parser.add_argument('--keep-superclones', dest='keep_superclones', action='store_true',
+    help='Whether to keep superclones, which are often artifacts of tree sampling')
   parser.add_argument('--max-multiprimary', dest='max_multiprimary', type=restricted_float, default=0.8,
     help='Maximum proportion of trees that may be multiprimary if ' \
     '--include=multiprimary=False. In that case, an exception will be thrown if ' \
@@ -42,7 +44,8 @@ def main():
 
   munger = ResultMunger(summaries, mutlist, mutass)
   summaries, mutass = munger.remove_small_nodes(args.min_ssms)
-  munger.remove_superclones()
+  if not args.keep_superclones:
+    munger.remove_superclones()
   if not args.include_multiprimary:
     munger.remove_multiprimary_trees(args.max_multiprimary)
 
