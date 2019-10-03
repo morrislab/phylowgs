@@ -64,12 +64,12 @@ class TitanParser(CnvParser):
       for record in reader:
         chrom = record['Chromosome'].lower()
         cnv = {}
-        cnv['start'] = int(record['Start_Position(bp)'])
-        cnv['end'] = int(record['End_Position(bp)'])
+        cnv['start'] = int(record['Start_Position.bp.'])
+        cnv['end'] = int(record['End_Position.bp.'])
         cnv['major_cn'] = int(record['MajorCN'])
         cnv['minor_cn'] = int(record['MinorCN'])
 
-        clonal_freq = record['Clonal_Frequency']
+        clonal_freq = record['Cellular_Prevalence']
         if clonal_freq == 'NA':
           cnv['cellular_prevalence'] = self._cellularity
         else:
