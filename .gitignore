@@ -1,4 +1,9 @@
 *.o
 *.pyc
 venv
-env
+*out
+*json
+*txt
+*noXY*
+input_list*
+run*sh
