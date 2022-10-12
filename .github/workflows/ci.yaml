@@ -1,0 +1,61 @@
+name: CI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    name: Build x86_64
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install libgsl-dev python2 wget
+          wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
+          python2 get-pip.py
+          pip2 install --user --progress-bar off numpy
+          pip2 install --user --progress-bar off ete2
+          pip2 install --user --progress-bar off scipy
+
+      - name: Build
+        run:  g++ -o mh.o -O3 mh.cpp  util.cpp `gsl-config --cflags --libs`
+
+      - name: Test
+        run:  python2 multievolve.py --num-chains 2 --ssms ssm_data.txt --cnvs cnv_data.txt
+
+  
+  build-aarch64:
+    name: Build aarch64
+    runs-on: ubuntu-20.04
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Build
+      uses: uraimo/run-on-arch-action@v2
+      with:
+        arch: aarch64
+        distro: ubuntu20.04
+        githubToken: ${{ github.token }}
+        dockerRunArgs: |
+          --volume "${PWD}:/phylowgs"
+        install: |
+          apt-get update -q -y
+          apt-get install -q -y gcc g++ libgsl-dev python2 python2-dev liblapack-dev libblas-dev gfortran wget file
+          wget https://bootstrap.pypa.io/pip/2.7/get-pip.py
+          python2 get-pip.py
+          pip2 install --user --progress-bar off numpy
+          pip2 install --user --progress-bar off ete2
+          pip2 install --user --progress-bar off scipy
+        run: |
+          set -x
+          cd /phylowgs
+          g++ -o mh.o -O3 mh.cpp  util.cpp `gsl-config --cflags --libs`
+          file mh.o | grep aarch64
+          # Run evolve.py for Aarch64 tests because multievolve.py is twice slower 
+          python2 evolve.py ssm_data.txt cnv_data.txt
+          
